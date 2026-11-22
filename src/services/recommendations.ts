@@ -3,12 +3,12 @@ import { db } from '../db/db';
 import { getSettings, listRatings } from '../db/repo';
 import { featureLabel, describeFeatures } from '../engine/features';
 import { hybridEngine, setDefaultNarrative, type RecommenderEngine } from '../engine/recommender';
-import { loadNarrativeIndex, metaFromCatalog } from './narrativeCatalog';
+import { getNarrativeIndex, loadNarrativeIndex, metaFromCatalog } from './narrativeCatalog';
 import type { NarrativeIndex } from '../engine/narrative';
 import { friendlyError } from '../providers/errors';
 import { META_VERSION } from '../providers/tmdb';
 import type { MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
-import { diagnose, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
+import { countriesOf, diagnose, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
 import { matchesPlatforms } from './availability';
 import { discoverCandidates, ensureFullTitles, genreNames, getTitle, personFilmography, refreshAvailability } from './catalog';
 import type { UserProfile } from '../engine/profile';
@@ -303,6 +303,25 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
     base = [...new Set([...(run.eligible ?? []), ...run.items.map((i) => i.key)])];
   }
   let all = await titleMap([...ratings.map((r) => r.key), ...base]);
+  // Filtro por país: las listas de TMDB (descubrir, tendencias) no traen el país de las películas. Antes de filtrar
+  // se completa con el catálogo narrativo y, si falta, con la ficha completa (hasta 60). Lo que siga sin datos se
+  // trata según la regla explícita (no pasa «incluir», sí pasa «excluir»).
+  if (f.includeCountries?.length || f.excludeCountries?.length) {
+    const idx = getNarrativeIndex();
+    const missing: TitleKey[] = [];
+    for (const k of base) {
+      const m = all.get(k);
+      if (!m || countriesOf(m).length) continue;
+      const c = idx?.get(k)?.countries;
+      if (c?.length) all.set(k, { ...m, productionCountries: c });
+      else missing.push(k);
+    }
+    if (missing.length) {
+      try { await ensureFullTitles(missing, { language: settings.language, country: settings.country }, 60); } catch (e) { warning ??= friendlyError(e); }
+      const fresh = await titleMap(missing.slice(0, 60));
+      for (const [k, m] of fresh) if (countriesOf(m).length) all.set(k, m);
+    }
+  }
   const candidatesOf = async (keys: TitleKey[]) => {
     const snaps = await db.availability.bulkGet(keys.map((k) => `${k}|${settings.country}`));
     return keys.map((k, i) => ({ meta: all.get(k)!, snap: snaps[i], rating: byKey.get(k) }) as Candidate)

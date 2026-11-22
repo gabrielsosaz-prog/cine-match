@@ -74,6 +74,15 @@ test('producción v3.1: Similares narrativo (White Lotus), tráiler, persona, pa
   await expect(page.getByTestId('active-filters')).toContainText('Estados Unidos');
   await expect(page.getByTestId('rec-item').first().or(page.getByTestId('filters-empty'))).toBeVisible({ timeout: 120000 });
   log('sin EE. UU.:', await page.getByTestId('rec-item').evaluateAll((els) => els.slice(0, 8).map((e) => e.querySelector('h3')?.textContent)));
+  // Verificación independiente con la ficha de TMDB: ninguno de los visibles tiene EE. UU. entre sus países
+  const keys = await page.getByTestId('rec-item').evaluateAll((els) => els.slice(0, 10).map((e) => e.getAttribute('data-key')!));
+  for (const k of keys) {
+    const [type, id] = k.split(':');
+    const d = await (await page.request.get(`/api/tmdb/${type}/${id}?language=es-MX`)).json();
+    const cs = [...(d.origin_country ?? []), ...(d.production_countries ?? []).map((c: any) => c.iso_3166_1)];
+    log('país', k, d.title ?? d.name, cs.join(','));
+    expect(cs, `${k} tiene EE. UU.`).not.toContain('US');
+  }
   await page.screenshot({ path: `test-results/prod-${info.project.name}-v31-paises.png` });
   await expect(page.getByTestId('filter-paramount')).toBeVisible();
   expect(errors, errors.join('\n')).toEqual([]);
