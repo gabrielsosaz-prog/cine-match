@@ -215,7 +215,9 @@ export async function searchAll(query: string, language: string): Promise<Unifie
   if (toPut.length) await db.titles.bulkPut(toPut);
   const titles = titlesRaw.map((x) => ({ ...x, genres: x.genreIds.map((id) => ({ id, name: names.get(id) ?? `Género ${id}` })) }));
   const nq = normName(query);
-  const isTitle = titles.some((t) => normName(t.title) === nq || normName(t.originalTitle ?? '') === nq);
+  // Un título con ese nombre exacto manda sólo si es conocido (un documental con 3 votos llamado «Michael J. Fox» no
+  // debe tapar a la persona)
+  const isTitle = titles.some((t) => (normName(t.title) === nq || normName(t.originalTitle ?? '') === nq) && (t.voteCount ?? 0) >= 100);
   const top = people[0];
   const peopleFirst = Boolean(top && top.match >= 0.9 && (top.popularity ?? 0) >= 0.5 && !isTitle);
   return { titles, people: people.slice(0, 8), peopleFirst, usedQuery, correctedPerson: corrected };

@@ -66,7 +66,7 @@ export function SearchResults({ hits, country, profileId }: { hits: SearchHit[];
 }
 
 function usePersonResults(query: string, language: string) {
-  const [res, setRes] = useState<UnifiedSearch>();
+  const [res, setRes] = useState<UnifiedSearch & { q: string }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const seq = useRef(0);
@@ -76,7 +76,7 @@ function usePersonResults(query: string, language: string) {
     const id = ++seq.current;
     const t = setTimeout(async () => {
       setBusy(true); setError(undefined);
-      try { const r = await searchAll(q, language); if (id === seq.current) setRes(r); }
+      try { const r = await searchAll(q, language); if (id === seq.current) setRes({ ...r, q }); }
       catch (e) { if (id === seq.current) { setError(friendlyError(e)); setRes(undefined); } }
       finally { if (id === seq.current) setBusy(false); }
     }, 350);
@@ -150,7 +150,7 @@ function UnifiedSearchView() {
   );
   const peopleBlock = people.length > 0 && <PeopleResults people={people} />;
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="search-view" data-results-for={busy ? '' : res?.q ?? ''}>
       <input autoFocus={!q} type="search" data-testid="search-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Película, serie, actor o director…" aria-label="Buscar película, serie o persona"
         className="w-full rounded-xl bg-ink-800 px-4 py-3 text-base ring-1 ring-white/10 focus:outline-none focus:ring-accent" />
       {busy && <Spinner label="Buscando…" />}

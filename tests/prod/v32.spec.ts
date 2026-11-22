@@ -17,6 +17,8 @@ async function start(page: Page) {
 }
 async function searchPerson(page: Page, q: string) {
   await page.getByTestId('search-input').fill(q);
+  // esperar a que los resultados correspondan a esta búsqueda (no a la anterior)
+  await expect(page.getByTestId('search-view')).toHaveAttribute('data-results-for', q.trim(), { timeout: 60000 });
   await expect(page.getByTestId('person-result').first()).toBeVisible({ timeout: 60000 });
   const people = await page.getByTestId('person-result').evaluateAll((els) => els.slice(0, 4).map((e) => `${e.getAttribute('data-person-id')} ${e.textContent?.replace(/\s+/g, ' ').slice(0, 70)}`));
   const order = await page.locator('[data-testid="people-section"], [data-testid="titles-section"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
