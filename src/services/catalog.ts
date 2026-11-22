@@ -138,9 +138,10 @@ export async function discoverCandidates(opts: { type: MediaType; language: stri
 export type { PersonHit, PersonCredit } from '../providers/tmdb';
 import type { PersonCredit, PersonHit } from '../providers/tmdb';
 
-export async function searchPeople(query: string, language: string): Promise<PersonHit[]> {
+/** v3.2: búsqueda de personas tolerante a iniciales, tildes y errores menores (ver services/peopleSearch.ts). */
+export async function searchPeople(query: string, language: string): Promise<RankedPerson[]> {
   const client = await getClient();
-  return client.searchPerson(query, language);
+  return (await tolerantPeopleSearch(query, (q) => client.searchPerson(q, language))).people;
 }
 
 /** Créditos que no son actuaciones de ficción: talk shows, noticieros, galas, apariciones como sí mismo. */
@@ -165,17 +166,21 @@ export async function personFilmography(personId: number, language: string, opts
     credits = { at: Date.now(), credits: await client.personCredits(personId, language) };
     creditCache.set(ck, credits);
     try { localStorage.setItem(`cine-match:credits:${ck}`, JSON.stringify(credits)); } catch { /* cuota llena: queda en memoria */ }
+  }
+  // v3.2: aunque la filmografía venga de la caché, sus títulos tienen que existir en la base (si no, no se muestran)
+  const uniq = [...new Map(credits.credits.map((c) => [c.key, c])).values()];
+  const have = await db.titles.bulkGet(uniq.map((c) => c.key));
+  if (have.some((h) => !h)) {
     const names = await genreNames(language);
-    const uniq = [...new Map(credits.credits.map((c) => [c.key, c])).values()];
-    const have = await db.titles.bulkGet(uniq.map((c) => c.key));
     const fresh = uniq.filter((_, i) => !have[i]).map((r) => metaFromSearch(r, names));
-    if (fresh.length) await db.titles.bulkPut(fresh);
+    await db.titles.bulkPut(fresh);
   }
   const role = opts.role ?? 'any';
   return credits.credits.filter((c) => (role === 'any' || c.kind === role) && (!opts.fiction || (!isSelf(c) && !c.genreIds.some((g) => NON_FICTION_GENRES.has(g)))));
 }
 
 // ───────────── v3.1: búsqueda unificada y personas ─────────────
+import { normName, tolerantPeopleSearch, type RankedPerson } from './peopleSearch';
 import type { PersonInfo } from '../providers/tmdb';
 export type { PersonInfo };
 const deaccent = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -185,26 +190,35 @@ export function queryVariants(q: string): string[] {
   return [...new Set([base, deaccent(base), base.replace(/\./g, '').replace(/\s+/g, ' '), deaccent(base).replace(/(.)\1+/g, '$1')])].filter((x) => x.length >= 2);
 }
 
-export interface UnifiedSearch { titles: SearchHit[]; people: PersonHit[]; peopleFirst: boolean; usedQuery: string }
+export interface UnifiedSearch { titles: SearchHit[]; people: RankedPerson[]; peopleFirst: boolean; usedQuery: string; correctedPerson?: string }
 
 /**
- * Búsqueda unificada: películas, series y personas (actuación, dirección, guion) con una llamada a TMDB.
- * Si no hay resultados, prueba variantes de escritura. Las personas se distinguen por id único (homónimos).
- * Las personas se muestran primero sólo si TMDB las considera el resultado más relevante.
+ * Búsqueda unificada (v3.2): películas, series y personas. Se consultan /search/multi y /search/person a la vez
+ * (en /search/multi las personas suelen quedar detrás de títulos que las mencionan, p. ej. «The Michael J. Fox Show»).
+ * Personas: id único, ordenadas por coincidencia del nombre y popularidad, con corrección de errores menores.
+ * Las personas van primero cuando lo escrito coincide con el nombre de alguien conocido y no es el título de una obra.
  */
 export async function searchAll(query: string, language: string): Promise<UnifiedSearch> {
   const client = await getClient();
   const names = await genreNames(language);
+  let titlesRaw: SearchResult[] = [];
+  let usedQuery = query.trim();
+  let peopleBase: PersonHit[] = [];
   for (const q of queryVariants(query)) {
-    const r = await client.searchMultiAll(q, language);
-    if (!r.titles.length && !r.people.length) continue;
-    const existing = await db.titles.bulkGet(r.titles.map((x) => x.key));
-    const toPut = r.titles.filter((_, i) => !existing[i]).map((x) => metaFromSearch(x, names));
-    if (toPut.length) await db.titles.bulkPut(toPut);
-    const titles = r.titles.map((x) => ({ ...x, genres: x.genreIds.map((id) => ({ id, name: names.get(id) ?? `Género ${id}` })) }));
-    return { titles, people: r.people, peopleFirst: r.firstKind === 'person', usedQuery: q };
+    const [r, p] = await Promise.all([client.searchMultiAll(q, language), client.searchPerson(q, language).catch(() => [] as PersonHit[])]);
+    titlesRaw = r.titles; peopleBase = [...p, ...r.people]; usedQuery = q;
+    if (r.titles.length || peopleBase.length) break;
   }
-  return { titles: [], people: [], peopleFirst: false, usedQuery: query };
+  const { people, corrected } = await tolerantPeopleSearch(query, (q) => client.searchPerson(q, language), peopleBase);
+  const existing = await db.titles.bulkGet(titlesRaw.map((x) => x.key));
+  const toPut = titlesRaw.filter((_, i) => !existing[i]).map((x) => metaFromSearch(x, names));
+  if (toPut.length) await db.titles.bulkPut(toPut);
+  const titles = titlesRaw.map((x) => ({ ...x, genres: x.genreIds.map((id) => ({ id, name: names.get(id) ?? `Género ${id}` })) }));
+  const nq = normName(query);
+  const isTitle = titles.some((t) => normName(t.title) === nq || normName(t.originalTitle ?? '') === nq);
+  const top = people[0];
+  const peopleFirst = Boolean(top && top.match >= 0.9 && (top.popularity ?? 0) >= 0.5 && !isTitle);
+  return { titles, people: people.slice(0, 8), peopleFirst, usedQuery, correctedPerson: corrected };
 }
 
 const personCache = new Map<string, PersonInfo>();

@@ -1,3 +1,12 @@
+# Resultados de pruebas (v3.2)
+
+## Resumen v3.2
+
+- Vitest: **193/193 OK**. 26 nuevas en `tests/unit/v32.test.ts` para los 22 casos pedidos: país incluido, excluido, coproducciones, incluidos y excluidos a la vez (también contra el catálogo simulado); actor incluido, excluido, dos actores en Todos y en Cualquiera, uno incluido y otro excluido, actores con países/tipo/plataformas, vacío legítimo y homónimos; «Michael Fox», «Michael J. Fox», «Leonardo DiCaprio» y variantes, «Ben Afleck»/«Jenifer Lopez» (con ids y nombres reales de TMDB en un buscador simulado); tráiler oficial en español, subtítulos confirmados por el título, sin subtítulos conocidos y búsqueda externa; persistencia, migración idempotente y conservación de valoraciones, vistos, descartes y ajustes. Se actualizó la prueba de prioridad de tráileres de v3.1 a la nueva escala.
+- Playwright, Android Pixel 7 y Galaxy S5 (360 px): **56/56 OK**. 4 flujos nuevos (`tests/e2e/v32.spec.ts`): Buscar por reparto (Todos, Cualquiera, exclusión, orden por título, volver con Atrás conservando todo, vacío legítimo); filtros de actores y países en Inicio con condiciones visibles, quitar una sin borrar las demás, persistencia y «Limpiar filtros»; tráiler con versiones, búsqueda en YouTube y Atrás de Android; búsqueda general con personas separadas de títulos.
+- Corregido al probar: una filmografía en caché no volvía a registrar sus títulos en la base (los resultados quedaban vacíos tras borrar datos); cambiar de versión del tráiler agregaba una entrada de historial y «Atrás» no cerraba el reproductor.
+- Producción con TMDB real: `tests/prod/v32.spec.ts` (Michael Fox → 521 → Volver al futuro, DiCaprio, errores de escritura, Ben Affleck + Jennifer Lopez en Todos, exclusión, Ricardo Darín con Argentina y sin España verificado contra la ficha de TMDB, tráileres de Volver al futuro, Breaking Bad y Parásitos). Resultados en el informe de la versión.
+
 # Resultados de pruebas (v3.1)
 
 ## Resumen v3.1

@@ -126,7 +126,13 @@ export function fakeTmdbHandler(catalog: FakeTitle[], opts: FakeOptions = {}) {
     if ((m = path.match(/^\/(movie|tv)\/(\d+)\/videos$/))) {
       const id = Number(m[2]);
       // Sintético: los ids pares tienen tráiler oficial subtitulado; los impares, ninguno
-      return { status: 200, body: { id, results: id % 2 === 0 ? [{ key: `trailer${id}`, site: 'YouTube', name: 'Tráiler Oficial [Subtitulado]', type: 'Trailer', official: true, iso_639_1: 'es', iso_3166_1: 'MX', size: 1080 }] : [] } };
+      // v3.2: los múltiplos de 4 suman el tráiler original en inglés (para elegir versión); los impares múltiplos de 3
+      // tienen sólo el original en inglés y un teaser (sin subtítulos verificables → búsqueda en YouTube)
+      const results = id % 2 === 0 ? [{ key: `trailer${id}`, site: 'YouTube', name: 'Tráiler Oficial [Subtitulado]', type: 'Trailer', official: true, iso_639_1: 'es', iso_3166_1: 'MX', size: 1080 }] : [];
+      if (id % 4 === 0) results.push({ key: `orig${id}`, site: 'YouTube', name: 'Official Trailer', type: 'Trailer', official: true, iso_639_1: 'en', iso_3166_1: 'US', size: 1080 });
+      if (id % 2 === 1 && id % 3 === 0) results.push({ key: `orig${id}`, site: 'YouTube', name: 'Official Trailer', type: 'Trailer', official: true, iso_639_1: 'en', iso_3166_1: 'US', size: 1080 },
+        { key: `teaser${id}`, site: 'YouTube', name: 'Teaser', type: 'Teaser', official: true, iso_639_1: 'en', iso_3166_1: 'US', size: 1080 });
+      return { status: 200, body: { id, results } };
     }
     if ((m = path.match(/^\/(trending)\/(movie|tv)\/week$/))) return { status: 200, body: { results: catalog.filter((t) => t.type === m![2]).slice(0, 20).map(listItem) } };
     if ((m = path.match(/^\/discover\/(movie|tv)$/))) {

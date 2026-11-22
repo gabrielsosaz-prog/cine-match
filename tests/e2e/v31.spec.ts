@@ -98,7 +98,7 @@ test('v3.1: tráiler en la ficha (reproductor oficial embebido) y aviso cuando n
   await page.goto('/#/t/movie/1000');
   await page.getByTestId('trailer-button').click();
   await expect(page.getByTestId('trailer-modal')).toBeVisible();
-  await expect(page.getByTestId('trailer-audio')).toContainText('subtítulos en español');
+  await expect(page.getByTestId('trailer-audio')).toContainText('Subtítulos en español');
   await expect(page.getByTestId('trailer-frame')).toHaveAttribute('src', /youtube-nocookie\.com\/embed\/trailer1000/);
   // Atrás de Android cierra el reproductor y deja la ficha donde estaba
   await page.goBack();
@@ -116,7 +116,7 @@ test('v3.1: excluir producciones de México y Paramount+ en Ajustes y filtros', 
   await page.getByTestId('country-input').fill('Méx');
   await page.getByTestId('country-hit').filter({ hasText: 'México' }).getByTestId('country-exclude').click();
   await expect(page.getByTestId('country-exc')).toContainText('México');
-  await expect(page.getByTestId('active-filters')).toContainText('Sin producciones de México');
+  await expect(page.getByTestId('active-filters')).toContainText('Países excluidos: México');
   await expect(page.getByTestId('rec-item').first().or(page.getByTestId('filters-empty'))).toBeVisible({ timeout: 30000 });
   // Los títulos visibles no tienen México entre sus países (ids múltiplos de 5 son mexicanos en el catálogo sintético)
   const keys = await page.getByTestId('rec-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')));

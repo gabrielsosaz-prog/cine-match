@@ -8,6 +8,7 @@ import type { NarrativeIndex } from '../engine/narrative';
 import { friendlyError } from '../providers/errors';
 import { META_VERSION } from '../providers/tmdb';
 import type { MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
+import { peopleSets, type PeopleSets } from './peopleFilter';
 import { countriesOf, diagnose, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
 import { matchesPlatforms } from './availability';
 import { discoverCandidates, ensureFullTitles, genreNames, getTitle, personFilmography, refreshAvailability } from './catalog';
@@ -259,6 +260,9 @@ export const FEW_CANDIDATES = 20;
 const discoverCache = new Map<string, { at: number; keys: TitleKey[] }>();
 
 export interface FilteredResult {
+  /** v3.2: títulos de cada persona incluida y total que cumple la inclusión (antes de los demás filtros) */
+  perPerson?: { person: { id: number; name: string }; count: number }[];
+  peopleTotal?: number;
   items: RecommendationItem[];
   candidates: number;
   diagnostics: { id: string; count: number }[];
@@ -279,7 +283,7 @@ export interface FilteredResult {
  *     cambiar de vista. La pantalla lo muestra de a 10.
  * No guarda nada ni cambia lo aprendido: es una vista temporal.
  */
-export async function rankWithFilters(profileId: string, run: RecommendationRun, f: RankFilters, opts: { discover?: boolean } = {}): Promise<FilteredResult> {
+export async function rankWithFilters(profileId: string, run: RecommendationRun, f: RankFilters, opts: { discover?: boolean; anyPlatform?: boolean } = {}): Promise<FilteredResult> {
   const settings = await getSettings(profileId);
   const ratings = await listRatings(profileId);
   const byKey = new Map(ratings.map((r) => [r.key, r]));
@@ -287,21 +291,24 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
   let base: TitleKey[];
   let outsidePlatforms: number | undefined;
   const lowEvidence = new Set<TitleKey>();
-  if (f.person) {
-    // Filmografía de la persona elegida (id único de TMDB), combinable con el resto de los filtros
-    let credits: TitleKey[] = [];
-    try {
-      const role = f.person.department && f.person.department !== 'Acting' ? 'any' : 'cast';
-      const list = await personFilmography(f.person.id, settings.language, { role, fiction: true });
-      credits = [...new Set(list.sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0)).map((c) => c.key))];
-    } catch (e) { warning = friendlyError(e); }
+  let people: PeopleSets | undefined;
+  try { people = await peopleSets(f, settings.language); } catch (e) { warning = friendlyError(e); }
+  if (people?.allow) {
+    // Personas incluidas: candidatos = sus filmografías (no sólo el ranking), combinables con el resto de los filtros
+    const credits = [...people.allow];
+    const metas0 = await titleMap(credits);
+    credits.sort((a, b) => (metas0.get(b)?.voteCount ?? 0) - (metas0.get(a)?.voteCount ?? 0));
     try { await refreshAvailability(credits, settings.country, 80); } catch (e) { warning ??= friendlyError(e); }
-    const snaps0 = await db.availability.bulkGet(credits.map((k) => `${k}|${settings.country}`));
-    base = credits.filter((_, i) => matchesPlatforms(snaps0[i], settings.platforms, settings.includeUnconfirmed));
-    outsidePlatforms = credits.length - base.length;
+    if (f.anyPlatform || opts.anyPlatform) base = credits;
+    else {
+      const snaps0 = await db.availability.bulkGet(credits.map((k) => `${k}|${settings.country}`));
+      base = credits.filter((_, i) => matchesPlatforms(snaps0[i], settings.platforms, settings.includeUnconfirmed));
+      outsidePlatforms = credits.length - base.length;
+    }
   } else {
     base = [...new Set([...(run.eligible ?? []), ...run.items.map((i) => i.key)])];
   }
+  if (people) base = base.filter((k) => !people!.deny.has(k));
   let all = await titleMap([...ratings.map((r) => r.key), ...base]);
   // Filtro por país: las listas de TMDB (descubrir, tendencias) no traen el país de las películas. Antes de filtrar
   // se completa con el catálogo narrativo y, si falta, con la ficha completa (hasta 60 por vez). Lo que siga sin
@@ -318,8 +325,8 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
       else missing.push(k);
     }
     if (missing.length) {
-      try { await ensureFullTitles(missing, { language: settings.language, country: settings.country }, 60); } catch (e) { warning ??= friendlyError(e); }
-      const fresh = await titleMap(missing.slice(0, 60));
+      try { await ensureFullTitles(missing, { language: settings.language, country: settings.country }, people?.allow ? 100 : 60); } catch (e) { warning ??= friendlyError(e); }
+      const fresh = await titleMap(missing.slice(0, 100));
       for (const [k, m] of fresh) if (countriesOf(m).length) all.set(k, m);
     }
   };
@@ -332,7 +339,7 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
   let cands = await candidatesOf(base);
   let pass = cands.filter((c) => matchesContent(c, f) && matchesWatched(c, f));
   let discovered = 0;
-  if (!f.person && pass.length < FEW_CANDIDATES && opts.discover !== false) {
+  if (!people?.allow && pass.length < FEW_CANDIDATES && opts.discover !== false) {
     // Pocos candidatos locales (p. ej. sólo Terror sin historial de terror): buscar en TMDB con estos filtros
     const ck = `${settings.country}|${settings.platforms.join(',')}|${JSON.stringify(hintsFromFilters(f))}`;
     let found = discoverCache.get(ck);
@@ -340,7 +347,7 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
       try { found = { at: Date.now(), keys: await discoverWithHints(hintsFromFilters(f), settings, 2) }; discoverCache.set(ck, found); }
       catch (e) { warning ??= friendlyError(e); }
     }
-    const extra = (found?.keys ?? []).filter((k) => !base.includes(k));
+    const extra = (found?.keys ?? []).filter((k) => !base.includes(k) && !people?.deny.has(k));
     if (extra.length) {
       try { await refreshAvailability(extra, settings.country, 60); } catch (e) { warning ??= friendlyError(e); }
       base = [...base, ...extra];
@@ -364,7 +371,7 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
     const scores = new Map(engine.rank({ profile, ratings, titles: all, candidates: cands.map((c) => c.meta.key), settings, limit: 400, includeWatched: true }).map((i) => [i.key, i.score]));
     diagnostics = diagnose(cands.map((c) => ({ ...c, score: scores.get(c.meta.key) })), f);
   }
-  return { items, candidates: pass.length, diagnostics, discovered, outsidePlatforms, warning };
+  return { items, candidates: pass.length, diagnostics, discovered, outsidePlatforms, warning, perPerson: people?.perPerson, peopleTotal: people?.allow?.size };
 }
 
 /**

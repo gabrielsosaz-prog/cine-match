@@ -10,6 +10,9 @@ import { refreshAvailability, searchAll, searchTitles, type PersonHit, type Sear
 import { IMG } from '../providers/tmdb';
 import { useScrollRestore } from '../hooks/useScrollRestore';
 import { departmentLabel } from './Person';
+import { CastSearch } from './CastSearch';
+import { oneOf, usePersistentState } from '../hooks/usePersistentState';
+import type { RankedPerson } from '../services/peopleSearch';
 import { AvailabilityLine, Empty, ErrorNote, Poster, Spinner, TitleLink, TypeBadge } from '../ui/components';
 
 export function useSearch(query: string, language: string, country: string) {
@@ -82,7 +85,7 @@ function usePersonResults(query: string, language: string) {
   return { res, busy, error };
 }
 
-export function PeopleResults({ people }: { people: PersonHit[] }) {
+export function PeopleResults({ people }: { people: (PersonHit & Partial<RankedPerson>)[] }) {
   return (
     <section aria-label="Personas" className="space-y-2" data-testid="people-section">
       <h2 className="text-sm font-semibold text-slate-300">Personas</h2>
@@ -93,7 +96,7 @@ export function PeopleResults({ people }: { people: PersonHit[] }) {
               {p.profilePath ? <img src={`${IMG}w92${p.profilePath}`} alt={`Foto de ${p.name}`} loading="lazy" className="h-16 w-12 shrink-0 rounded-lg object-cover" />
                 : <span className="flex h-16 w-12 shrink-0 items-center justify-center rounded-lg bg-ink-800 text-xl text-slate-500" aria-hidden>👤</span>}
               <span className="min-w-0 flex-1">
-                <span className="block font-semibold leading-tight">{p.name}</span>
+                <span className="block font-semibold leading-tight">{p.name}{p.fuzzy && <span className="ml-1 text-[10px] font-normal text-amber-300" data-testid="person-fuzzy">¿quisiste decir?</span>}</span>
                 <span className="block text-xs text-slate-400">{departmentLabel(p.department)}</span>
                 {p.knownFor.length > 0 && <span className="block truncate text-[11px] text-slate-500">{p.knownFor.join(' · ')}</span>}
               </span>
@@ -112,6 +115,23 @@ export function PeopleResults({ people }: { people: PersonHit[] }) {
  * se conserva al abrir una ficha y volver.
  */
 export default function Search() {
+  const { profileId } = useApp();
+  const [mode, setMode] = usePersistentState<'all' | 'cast'>(`cine-match:search-mode:${profileId}`, 'all', oneOf(['all', 'cast'] as const));
+  return (
+    <div className="space-y-3">
+      <h1 className="text-2xl font-bold">Buscar</h1>
+      <div className="flex gap-1.5" role="tablist" aria-label="Tipo de búsqueda">
+        {([['all', 'Títulos y personas'], ['cast', 'Buscar por reparto']] as const).map(([m, l]) => (
+          <button key={m} type="button" role="tab" aria-selected={mode === m} data-testid={`search-mode-${m}`} onClick={() => setMode(m)}
+            className={`rounded-full px-3 py-1.5 text-sm ${mode === m ? 'bg-accent text-ink-950 font-semibold' : 'bg-ink-800 text-slate-300 ring-1 ring-white/10'}`}>{l}</button>
+        ))}
+      </div>
+      {mode === 'cast' ? <CastSearch /> : <UnifiedSearchView />}
+    </div>
+  );
+}
+
+function UnifiedSearchView() {
   const { settings, profileId } = useApp();
   const [q, setQRaw] = useState(() => { try { return sessionStorage.getItem('cine-match:search-q') ?? ''; } catch { return ''; } });
   const setQ = (v: string) => { setQRaw(v); try { sessionStorage.setItem('cine-match:search-q', v); } catch { /* */ } };
@@ -131,13 +151,13 @@ export default function Search() {
   const peopleBlock = people.length > 0 && <PeopleResults people={people} />;
   return (
     <div className="space-y-3">
-      <h1 className="text-2xl font-bold">Buscar</h1>
       <input autoFocus={!q} type="search" data-testid="search-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Película, serie, actor o director…" aria-label="Buscar película, serie o persona"
         className="w-full rounded-xl bg-ink-800 px-4 py-3 text-base ring-1 ring-white/10 focus:outline-none focus:ring-accent" />
       {busy && <Spinner label="Buscando…" />}
       {error && <ErrorNote>{error}</ErrorNote>}
       {!busy && !error && res && q.trim().length >= 2 && hits.length === 0 && people.length === 0 && <Empty>Sin resultados para «{q}».</Empty>}
       {res && res.usedQuery !== q.trim().replace(/\s+/g, ' ') && (hits.length > 0 || people.length > 0) && <p className="text-[11px] text-slate-500" data-testid="search-variant">Mostrando resultados para «{res.usedQuery}».</p>}
+      {res?.correctedPerson && people.some((p) => p.fuzzy) && <p className="text-[11px] text-amber-200" data-testid="search-corrected">No hay personas con «{q.trim()}» exacto en TMDB; ¿quisiste decir {res.correctedPerson}?</p>}
       {res?.peopleFirst ? <>{peopleBlock}{titlesBlock}</> : <>{titlesBlock}{peopleBlock}</>}
     </div>
   );

@@ -224,7 +224,7 @@ function SimilarCard({ r, meta, snap, profileId, userScore, watched, lines, onAd
               {r.perRef.map((p) => <li key={p.key} className="flex items-center gap-2"><span className="w-28 truncate">{refName(p.key)}</span><span className="h-1.5 flex-1 rounded bg-ink-800"><span className="block h-1.5 rounded bg-violet-400/70" style={{ width: `${p.percent}%` }} /></span><span className="w-8 text-right">{p.percent}%</span></li>)}
             </ul>
           )}
-          {open && <div className="mt-2 flex flex-wrap items-center gap-2"><TrailerButton k={r.key} originalLanguage={meta.originalLanguage} compact /></div>}
+          {open && <div className="mt-2 flex flex-wrap items-center gap-2"><TrailerButton k={r.key} originalLanguage={meta.originalLanguage} title={meta.title} year={meta.year} compact /></div>}
           {open && r.affinity && <div className="mt-2 rounded-lg bg-ink-950/60 p-2"><p className="mb-1 text-[10px] text-slate-500">«Para vos» (afinidad, distinta de la similitud):</p><ChannelBars channels={r.affinity.channels} base={r.affinity.base} score={r.affinity.score} /></div>}
         </div>
       </div>

@@ -13,6 +13,7 @@ import { discoverCandidates, ensureFullTitles, genreNames, getTitle } from './ca
 import { countriesOf, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
 import { loadNarrativeIndex, metaFromCatalog, narrativeCatalogError } from './narrativeCatalog';
 import { latestRun, predictFor } from './recommendations';
+import { peopleSets } from './peopleFilter';
 
 /**
  * Sección «Similares» (v3.1): títulos parecidos a 1-5 referencias, por coincidencias NARRATIVAS relevantes.
@@ -165,7 +166,10 @@ export async function findSimilar(profileId: string, refKeys: TitleKey[], f: Ran
   const keys = scored.map((x) => x.key);
   const snaps = await db.availability.bulkGet(keys.map((k) => `${k}|${settings.country}`));
   const snapOf = new Map(keys.map((k, i) => [k, snaps[i]]));
+  let people: Awaited<ReturnType<typeof peopleSets>>;
+  try { people = await peopleSets(f, settings.language); } catch (e) { warning ??= friendlyError(e); }
   const passing = scored.filter((x) => {
+    if (people && (people.deny.has(x.key) || (people.allow && !people.allow.has(x.key)))) return false;
     let meta = metas.get(x.key)!;
     // Las listas de TMDB no traen el país de las películas: se completa con el catálogo narrativo si hace falta
     if (!countriesOf(meta).length && idx?.get(x.key)?.countries.length) meta = { ...meta, productionCountries: idx.get(x.key)!.countries };

@@ -10,7 +10,7 @@ import { useScrollRestore } from '../hooks/useScrollRestore';
 import { hintsFromFilters, rankWithFilters } from '../services/recommendations';
 import { TrailerButton } from '../ui/Trailer';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
-import { activeFilters, filterLabel, loadFilters, saveFilters, type RankFilters, type WatchedFilter } from '../services/filters';
+import { activeFilters, filterLabel, includedPeople, loadFilters, saveFilters, without, type RankFilters, type WatchedFilter } from '../services/filters';
 import type { AvailabilitySnapshot, MediaType, Named, PlatformId, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
 import { AvailabilityLine, ChannelBars, Chip, Empty, ErrorNote, Poster, personalState, publicScore, ScorePair, Spinner, TitleLink, TypeBadge, PlatformPill } from '../ui/components';
 import { safely } from '../services/notices';
@@ -69,7 +69,7 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             <div className="mt-2 rounded-lg bg-ink-950/60 p-2">
               {shownItem.lowEvidence && <p className="mb-1 text-[11px] text-amber-200">Este título se sumó con una búsqueda en TMDB para tus filtros y tu historial casi no tiene información sobre algo parecido: la estimación es de baja confianza y se apoya en datos públicos.</p>}
               <ChannelBars channels={shownItem.channels} base={shownItem.base} score={shownItem.score} />
-              <div className="mt-2 flex flex-wrap items-center gap-2"><TrailerButton k={item.key} originalLanguage={meta.originalLanguage} compact /></div>
+              <div className="mt-2 flex flex-wrap items-center gap-2"><TrailerButton k={item.key} originalLanguage={meta.originalLanguage} title={meta.title} year={meta.year} compact /></div>
             </div>
           )}
         </div>
@@ -299,7 +299,12 @@ export default function Home() {
       </div>
       {advanced && (
         <div className="flex flex-wrap gap-1.5" data-testid="active-filters">
-          {activeFilters(filters).map((id) => <span key={id} className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] text-accent">{filterLabel(id, filters, genreName, platformName)}</span>)}
+          {activeFilters(filters).map((id) => (
+            <span key={id} className="flex items-center gap-1 rounded-full bg-accent/15 py-0.5 pl-2 pr-1 text-[11px] text-accent" data-testid="active-filter" data-filter={id}>
+              {filterLabel(id, filters, genreName, platformName)}
+              <button type="button" aria-label={`Quitar ${filterLabel(id, filters, genreName, platformName)}`} data-testid="active-filter-remove" onClick={() => setFilters(without(filters, id))} className="px-1">✕</button>
+            </span>
+          ))}
         </div>
       )}
 
@@ -314,7 +319,21 @@ export default function Home() {
           Había pocos títulos para estos filtros en tu ranking: se sumaron {filtered.discovered} buscados en TMDB con los mismos filtros y tus plataformas. Los marcados «provisional» tienen estimación de baja confianza.
         </p>
       )}
-      {advanced && filtered?.outsidePlatforms ? <p className="text-[11px] text-slate-500" data-testid="person-outside">{filtered.outsidePlatforms} títulos de {filters.person?.name} no figuran en tus plataformas en {settings.country} y no se muestran.</p> : null}
+      {advanced && filtered?.outsidePlatforms ? (
+        <p className="text-[11px] text-slate-500" data-testid="person-outside">
+          {filtered.outsidePlatforms} {filtered.outsidePlatforms === 1 ? 'título' : 'títulos'} con {includedPeople(filters).map((p) => p.name).join(' y ')} no {filtered.outsidePlatforms === 1 ? 'figura' : 'figuran'} en tus plataformas en {settings.country} (o falta verificarlos) y no se muestran.{' '}
+          <button type="button" className="underline" data-testid="person-any-platform" onClick={() => setFilters({ ...filters, anyPlatform: true })}>Mostrar también</button>
+        </p>
+      ) : null}
+      {advanced && filters.anyPlatform && includedPeople(filters).length > 0 && (
+        <p className="text-[11px] text-slate-500" data-testid="person-any-platform-on">Incluye títulos fuera de tus plataformas. <button type="button" className="underline" onClick={() => setFilters({ ...filters, anyPlatform: false })}>Sólo mis plataformas</button></p>
+      )}
+      {advanced && filtered?.perPerson && filtered.peopleTotal === 0 && (
+        <p role="status" className="rounded-xl bg-amber-500/10 p-2 text-xs text-amber-100" data-testid="people-none">
+          {filters.peopleMode === 'all' && filtered.perPerson.length > 1 ? `En TMDB no hay películas ni series donde actúen ${filtered.perPerson.map((x) => x.person.name).join(' y ')} a la vez` : 'Las personas elegidas no tienen títulos que cumplan la selección'}
+          {' '}({filtered.perPerson.map((x) => `${x.person.name}: ${x.count}`).join(' · ')} títulos cada uno{filters.excludePeople?.length ? ', antes de quitar los excluidos' : ''}).
+        </p>
+      )}
 
       {featured.length > 0 && (
         <section aria-label="Destacadas" className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4">

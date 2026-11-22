@@ -68,7 +68,7 @@ export default function TitlePage() {
           {countriesOf(meta).length > 0 && <div className="mt-0.5 text-[11px] text-slate-500" data-testid="title-countries">{meta.type === 'tv' ? 'País de origen' : 'Países de origen y producción'}: {countriesOf(meta).map(countryName).join(', ')}</div>}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2"><TrailerButton key={meta.key} k={meta.key} originalLanguage={meta.originalLanguage} country={settings.country} /></div>
+      <div className="flex flex-wrap items-center gap-2"><TrailerButton key={meta.key} k={meta.key} originalLanguage={meta.originalLanguage} country={settings.country} title={meta.title} year={meta.year} /></div>
       <Card className="space-y-2" data-testid="title-scores">
         <div className="flex items-center gap-3">
           <ScorePair item={pred ?? undefined} meta={meta} />
