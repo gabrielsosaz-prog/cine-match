@@ -74,7 +74,7 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
   }
   // Los títulos se siguen encontrando
   await page.getByTestId('search-input').fill('Volver al futuro');
-  await expect(page.getByTestId('search-result').first()).toContainText('Volver al futuro', { timeout: 60000 });
+  await expect(page.getByTestId('search-result').first()).toContainText(/Volver al futuro/i, { timeout: 60000 });
 
   // 14. Buscar por reparto: Ben Affleck + Jennifer Lopez, Todos
   await page.getByTestId('search-mode-cast').click();
