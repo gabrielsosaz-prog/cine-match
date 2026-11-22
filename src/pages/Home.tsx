@@ -175,13 +175,16 @@ export default function Home() {
 
   const advanced = activeFilters(filters).length > 0;
   const filtersKey = JSON.stringify(filters);
-  const [filtered, setFiltered] = useState<Awaited<ReturnType<typeof rankWithFilters>>>();
+  const [filteredState, setFiltered] = useState<Awaited<ReturnType<typeof rankWithFilters>> & { for: string }>();
+  // Resultado sólo válido para los filtros y el ranking con los que se calculó: evita mostrar «ningún título» un instante al cambiar filtros
+  const filterSig = `${shown?.id}|${filtersKey}|${applyTick}`;
+  const filtered = filteredState?.for === filterSig ? filteredState : undefined;
   const [filterBusy, setFilterBusy] = useState(false);
   useEffect(() => {
     if (!shown || !advanced) { setFiltered(undefined); return; }
     let alive = true;
     setFilterBusy(true);
-    rankWithFilters(profileId, shown, filters).then((r) => { if (alive) setFiltered(r); }).catch((e) => { if (alive) setFiltered({ items: [], candidates: 0, diagnostics: [], discovered: 0, warning: e instanceof Error ? e.message : String(e) }); }).finally(() => { if (alive) setFilterBusy(false); });
+    rankWithFilters(profileId, shown, filters).then((r) => { if (alive) setFiltered({ ...r, for: filterSig }); }).catch((e) => { if (alive) setFiltered({ items: [], candidates: 0, diagnostics: [], discovered: 0, warning: e instanceof Error ? e.message : String(e), for: filterSig }); }).finally(() => { if (alive) setFilterBusy(false); });
     return () => { alive = false; };
   }, [shown?.id, filtersKey, applyTick, advanced]);
 
@@ -313,7 +316,7 @@ export default function Home() {
         </section>
       )}
 
-      {shown && rows.length === 0 && !busy && !(advanced && filterBusy) && (
+      {shown && rows.length === 0 && !busy && !(advanced && (filterBusy || !filtered)) && (
         advanced ? (
           <Empty>
             <span data-testid="filters-empty">Ningún título cumple todos los filtros entre {filtered?.candidates ?? 0} candidatos evaluados.</span>

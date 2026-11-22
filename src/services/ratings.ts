@@ -51,7 +51,7 @@ export async function rateAndLearn(profileId: string, key: TitleKey, patch: Rati
   db.logs.add({ profileId, at: Date.now(), type: 'rating_saved', key, algorithmVersion: getEngine().version, detail: JSON.stringify(Object.keys(patch)) }).catch(() => undefined);
   const res: SaveResult = { rating, confirmed };
   if (affectsLearning(patch)) {
-    res.recompute = requestRecompute(profileId, { trigger: 'valoración', extraKeys: [key] }, opts.wait ? 0 : opts.debounceMs ?? 600);
+    res.recompute = requestRecompute(profileId, { trigger: 'valoración', extraKeys: [key], actorDiscovery: true }, opts.wait ? 0 : opts.debounceMs ?? 600);
     if (opts.wait) res.run = await res.recompute;
   }
   return res;
