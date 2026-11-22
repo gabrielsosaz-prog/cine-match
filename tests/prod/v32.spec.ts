@@ -129,27 +129,39 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
   log('vacío legítimo:', await page.getByTestId('cast-empty').innerText());
 
   // 16-19. Tráileres
-  for (const [k, name, year] of [['movie/105', 'Volver al futuro', 1985], ['tv/1396', 'Breaking Bad', 2008], ['movie/496243', 'Parásitos', 2019]] as const) {
+  let searchSeen = false;
+  for (const [k, name, year] of [['movie/105', 'Volver al Futuro', 1985], ['tv/1396', 'Breaking Bad', 2008], ['movie/496243', 'Parásitos', 2019], ['tv/111803', 'The White Lotus', 2021], ['tv/94997', 'La casa del dragón', 2022]] as const) {
     await page.goto(`/#/t/${k}`);
+    const shown = (await page.getByRole('heading', { level: 1 }).innerText()).trim();
     await page.getByTestId('trailer-button').click();
     const modal = page.getByTestId('trailer-modal');
     await expect(modal.or(page.getByTestId('trailer-none')).first()).toBeVisible({ timeout: 60000 });
     if (!(await modal.isVisible())) { log(k, 'sin tráiler informado por TMDB'); continue; }
     const versions = await page.getByTestId('trailer-version').evaluateAll((els) => els.map((e) => e.textContent?.replace(/\s+/g, ' ').trim()));
-    const search = page.getByTestId('trailer-youtube-search');
+    const search = modal.getByTestId('trailer-youtube-search');
     log(k, 'elegido:', await page.getByTestId('trailer-audio').innerText(), '| versiones:', versions, '| búsqueda YouTube:', (await search.count()) ? await search.first().getAttribute('href') : 'no');
-    if (k === 'movie/105') await expect(page.getByTestId('trailer-audio')).toContainText('español');
-    if (k === 'movie/496243') {
-      // Parásitos: TMDB sólo lista vídeos sin español → no se afirma subtítulo y se ofrece la búsqueda
-      await expect(page.getByTestId('trailer-audio')).toContainText('no confirmados');
-      const href = await search.first().getAttribute('href');
-      expect(decodeURIComponent(href!.split('search_query=')[1])).toMatch(new RegExp(`^${name}|Parasite|기생충`));
-      expect(href).toContain(`${year}`);
+    const audio = await page.getByTestId('trailer-audio').innerText();
+    if (k === 'movie/105') expect(audio).toContain('español');
+    if (k === 'movie/496243') expect(versions.some((x) => /VOSE/.test(x ?? '') && /Subtítulos en español indicados/.test(x ?? ''))).toBe(true);
+    // «[Subtitled]» en inglés no se presenta como subtítulos en español
+    expect(versions.filter((x) => /\[Subtitled\]/.test(x ?? '')).every((x) => /no confirmados/.test(x!))).toBe(true);
+    // Invariante: la búsqueda externa aparece sólo si ninguna versión es en español o con subtítulos indicados
+    // (las versiones van ordenadas: si la elegida es de idioma original, ninguna es mejor)
+    const noSpanish = /no confirmados|no es el tráiler/.test(audio);
+    expect(await search.count()).toBe(noSpanish ? 1 : 0);
+    if (noSpanish) {
+      const href = (await search.first().getAttribute('href'))!;
+      expect(href.startsWith('https://www.youtube.com/results?search_query=')).toBe(true);
+      expect(decodeURIComponent(href.split('search_query=')[1])).toBe(`${shown} ${year} tráiler subtitulado español`);
+      log(k, 'búsqueda para', name, '→', href);
+      searchSeen = true;
     }
     await page.goBack(); // 20. Atrás de Android
     await expect(modal).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`#/t/${k}`));
   }
+
+  log('búsqueda externa ejercitada con datos reales:', searchSeen);
 
   // 21. Inicio: filtros de personas y países visibles, y persistencia
   await page.goto('/#/');
