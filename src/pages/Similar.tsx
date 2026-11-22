@@ -154,7 +154,7 @@ export default function Similar() {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-xs text-slate-300"><input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} data-testid="similar-only-mine" />Sólo en mis plataformas</label>
-        <select value={sort} onChange={(e) => setSort(e.target.value as SimSort)} data-testid="similar-sort" aria-label="Ordenar" className="ml-auto rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10">
+        <select value={sort} onChange={(e) => setSort(e.target.value as SimSort)} data-testid="similar-sort" aria-label="Ordenar" className="ml-auto min-w-0 max-w-[55vw] rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10">
           {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>

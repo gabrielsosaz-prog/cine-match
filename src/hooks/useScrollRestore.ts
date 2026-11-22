@@ -40,7 +40,10 @@ export function useScrollRestore(screen: string, ready: boolean): { page: number
   useEffect(() => {
     if (nav !== 'POP') clearPosition(k);
     let t: ReturnType<typeof setTimeout> | undefined;
-    const save = () => write(k, { y: window.scrollY, ...firstVisible(), page: pageRef.current, at: Date.now() });
+    // Sólo se guarda mientras esta pantalla es la actual: al cambiar de pantalla el navegador ajusta el desplazamiento
+    // (página nueva más corta) y ese ajuste no debe pisar la posición guardada al tocar la tarjeta.
+    const here = window.location.hash;
+    const save = () => window.location.hash === here && write(k, { y: window.scrollY, ...firstVisible(), page: pageRef.current, at: Date.now() });
     const onScroll = () => { if (t) clearTimeout(t); t = setTimeout(save, 150); };
     window.addEventListener('scroll', onScroll, { passive: true });
     // Al tocar una tarjeta o enlace se guarda en el acto (antes de que cambie la pantalla)

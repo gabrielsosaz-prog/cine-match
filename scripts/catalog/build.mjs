@@ -204,6 +204,8 @@ writeFileSync(join(OUT, 'catalog-meta.json'), JSON.stringify(meta));
 const buf = new Int8Array(meta.embedded * DIM);
 order.slice(0, meta.embedded).forEach((t, i) => { const v = vecs.get(t.key); for (let j = 0; j < DIM; j++) buf[i * DIM + j] = Math.max(-127, Math.min(127, Math.round(v[j] * 127))); });
 writeFileSync(join(OUT, 'catalog-emb.bin'), Buffer.from(buf.buffer));
+// Sólo para la evaluación comparativa con v3.0 (que usaba la sinopsis en español); no se publica en la app
+writeFileSync(join(OUT, 'eval-texts.json'), JSON.stringify(Object.fromEntries(order.map((t) => [t.key, t.overviewEs]))));
 
 // 8) Informe y casos diagnósticos
 const idx = new Map(order.map((t, i) => [t.key, i]));

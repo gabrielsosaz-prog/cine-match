@@ -63,12 +63,16 @@ export function buildCatalog(perCluster = 25, seed = 42): FakeTitle[] {
       });
     }
   }
+  // v3.1: Paramount+ (531) en 1 de cada 9 títulos, sin alterar la secuencia aleatoria del resto
+  for (const t of out) if (t.id % 9 === 0 && t.providers) t.providers = [...t.providers, { id: 531, name: 'Paramount Plus' }];
   // Homónimos: misma denominación e id numérico, distinto tipo
   out.push({ ...out[0], id: 9000, type: 'movie', name: 'La Casa', year: 2012 });
   out.push({ ...out[30], id: 9000, type: 'tv', name: 'La Casa', year: 2020 });
   return out;
 }
 
+/** País sintético: 1 de cada 5 títulos es de México, el resto de EE. UU., España o Corea según el idioma */
+export const countryOf = (t: FakeTitle) => (t.id % 5 === 0 ? 'MX' : t.lang === 'ko' ? 'KR' : t.lang === 'es' ? 'ES' : 'US');
 const listItem = (t: FakeTitle) => ({
   id: t.id, media_type: t.type, [t.type === 'movie' ? 'title' : 'name']: t.name, [t.type === 'movie' ? 'original_title' : 'original_name']: t.name,
   [t.type === 'movie' ? 'release_date' : 'first_air_date']: `${t.year}-05-01`, overview: t.overview, poster_path: null, genre_ids: t.genres,
@@ -95,7 +99,11 @@ export function fakeTmdbHandler(catalog: FakeTitle[], opts: FakeOptions = {}) {
     if ((m = path.match(/^\/genre\/(movie|tv)\/list$/))) return { status: 200, body: { genres: Object.entries(GENRES).map(([id, name]) => ({ id: Number(id), name })) } };
     if (path === '/search/multi') {
       const q = (u.searchParams.get('query') ?? '').toLowerCase();
-      return { status: 200, body: { results: [{ id: 1, media_type: 'person', name: 'Persona' }, ...catalog.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 20).map(listItem)] } };
+      // Personas con nombre «Actor N» (v3.1: búsqueda unificada); una persona sin nombre se ignora
+      const people = [...new Set(catalog.flatMap((t) => t.cast))].map((id) => ({ id, media_type: 'person', name: `Actor ${id}`, known_for_department: 'Acting', profile_path: null, popularity: 50,
+        known_for: catalog.filter((t) => t.cast.includes(id)).slice(0, 2).map((t) => ({ ...listItem(t), media_type: t.type })) })).filter((p) => p.name.toLowerCase().includes(q));
+      const titles = catalog.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 20).map(listItem);
+      return { status: 200, body: { results: [{ id: 1, media_type: 'person' }, ...(people.length && !titles.length ? people : []), ...titles, ...(titles.length ? people : [])].slice(0, 20) } };
     }
     if (path === '/search/person') {
       const q = (u.searchParams.get('query') ?? '').toLowerCase();
@@ -111,6 +119,15 @@ export function fakeTmdbHandler(catalog: FakeTitle[], opts: FakeOptions = {}) {
       const crew = catalog.filter((t) => t.director === id).map((t) => ({ ...listItem(t), media_type: t.type, job: 'Director', department: 'Directing' }));
       return { status: 200, body: { id, cast, crew } };
     }
+    if ((m = path.match(/^\/person\/(\d+)$/))) {
+      const id = Number(m[1]);
+      return { status: 200, body: { id, name: id === 99231 ? 'Actor 231' : `Actor ${id}`, known_for_department: id === 99231 ? 'Directing' : 'Acting', profile_path: null, place_of_birth: 'Ciudad sintética', also_known_as: [] } };
+    }
+    if ((m = path.match(/^\/(movie|tv)\/(\d+)\/videos$/))) {
+      const id = Number(m[2]);
+      // Sintético: los ids pares tienen tráiler oficial subtitulado; los impares, ninguno
+      return { status: 200, body: { id, results: id % 2 === 0 ? [{ key: `trailer${id}`, site: 'YouTube', name: 'Tráiler Oficial [Subtitulado]', type: 'Trailer', official: true, iso_639_1: 'es', iso_3166_1: 'MX', size: 1080 }] : [] } };
+    }
     if ((m = path.match(/^\/(trending)\/(movie|tv)\/week$/))) return { status: 200, body: { results: catalog.filter((t) => t.type === m![2]).slice(0, 20).map(listItem) } };
     if ((m = path.match(/^\/discover\/(movie|tv)$/))) {
       const type = m[1];
@@ -120,9 +137,10 @@ export function fakeTmdbHandler(catalog: FakeTitle[], opts: FakeOptions = {}) {
       const castQ = u.searchParams.get('with_cast')?.split('|').map(Number);
       const crewQ = u.searchParams.get('with_crew')?.split('|').map(Number);
       const page = Number(u.searchParams.get('page') ?? 1);
+      const originQ = u.searchParams.get('with_origin_country')?.split('|');
       const sort = u.searchParams.get('sort_by') ?? 'popularity.desc';
       let list = catalog.filter((t) => t.type === type && (!genres || t.genres.some((g) => genres.includes(g))) && (!prov || (t.providers ?? []).some((p) => prov.includes(p.id)))
-        && (!kws || t.keywords.some((k) => kws.includes(k))) && (!castQ || t.cast.some((c) => castQ.includes(c))) && (!crewQ || crewQ.includes(t.director) || crewQ.includes(t.director + 500)));
+        && (!kws || t.keywords.some((k) => kws.includes(k))) && (!castQ || t.cast.some((c) => castQ.includes(c))) && (!crewQ || crewQ.includes(t.director) || crewQ.includes(t.director + 500)) && (!originQ || originQ.includes(countryOf(t))));
       list = list.sort((a, b) => sort.startsWith('vote_average') ? b.vote - a.vote : sort.startsWith('vote_count') ? b.votes - a.votes : b.popularity - a.popularity);
       return { status: 200, body: { results: list.slice((page - 1) * 20, page * 20).map(listItem) } };
     }
@@ -148,6 +166,7 @@ export function fakeTmdbHandler(catalog: FakeTitle[], opts: FakeOptions = {}) {
           seasons: t.type === 'tv' ? Array.from({ length: 1 + (t.id % 4) }, (_, i) => ({ season_number: i + 1, name: `Temporada ${i + 1}`, episode_count: 8 })) : undefined,
           created_by: t.type === 'tv' ? [{ id: t.director, name: `Creador ${t.director}` }] : undefined,
           vote_average: t.vote, vote_count: t.votes, popularity: t.popularity, original_language: t.lang,
+          origin_country: [countryOf(t)], production_countries: t.type === 'movie' ? [{ iso_3166_1: countryOf(t) }, ...(t.id % 7 === 0 ? [{ iso_3166_1: 'MX' }] : [])] : undefined,
           keywords: t.type === 'movie' ? { keywords: kws } : { results: kws },
           credits: { cast: t.cast.map((c) => ({ id: c, name: `Actor ${c}`, character: 'Personaje' })), crew: t.type === 'movie' ? [{ id: t.director, name: `Director ${t.director}`, job: 'Director', department: 'Directing' }, { id: t.director + 500, name: `Guionista ${t.director + 500}`, job: 'Screenplay', department: 'Writing' }] : [] },
           aggregate_credits: t.type === 'tv' ? { cast: t.cast.map((c, i) => ({ id: c, name: `Actor ${c}`, roles: [{ character: 'Personaje' }], order: i, total_episode_count: 8 })), crew: [{ id: t.director + 500, name: `Guionista ${t.director + 500}`, department: 'Writing', jobs: [{ job: 'Writer' }], total_episode_count: 8 }] } : undefined,

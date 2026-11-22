@@ -117,6 +117,10 @@ describe('v3.1 · orden estricto «Para vos»', () => {
     expect(Math.min(...sorted.slice(0, 3).map((r) => r.item.score))).toBeGreaterThanOrEqual(Math.max(...sorted.slice(3).map((r) => r.item.score)));
     expect(sortRows(engineOrder, 'recommended', 'desc').map((r) => r.key)).toEqual(engineOrder.map((r) => r.key));
   });
+  it('los títulos con información insuficiente («—») van al final, no intercalados', () => {
+    const rows = [item('tv:1', 7.5, 1), { key: 'tv:9' as TitleKey, item: { key: 'tv:9', score: 8.9, rank: 2, confidence: 0.05 } as RecommendationItem, meta: undefined }, item('tv:2', 7.1, 3)];
+    expect(sortRows(rows, 'affinity', 'desc').map((r) => r.key)).toEqual(['tv:1', 'tv:2', 'tv:9']);
+  });
 });
 
 describe('v3.1 · tráileres', () => {

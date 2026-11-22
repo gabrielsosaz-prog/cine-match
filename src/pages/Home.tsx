@@ -12,7 +12,7 @@ import { TrailerButton } from '../ui/Trailer';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
 import { activeFilters, filterLabel, loadFilters, saveFilters, type RankFilters, type WatchedFilter } from '../services/filters';
 import type { AvailabilitySnapshot, MediaType, Named, PlatformId, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
-import { AvailabilityLine, ChannelBars, Chip, Empty, ErrorNote, Poster, publicScore, ScorePair, Spinner, TitleLink, TypeBadge, PlatformPill } from '../ui/components';
+import { AvailabilityLine, ChannelBars, Chip, Empty, ErrorNote, Poster, personalState, publicScore, ScorePair, Spinner, TitleLink, TypeBadge, PlatformPill } from '../ui/components';
 import { safely } from '../services/notices';
 import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import FilterPanel from '../ui/FilterPanel';
@@ -130,7 +130,7 @@ export function filterByWatched<T extends { key: TitleKey }>(rows: T[], ratings:
 }
 
 export type HomeSort = 'recommended' | 'affinity' | 'public' | 'year' | 'title';
-const HOME_SORTS: [HomeSort, string][] = [['recommended', 'Recomendado (con variedad)'], ['affinity', 'Para vos (estricto)'], ['public', 'Público (TMDB)'], ['year', 'Año'], ['title', 'Título']];
+const HOME_SORTS: [HomeSort, string][] = [['recommended', 'Recomendado'], ['affinity', 'Para vos (estricto)'], ['public', 'Público (TMDB)'], ['year', 'Año'], ['title', 'Título']];
 export const PAGE_SIZE = 10;
 
 /**
@@ -142,7 +142,7 @@ export const PAGE_SIZE = 10;
  */
 export function sortRows<T extends { key: TitleKey; item: RecommendationItem; meta?: TitleMeta }>(rows: T[], sort: HomeSort, dir: 'asc' | 'desc'): T[] {
   if (sort === 'recommended') return dir === 'desc' ? rows : [...rows].reverse();
-  const val = (r: T): number | string | undefined => sort === 'affinity' ? r.item.score : sort === 'public' ? publicScore(r.meta) : sort === 'year' ? r.meta?.year : r.meta?.title;
+  const val = (r: T): number | string | undefined => sort === 'affinity' ? (personalState(r.item).kind === 'insufficient' ? undefined : r.item.score) : sort === 'public' ? publicScore(r.meta) : sort === 'year' ? r.meta?.year : r.meta?.title;
   const sign = dir === 'desc' ? -1 : 1;
   return [...rows].sort((a, b) => {
     const x = val(a), y = val(b);
@@ -281,21 +281,21 @@ export default function Home() {
         <Chip active={quickPlatform === 'all' && !filters.platforms.length} onClick={() => setFilters({ ...filters, platforms: [] })}>Todas</Chip>
         {PLATFORMS.filter((p) => settings.platforms.includes(p.id)).map((p) => <Chip key={p.id} testId={`filter-${p.id}`} active={quickPlatform === p.id} onClick={() => setFilters({ ...filters, platforms: quickPlatform === p.id ? [] : [p.id] })}>{p.label}</Chip>)}
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Chip active={quickType === 'all'} onClick={() => setFilters({ ...filters, types: [] })}>Todo</Chip>
         <Chip active={quickType === 'movie'} onClick={() => setFilters({ ...filters, types: ['movie'] })} testId="filter-movie">Películas</Chip>
         <Chip active={quickType === 'tv'} onClick={() => setFilters({ ...filters, types: ['tv'] })} testId="filter-tv">Series</Chip>
         <Link to="/pendientes" className="ml-auto shrink-0 rounded-full bg-ink-800 px-3 py-1.5 text-sm text-slate-300 ring-1 ring-white/10">Pendientes ({pendingCount})</Link>
       </div>
       <FilterPanel value={filters} onChange={setFilters} genres={genres} userPlatforms={settings.platforms} onSearchMore={advanced ? onSearchMore : undefined} searching={busy} language={settings.language} />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <label className="text-xs text-slate-400" htmlFor="home-sort">Ordenar por</label>
-        <select id="home-sort" value={sort} onChange={(e) => setSort(e.target.value as HomeSort)} data-testid="home-sort" className="rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10">
+        <select id="home-sort" value={sort} onChange={(e) => setSort(e.target.value as HomeSort)} data-testid="home-sort" className="min-w-0 max-w-[55vw] rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10">
           {HOME_SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <button type="button" data-testid="home-dir" onClick={() => { setDir(dir === 'asc' ? 'desc' : 'asc'); setPage(1); }} className="rounded-lg bg-ink-800 px-2 py-1.5 text-xs ring-1 ring-white/10"
           aria-label="Invertir el orden">{sort === 'title' ? (dir === 'asc' ? 'A→Z' : 'Z→A') : dir === 'desc' ? '↓ Mayor' : '↑ Menor'}</button>
-        {(sort !== 'affinity' || dir !== 'desc') && <button type="button" data-testid="home-sort-reset" onClick={() => setSort('affinity')} className="text-[11px] text-accent underline">Restablecer</button>}
+        {(sort !== 'recommended' || dir !== 'desc') && <button type="button" data-testid="home-sort-reset" onClick={() => setSort('recommended')} className="text-[11px] text-accent underline">Restablecer</button>}
       </div>
       {advanced && (
         <div className="flex flex-wrap gap-1.5" data-testid="active-filters">
