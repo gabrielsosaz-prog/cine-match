@@ -1,4 +1,40 @@
-# Resultados de pruebas (v3.0)
+# Resultados de pruebas (v3.1)
+
+## Resumen v3.1
+
+- Vitest: **167/167 OK**: 16 nuevas en `v31.test.ts` (sin 100 % salvo identidad, coincidencias débiles que no suben la similitud, rasgos por encima del género, metadatos escasos, sagas, procedencia de los rasgos, modos «En común»/«Combinar», importancia por referencia, orden estricto global con «info insuf.» al final, prioridad de tráileres, regla de países y coproducciones, Paramount+, variantes de búsqueda, lugares compuestos como coincidencia débil) y la evaluación con datos reales (`narrative.eval.test.ts`).
+- Playwright, Android Pixel 7 y Galaxy S5 (360 px): **48/48 OK**. 6 flujos nuevos (`tests/e2e/v31.spec.ts`): orden estricto después de «Ver más»; volver con Atrás a la misma tarjeta y cantidad cargada (y empezar arriba al entrar desde el menú); buscar una persona, filtrar su filmografía y volver a la búsqueda; tráiler embebido que se cierra con Atrás y aviso cuando no hay; excluir México y Paramount+; Similares con dos referencias, modos, importancia, porcentajes < 100 % y volver conservando todo. Con TMDB simulado; el catálogo narrativo real se prueba en producción (`tests/prod/v31.spec.ts`).
+- Corregido al probar: la página se ensanchaba 8 px a 360 px (fila «Todo / Películas / Series / Pendientes»), lo que hacía zoom y tapaba la barra inferior; la posición guardada se pisaba al cambiar de pantalla; el botón de tráiler conservaba el estado del título anterior; un cálculo viejo de Similares podía pisar a uno nuevo.
+
+## Evaluación v3.1 con datos reales (`docs/eval-v3.1.json`)
+
+Catálogo real de 6.558 títulos (TMDB + Wikipedia, vectores `bge-small-en-v1.5`). Casos fijados **antes** de evaluar en `eval/cases.json` (16 tríos referencia → positivo vs señuelo; 1 omitido por falta de datos). Las etiquetas las puse yo a partir de sinopsis publicadas: **no son juicios de usuarios** y el conjunto es chico; las diferencias no son estadísticamente concluyentes. v3.0 se reprodujo con su propia fórmula sobre el mismo catálogo y las mismas sinopsis en español.
+
+| Medida | v3.0 | v3.1 |
+|---|---|---|
+| Positivo por encima del señuelo | 9/15 (60 %) | 10/15 (67 %) |
+| MRR del positivo entre 6.557 candidatos | 0,043 | 0,076 |
+| Tiempo por consulta (Node, todo el catálogo) | 263 ms | 118 ms |
+| Máximo mostrado | 100 % siempre (relativo al mejor) | máx. 66 % en los casos (100 % sólo identidad) |
+
+- Mejoras claras: varias referencias con tonos distintos (Breaking Bad + The Office → Barry: puesto 828 → 8), señuelos léxicos (puesto 127 → 6) y tono contradictorio (145 → 35).
+- Sin resolver en ninguna versión: «distinto género, conflicto parecido» (ambos fallan) y Batman → El gran truco frente a otra película de Batman (el puntaje crudo favorece a la saga; en la lista, la variedad por saga la compensa).
+- Confianza: alta 3/5 aciertos, media 7/9, baja 0/1. **No está calibrada** como probabilidad: indica cantidad de evidencia.
+- Sagas en el top 10 crudo: Harry Potter 7 y Volver al futuro 2 en ambas versiones; en la pantalla, el orden «Relevancia» limita la misma saga.
+
+**Diagnóstico White Lotus** (The White Lotus + El club gastronómico + El intercambio, «En común»):
+
+| Título señalado | v3.0 (puesto · % mostrado) | v3.1 (puesto · %) |
+|---|---|---|
+| Perfil falso | 55 · 36 % | 3.458 · 6 % |
+| American Horror Story | 65 · 34 % | 1.327 · 10 % |
+| 56 días | 97 · 30 % | 3.358 · 6 % |
+| Love Story | 95 · 31 % | 3.156 · 6 % |
+| El cuerpo en llamas | 173 · 25 % | 426 · 14 % |
+| La novia | 389 · 16 % | 200 · 16 % |
+
+Causa en v3.0: «antología», «basada en un libro», lugares y la sinopsis léxica pesaban como si fueran parecido narrativo, y el porcentaje era relativo al mejor. En v3.1 esas etiquetas casi no pesan. Limitación: las dos series nuevas tienen sinopsis de ~150 caracteres y sin artículo de Wikipedia, así que el núcleo común es pobre («secretos») y los primeros resultados combinados son flojos (≤ 36 %); se muestra así, con esa advertencia, en lugar de inflar porcentajes. Con The White Lotus sola: Nueve perfectos desconocidos, Room 104, Parásitos, Otro pequeño favor, Malos momentos en el Hotel Royale.
+
 
 ## Resumen v3.0
 
