@@ -57,17 +57,22 @@ export default function Similar() {
   const addRef = (k: TitleKey) => { if (!refs.includes(k) && refs.length < MAX_REFS) setRefs([...refs, k]); setQ(''); };
 
   const first = useRef(true);
+  // Sólo la última búsqueda pedida actualiza la pantalla (si se cambia de modo rápido, un cálculo viejo no pisa al nuevo)
+  const seq = useRef(0);
+  const sig = JSON.stringify([refs, filters, onlyMine, mode, weights]);
+  const [respSig, setRespSig] = useState('');
   const run = async () => {
     if (!refs.length) return;
+    const my = ++seq.current;
     setBusy(true); setErr(undefined);
     if (!first.current) setPage(1);
     first.current = false;
-    try { setResp(await findSimilar(profileId, refs, filters, { onlyMyPlatforms: onlyMine, mode, weights: weights as any })); }
-    catch (e) { setErr(friendlyError(e)); }
-    finally { setBusy(false); }
+    try { const r = await findSimilar(profileId, refs, filters, { onlyMyPlatforms: onlyMine, mode, weights: weights as any }); if (my === seq.current) { setResp(r); setRespSig(sig); } }
+    catch (e) { if (my === seq.current) setErr(friendlyError(e)); }
+    finally { if (my === seq.current) setBusy(false); }
   };
   // Recalcular al cambiar referencias, filtros o el alcance de plataformas
-  useEffect(() => { if (refs.length) run(); else setResp(undefined); }, [refs.join(','), JSON.stringify(filters), onlyMine, mode, JSON.stringify(weights)]);
+  useEffect(() => { if (refs.length) run(); else { seq.current++; setResp(undefined); setBusy(false); } }, [sig]);
 
   const keys = resp?.results.map((r) => r.key) ?? [];
   const metas = useLiveQuery(() => db.titles.bulkGet(keys), [keys.join(',')]);
@@ -176,8 +181,10 @@ export default function Similar() {
             : `Resultado no del todo personalizado: tenés ${resp.ratedCount} valoraciones (hacen falta al menos 5). El orden se basa sobre todo en la similitud.`}</p>
         </div>
       )}
-      {resp && !busy && rows.length === 0 && <Empty><span data-testid="similar-empty">No encontramos títulos parecidos con estos filtros{onlyMine ? ' en tus plataformas' : ''}.</span></Empty>}
-      <ul className="space-y-3">
+      {resp && !busy && rows.length === 0 && <Empty><span data-testid="similar-empty">{mode === 'common' && refs.length > 1 && resp.profile.core.length === 0
+        ? 'Ningún título se parece lo suficiente a todas las referencias a la vez (casi no tienen rasgos en común). Probá el modo «Combinar» o bajá la importancia de alguna.'
+        : `No encontramos títulos parecidos con estos filtros${onlyMine ? ' en tus plataformas' : ''}.`}</span></Empty>}
+      <ul className="space-y-3" data-testid="similar-list" data-current={String(!busy && respSig === sig)}>
         {rows.slice(0, page * PAGE).map(({ r, meta, snap }) => (
           <SimilarCard key={r.key} r={r} meta={meta} snap={snap} profileId={profileId} userScore={rs.byKey.get(r.key)?.overall} watched={rs.byKey.get(r.key)?.watched ?? false}
             lines={explainSimilar(r, title, refs.length)} refName={title} onAddRef={refs.length < MAX_REFS && !refs.includes(r.key) ? () => addRef(r.key) : undefined} />

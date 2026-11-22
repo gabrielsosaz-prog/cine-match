@@ -10,7 +10,7 @@
  * No se asume que todo lo de una referencia es deseado: el núcleo común pesa más que lo particular, las
  * coincidencias débiles casi no pesan y las diferencias se informan.
  */
-import { FACET, pairSimilarity, type Narrative, type NarrativeIndex, type PairSimilarity } from './core';
+import { FACET, narrativeQuality, pairSimilarity, type Narrative, type NarrativeIndex, type PairSimilarity } from './core';
 import { weakKind } from './weak';
 
 export type SimilarMode = 'common' | 'combine';
@@ -23,7 +23,12 @@ export interface RefProfile {
   /** rasgos fuertes presentes en unas referencias y ausentes en otras */
   contrasts: { label: string; in: string[]; notIn: string[] }[];
   centroid?: Float32Array;
+  /** calidad de datos de cada referencia (0-1); en «En común» una referencia con muy pocos datos pesa menos */
+  quality: Map<string, number>;
 }
+
+/** Peso efectivo: importancia elegida × fiabilidad de los datos (0,35 a 1). Con datos completos = importancia. */
+const reliability = (q: number) => 0.35 + 0.65 * Math.min(1, q / 0.6);
 
 export function buildRefProfile(refs: RefIn[], idx?: NarrativeIndex): RefProfile {
   const n = refs.length;
@@ -59,12 +64,12 @@ export function buildRefProfile(refs: RefIn[], idx?: NarrativeIndex): RefProfile
     const rows = refs.filter((r) => r.n.row >= 0);
     if (rows.length) {
       centroid = new Float32Array(idx.meta.dim);
-      for (const r of rows) { const v = idx.rowVec(r.n.row); for (let i = 0; i < v.length; i++) centroid[i] += v[i] * r.weight; }
+      for (const r of rows) { const v = idx.rowVec(r.n.row); const w = r.weight * reliability(narrativeQuality(r.n)); for (let i = 0; i < v.length; i++) centroid[i] += v[i] * w; }
       const norm = Math.hypot(...centroid) || 1;
       for (let i = 0; i < centroid.length; i++) centroid[i] /= norm;
     }
   }
-  return { core: core.slice(0, 30), distinctive, contrasts: contrasts.slice(0, 6), centroid };
+  return { core: core.slice(0, 30), distinctive, contrasts: contrasts.slice(0, 6), centroid, quality: new Map(refs.map((r) => [r.n.key, narrativeQuality(r.n)])) };
 }
 
 export interface MultiScore {
@@ -89,7 +94,10 @@ export function scoreMulti(refs: RefIn[], prof: RefProfile, C: Narrative, mode: 
   let score: number;
   if (refs.length === 1) score = perRef[0].s.score;
   else if (mode === 'common') {
-    const harm = W / perRef.reduce((a, p) => a + p.weight / Math.max(0.02, p.s.score), 0);
+    // Media armónica ponderada: exige parecido con todas, pero una referencia con muy pocos datos (sinopsis breve,
+    // sin rasgos) pesa menos, para que su falta de información no hunda a los candidatos buenos.
+    const ew = perRef.map((p) => p.weight * reliability(prof.quality.get(p.key) ?? 1));
+    const harm = ew.reduce((a, w) => a + w, 0) / perRef.reduce((a, p, i) => a + ew[i] / Math.max(0.02, p.s.score), 0);
     const parts: [number, number | undefined][] = [[0.5, harm], [0.25, coreCoverage], [0.25, centroidSem]];
     const avail = parts.filter(([, v]) => v !== undefined) as [number, number][];
     score = avail.reduce((a, [w, v]) => a + w * v, 0) / avail.reduce((a, [w]) => a + w, 0);

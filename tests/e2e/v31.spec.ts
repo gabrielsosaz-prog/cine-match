@@ -10,6 +10,9 @@ async function mockTmdb(page: Page) {
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await page.route('https://image.tmdb.org/**', (r) => r.fulfill({ status: 404 }));
+  // El catálogo narrativo real usa ids de TMDB que en el catálogo sintético son otros títulos: aquí no se carga
+  // (la app sigue funcionando sin él, con rasgos y palabras clave). El catálogo real se prueba en producción.
+  await page.route('**/catalog/manifest.json', (r) => r.fulfill({ status: 404 }));
   // El reproductor oficial no se carga en las pruebas (sin red externa): se verifica la URL embebida
   await page.route('https://www.youtube-nocookie.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>reproductor</body></html>' }));
 }
@@ -132,20 +135,20 @@ test('v3.1: Similares con modos En común / Combinar, importancia por referencia
   await page.getByTestId('similar-only-mine').uncheck();
   await page.getByTestId('similar-search').fill('Thriller Film 1');
   await page.getByTestId('similar-hit').first().click();
-  await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 30000 });
-  await page.getByTestId('similar-search').fill('Comedy');
+  await expect(page.locator('[data-testid="similar-list"][data-current="true"] [data-testid="similar-item"]').first()).toBeVisible({ timeout: 30000 });
+  await page.getByTestId('similar-search').fill('Thriller Serie 2');
   await page.locator('[data-testid="similar-hit"]:not([disabled])').first().click();
   await expect(page.getByTestId('similar-ref')).toHaveCount(2);
   await expect(page.getByTestId('similar-mode-common')).toHaveAttribute('aria-checked', 'true');
-  await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-testid="similar-list"][data-current="true"] [data-testid="similar-item"]').first()).toBeVisible({ timeout: 30000 });
   const pcts = (await page.getByTestId('similarity').allInnerTexts()).map(num);
   expect(Math.max(...pcts)).toBeLessThan(100);
   await expect(page.getByTestId('similarity-confidence').first()).toContainText('confianza');
   await page.getByTestId('similar-mode-combine').click();
   await expect(page.getByTestId('similar-mode-combine')).toHaveAttribute('aria-checked', 'true');
-  await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-testid="similar-list"][data-current="true"] [data-testid="similar-item"]').first()).toBeVisible({ timeout: 30000 });
   await page.getByTestId('similar-ref-weight').first().selectOption('2');
-  await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-testid="similar-list"][data-current="true"] [data-testid="similar-item"]').first()).toBeVisible({ timeout: 30000 });
   await page.getByTestId('similar-explanation').first().click();
   await expect(page.getByTestId('similar-per-ref').first()).toBeVisible();
   await expect(page.getByTestId('similar-semantic')).toBeVisible();

@@ -55,6 +55,9 @@ describe('v3.1 · similitud narrativa', () => {
     expect(s.weak.map((w) => w.name)).toEqual(expect.arrayContaining(['based on novel or book', 'italy']));
     expect(s.keywords).toHaveLength(0);
     expect(weakKind('Sicily')).toBe('geo');
+    expect(weakKind('sicily, italy')).toBe('geo');
+    expect(weakKind('stockholm archipelago')).toBe('geo');
+    expect(weakKind('class conflict')).toBeUndefined();
     expect(weakKind('based on novel or book')).toBe('generic');
     expect(weakKind('class conflict')).toBeUndefined();
   });

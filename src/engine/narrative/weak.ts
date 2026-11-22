@@ -29,7 +29,9 @@ export type WeakKind = 'geo' | 'generic' | 'era' | undefined;
 /** Clasifica una palabra clave de TMDB (nombre en inglés). undefined = específica. */
 export function weakKind(name: string): WeakKind {
   const n = name.toLowerCase().trim();
-  if (geoSet().has(n) || /\b(city|county|province|island|islands)$/.test(n) && geoSet().has(n.replace(/\s+(city|county|province|island|islands)$/, ''))) return 'geo';
+  // «sicily, italy», «paris, france»: lugar compuesto
+  if (n.includes(',')) { const parts = n.split(',').map((x) => x.trim()).filter(Boolean); if (parts.length > 1 && parts.every((x) => weakKind(x) === 'geo')) return 'geo'; }
+  if (geoSet().has(n) || /\b(city|county|province|island|islands|archipelago|coast|countryside)$/.test(n) && geoSet().has(n.replace(/\s+(city|county|province|island|islands|archipelago|coast|countryside)$/, ''))) return 'geo';
   if (/^\d{4}s$|^\d{2}(st|nd|rd|th) century$|^(19|20)\d\d$/.test(n)) return 'era';
   if (WEAK.has(n)) return 'generic';
   return undefined;

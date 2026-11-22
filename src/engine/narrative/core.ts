@@ -233,11 +233,17 @@ export function pairSimilarity(R: Narrative, C: Narrative, idx?: NarrativeIndex)
     if (def.strength === 'strong' && ev.conf >= 0.6 && !C.facets.has(id) && C.facets.size >= 2) differences.push({ kind: 'missing', facet: id, label: def.label });
     for (const o of def.opposite ?? []) if ((C.facets.get(o)?.conf ?? 0) >= 0.5) differences.push({ kind: 'opposite', facet: id, label: def.label, other: FACET.get(o)?.label });
   }
-  const evidence = Math.min(1, (semOk ? 0.35 + 0.1 * Math.min(R.textQ, C.textQ) : 0) + 0.25 * Math.min(1, facets.length / 3) + 0.15 * Math.min(1, Math.min(R.kw.size, C.kw.size) / 8) + 0.15 * Math.min(1, fTot / 2));
+  // Evidencia (no es una probabilidad de acierto): cuánto texto y cuántos rasgos sostienen la comparación.
+  // El argumento sólo cuenta completo si ambos tienen trama de Wikipedia; una sinopsis breve de TMDB vale menos.
+  const textPart = (q: number) => (q >= 2 ? 1 : q >= 1 ? 0.55 : 0.2);
+  const evidence = Math.min(1, (semOk ? 0.4 * Math.min(textPart(R.textQ), textPart(C.textQ)) : 0) + 0.25 * Math.min(1, facets.length / 3) + 0.15 * Math.min(1, Math.min(R.kw.size, C.kw.size) / 8) + 0.2 * Math.min(1, fTot / 2));
   facets.sort((a, b) => b.weight - a.weight);
   keywords.sort((a, b) => b.weight - a.weight);
   return { score: Math.max(0, Math.min(0.99, score)), components: comp, facets, keywords, weak, people, differences: differences.slice(0, 3), sameFranchise, evidence };
 }
+
+/** Calidad de los datos de un título como referencia (0-1): texto del argumento, rasgos y temáticas. */
+export const narrativeQuality = (n: Narrative) => Math.min(1, 0.5 * (n.row < 0 ? 0 : n.textQ >= 2 ? 1 : n.textQ >= 1 ? 0.55 : 0.2) + 0.25 * Math.min(1, n.facets.size / 4) + 0.25 * Math.min(1, [...n.kw.values()].filter((x) => !weakKind(x)).length / 8));
 
 export const confidenceLabel = (e: number) => (e >= 0.7 ? 'alta' : e >= 0.45 ? 'media' : 'baja');
 
