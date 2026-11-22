@@ -1,0 +1,26 @@
+name: Flujos reales en producción
+# Recorre la app publicada con TMDB real en emulación Android (Pixel 7 y 360 px). Manual.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL de la app
+        required: false
+        default: https://cine-match-pied-tau.vercel.app
+permissions:
+  contents: read
+jobs:
+  prod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test -c playwright.prod.config.ts --reporter=line
+        env:
+          PROD_URL: ${{ github.event.inputs.url }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: capturas-produccion, path: test-results/, retention-days: 7 }
