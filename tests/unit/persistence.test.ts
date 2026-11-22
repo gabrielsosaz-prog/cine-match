@@ -9,28 +9,28 @@ const P = 'p-principal';
 
 describe('Persistencia de valoraciones', () => {
   it('guarda, modifica y conserva fecha de creación', async () => {
-    const a = (await saveRating(P, 'movie:1', { overall: 8, dimensions: { story: 9 } }))!;
+    const a = (await saveRating(P, 'movie:1', { overall: 8, dimensions: { story: 4 } }))!;
     await new Promise((r) => setTimeout(r, 5));
-    const b = (await saveRating(P, 'movie:1', { overall: 6, dimensions: { story: 7, ending: 4, acting: 9 } }))!;
+    const b = (await saveRating(P, 'movie:1', { overall: 6, dimensions: { story: 3, ending: 2, acting: 5 } }))!;
     expect(b.createdAt).toBe(a.createdAt);
     expect(b.updatedAt).toBeGreaterThan(a.updatedAt);
     const all = await listRatings(P);
     expect(all).toHaveLength(1);
     expect(all[0].overall).toBe(6);
-    expect(all[0].dimensions).toEqual({ story: 7, ending: 4, acting: 9 });
+    expect(all[0].dimensions).toEqual({ story: 3, ending: 2, acting: 5 });
   });
   it('dimensiones opcionales y general independiente', async () => {
-    const r = (await saveRating(P, 'tv:2', { dimensions: { suspense: 10 } }))!;
+    const r = (await saveRating(P, 'tv:2', { dimensions: { suspense: 5 } }))!;
     expect(r.overall).toBeUndefined();
-    const g = (await saveRating(P, 'tv:3', { overall: 3, dimensions: { visuals: 10, story: 10, acting: 10 } }))!;
+    const g = (await saveRating(P, 'tv:3', { overall: 3, dimensions: { visuals: 5, story: 5, acting: 5 } }))!;
     expect(g.overall).toBe(3); // no se reemplaza por la media de aspectos
     const only = (await saveRating(P, 'tv:4', { overall: 7 }))!;
     expect(only.dimensions).toEqual({});
   });
-  it('normaliza valores fuera de rango y descarta aspectos desconocidos', async () => {
-    const r = (await saveRating(P, 'movie:4', { overall: 14, dimensions: { pacing: -2, story: NaN as any, foo: 5 } as any }))!;
+  it('normaliza valores fuera de rango y descarta aspectos desconocidos o retirados', async () => {
+    const r = (await saveRating(P, 'movie:4', { overall: 14, dimensions: { pacing: -2, story: NaN as any, foo: 5, acting: 9, characters: 4 } as any }))!;
     expect(r.overall).toBe(10);
-    expect(r.dimensions).toEqual({ pacing: 1 });
+    expect(r.dimensions).toEqual({ pacing: 1, acting: 5 }); // estrellas 1-5
   });
   it('guarda motivo de abandono sólo para abandonadas', async () => {
     const a = (await saveRating(P, 'tv:6', { list: 'abandoned', abandonReason: 'Ritmo muy lento' }))!;
@@ -64,20 +64,20 @@ describe('Visto independiente de la puntuación', () => {
     expect(r.watchedAt).toBeDefined();
   });
   it('puntuar no marca vista', async () => {
-    const r = (await saveRating(P, 'movie:11', { overall: 9, dimensions: { suspense: 8 } }))!;
+    const r = (await saveRating(P, 'movie:11', { overall: 9, dimensions: { suspense: 4 } }))!;
     expect(r.watched).toBe(false);
   });
   it('cambiar el estado de visto no toca la puntuación, y viceversa', async () => {
-    await saveRating(P, 'movie:12', { overall: 7, dimensions: { acting: 9 } });
+    await saveRating(P, 'movie:12', { overall: 7, dimensions: { acting: 4 } });
     const w = (await saveRating(P, 'movie:12', { watched: true }))!;
-    expect(w).toMatchObject({ watched: true, overall: 7, dimensions: { acting: 9 } });
+    expect(w).toMatchObject({ watched: true, overall: 7, dimensions: { acting: 4 } });
     const u = (await saveRating(P, 'movie:12', { watched: false }))!;
     expect(u).toMatchObject({ watched: false, overall: 7 });
     const s = (await saveRating(P, 'movie:12', { overall: 4 }))!;
     expect(s.watched).toBe(false);
     const cleared = (await saveRating(P, 'movie:12', { overall: null, watched: true }))!;
     expect(cleared.overall).toBeUndefined();
-    expect(cleared.dimensions).toEqual({ acting: 9 });
+    expect(cleared.dimensions).toEqual({ acting: 4 });
   });
   it('un registro vacío (no vista, sin lista ni notas) se elimina', async () => {
     await saveRating(P, 'movie:13', { watched: true });

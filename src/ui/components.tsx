@@ -64,18 +64,55 @@ export function ScoreRow({ label, value, onChange, testId, compact }: { label: s
   );
 }
 
-export function DimensionEditor({ value, onChange, defaultOpen }: { value: DimensionScores; onChange: (v: DimensionScores) => void; defaultOpen?: boolean }) {
+/** Estrellas 1-5 para un aspecto. Tocar la estrella elegida o «Quitar» lo deja sin valorar. */
+export function StarRow({ label, value, onChange, testId, highlight }: { label: string; value?: number; onChange: (v: number | undefined) => void; testId?: string; highlight?: boolean }) {
+  return (
+    <div className={`flex items-center gap-2 rounded-lg py-1 ${highlight ? 'bg-accent/10 px-1.5 ring-1 ring-accent/30' : ''}`} data-testid={testId}>
+      <span className="min-w-0 flex-1 text-[13px] leading-tight text-slate-300">{label}</span>
+      <div className="flex shrink-0" role="radiogroup" aria-label={label}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={value === n} aria-label={`${label}: ${n} ${n === 1 ? 'estrella' : 'estrellas'}`}
+            onClick={() => onChange(value === n ? undefined : n)}
+            className={`grid h-9 w-8 place-items-center text-xl leading-none ${value !== undefined && n <= value ? 'text-accent' : 'text-slate-600'}`}>★</button>
+        ))}
+      </div>
+      <button type="button" onClick={() => onChange(undefined)} disabled={value === undefined} aria-label={`Quitar ${label}`} data-testid={testId ? `${testId}-clear` : undefined}
+        className="w-7 shrink-0 text-center text-xs text-slate-400 disabled:invisible">✕</button>
+    </div>
+  );
+}
+
+export function DimensionEditor({ value, onChange, defaultOpen, highlightMissing }: { value: DimensionScores; onChange: (v: DimensionScores) => void; defaultOpen?: boolean; highlightMissing?: boolean }) {
   const [open, setOpen] = useState(defaultOpen ?? Object.keys(value).length > 0);
+  const done = DIMENSIONS.filter((d) => value[d.id] !== undefined).length;
   return (
     <div>
-      <button type="button" className="mb-2 text-sm font-semibold text-accent" onClick={() => setOpen(!open)}>
-        {open ? '▾' : '▸'} Puntuar aspectos (opcional){Object.keys(value).length ? ` · ${Object.keys(value).length}/${DIMENSIONS.length}` : ''}
+      <button type="button" className="mb-1 text-sm font-semibold text-accent" onClick={() => setOpen(!open)} aria-expanded={open} data-testid="toggle-aspects">
+        {open ? '▾' : '▸'} Aspectos con estrellas (opcional) · {done}/{DIMENSIONS.length}
       </button>
-      {open && DIMENSIONS.map((d) => (
-        <ScoreRow key={d.id} compact label={d.label} value={value[d.id]} testId={`dim-${d.id}`}
-          onChange={(v) => { const n = { ...value }; if (v === undefined) delete n[d.id as DimensionId]; else n[d.id as DimensionId] = v; onChange(n); }} />
-      ))}
+      {open && (
+        <div className="space-y-0.5">
+          {DIMENSIONS.map((d) => (
+            <StarRow key={d.id} label={d.label} value={value[d.id]} testId={`dim-${d.id}`} highlight={highlightMissing && value[d.id] === undefined}
+              onChange={(v) => { const n = { ...value }; if (v === undefined) delete n[d.id as DimensionId]; else n[d.id as DimensionId] = v; onChange(n); }} />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Indicador compacto del porcentaje de aspectos completados (informativo, no mide calidad). */
+export function CompletionRing({ percent, done, total }: { percent: number; done: number; total: number }) {
+  const r = 9, c = 2 * Math.PI * r;
+  return (
+    <span className="inline-flex items-center gap-1" title={`${done} de ${total} aspectos`} data-testid="completion" data-percent={percent}>
+      <svg viewBox="0 0 24 24" className="h-5 w-5 -rotate-90" aria-hidden="true">
+        <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="3" />
+        <circle cx="12" cy="12" r={r} fill="none" stroke="#f5b83d" strokeWidth="3" strokeDasharray={`${(percent / 100) * c} ${c}`} strokeLinecap="round" />
+      </svg>
+      <span className="text-[11px] tabular-nums text-slate-300">{percent}%</span>
+    </span>
   );
 }
 

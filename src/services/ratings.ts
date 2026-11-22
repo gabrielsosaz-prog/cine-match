@@ -4,7 +4,8 @@ import { getEngine, refreshRecommendations } from './recommendations';
 import type { TitleKey } from '../types';
 
 /** ¿El cambio afecta lo que el motor aprende? Marcar «vista» no: no es una señal de gusto. */
-export const affectsLearning = (p: RatingPatch) => p.overall !== undefined || p.dimensions !== undefined || p.list !== undefined;
+export const affectsLearning = (p: RatingPatch) =>
+  p.overall !== undefined || p.dimensions !== undefined || p.list !== undefined || p.notInterested !== undefined || p.comment !== undefined;
 
 /**
  * Guardar dispara el ciclo de aprendizaje:
@@ -22,6 +23,11 @@ export async function rateAndLearn(profileId: string, key: TitleKey, patch: Rati
 /** Marca o desmarca «vista» con una sola acción, sin tocar la puntuación. */
 export async function setWatched(profileId: string, key: TitleKey, watched: boolean) {
   return saveRating(profileId, key, { watched });
+}
+
+/** «No me interesa» (o revertirlo) sin tocar vista, nota, aspectos ni listas. Recalcula el modelo. */
+export async function setNotInterested(profileId: string, key: TitleKey, value: boolean) {
+  return rateAndLearn(profileId, key, { notInterested: value });
 }
 
 export async function removeAndLearn(profileId: string, key: TitleKey) {

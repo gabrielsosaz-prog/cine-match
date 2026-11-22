@@ -1,0 +1,48 @@
+{
+  "aviso": "Escenarios sintéticos construidos a mano: muestran cómo responde el motor, no validan su precisión con usuarios reales.",
+  "escenarios": {
+    "Influencia del suspenso según cantidad de títulos puntuados": {
+      "1 título": 0.15,
+      "3 títulos": 0.32,
+      "8 títulos": 0.67
+    },
+    "Escenario actor: películas con el actor A": {
+      "afinidadConUnaActuacion": 1,
+      "afinidadConCuatro": 1.75,
+      "prediccionSinDatos": 7.06,
+      "conUnaActuacion5Estrellas": 7.25,
+      "conCuatro": 7.61,
+      "tituloSinElActor": 7.2,
+      "aporteActorUna": 0.15,
+      "aporteActorCuatro": 0.41
+    },
+    "Escenario final: finales con giro puntuados 5★ vs. otros 2★": {
+      "conGiro": 8.9,
+      "sinDatosDeFinal": 8.14
+    },
+    "Escenario «Otros»: comentario sobre la simulación en un título puntuado 9": {
+      "tituloConRealidadVirtual": {
+        "antes": 7.31,
+        "despues": 7.82
+      },
+      "tituloSinRelacion": {
+        "cambio": 0
+      }
+    },
+    "Escenario saga: descartar Avengers: Endgame": {
+      "penalizacionMismaSaga": -0.71,
+      "penalizacionAccionNoRelacionada": -0.05
+    },
+    "Escenario subgénero: descartes de superhéroes": {
+      "unDescarte": -0.31,
+      "tres": -0.65,
+      "cinco": -0.84
+    },
+    "Escenario excepción: rechazos de superhéroes + Batman puntuadas 9": {
+      "penalizacionBatman": -0.15,
+      "penalizacionOtroSuperheroe": -0.7,
+      "prediccionBatman": 9.53,
+      "prediccionOtroSuperheroe": 8.52
+    }
+  }
+}

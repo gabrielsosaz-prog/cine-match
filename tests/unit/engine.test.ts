@@ -8,7 +8,7 @@ import type { FakeTitle } from '../fixtures/fakeTmdb';
 let metas: Map<TitleKey, TitleMeta>, catalog: FakeTitle[], byKey: Map<TitleKey, FakeTitle>;
 beforeAll(async () => ({ metas, catalog, byKey } = await syntheticMetas(20)));
 const keysOf = (c: string) => [...byKey].filter(([, t]) => t.cluster === c).map(([k]) => k);
-const R = (key: TitleKey, overall: number, extra: Partial<Rating> = {}): Rating => ({ id: `p|${key}`, profileId: 'p', key, watched: true, overall, dimensions: {}, createdAt: 0, updatedAt: 0, schema: 2, ...extra });
+const R = (key: TitleKey, overall: number, extra: Partial<Rating> = {}): Rating => ({ id: `p|${key}`, profileId: 'p', key, watched: true, overall, dimensions: {}, createdAt: 0, updatedAt: 0, schema: 3, ...extra });
 const genreAff = (p: ReturnType<typeof buildProfile>, g: number) => p.features.get(`g:${g}`)?.affinity ?? 0;
 
 describe('Actualización de preferencias', () => {
@@ -31,16 +31,18 @@ describe('Actualización de preferencias', () => {
     const single = buildProfile([R(keysOf('horror')[0], 10)], metas);
     expect(genreAff(single, 27)).toBeLessThan(2.5); // contracción: una nota no da afinidad máxima
   });
-  it('señales implícitas: abandonada y "no me interesa" cuentan como negativas', () => {
+  it('señales implícitas: abandonada cuenta como negativa; «no me interesa» va al modelo de descartes, no al de gustos', () => {
     const k = keysOf('horror')[0];
-    const p = buildProfile([R(keysOf('comedy')[0], 8), { ...R(k, 0), overall: undefined, watched: false, list: 'not_interested' }], metas);
-    expect(genreAff(p, 27)).toBeLessThan(0);
+    const p = buildProfile([R(keysOf('comedy')[0], 8), { ...R(k, 0), overall: undefined, watched: false, notInterested: true }], metas);
+    expect(genreAff(p, 27)).toBe(0); // descartar sin ver no es una nota baja
+    expect(p.rejections.count).toBe(1);
+    expect(p.rejections.genres.get(27)?.rej).toBe(1);
     const p2 = buildProfile([R(keysOf('comedy')[0], 8), { ...R(k, 0), overall: undefined, watched: false, list: 'abandoned', abandonReason: 'Ritmo muy lento' }], metas);
-    expect(genreAff(p2, 27)).toBeLessThan(genreAff(p, 27));
+    expect(genreAff(p2, 27)).toBeLessThan(0);
   });
   it('aprende la importancia de cada dimensión a partir de la nota general', () => {
     const ks = [...metas.keys()].slice(0, 8);
-    const rs = ks.map((k, i) => R(k, 3 + (i % 6), { dimensions: { suspense: 3 + (i % 6), visuals: 7 } }));
+    const rs = ks.map((k, i) => R(k, 3 + (i % 6), { dimensions: { suspense: 1 + (i % 5), visuals: 4 } }));
     const p = buildProfile(rs, metas);
     const sus = p.dimensions.find((d) => d.id === 'suspense')!;
     const vis = p.dimensions.find((d) => d.id === 'visuals')!;
@@ -48,7 +50,7 @@ describe('Actualización de preferencias', () => {
   });
   it('los pesos manuales por dimensión se aplican', () => {
     const ks = [...metas.keys()].slice(0, 3);
-    const p = buildProfile(ks.map((k) => R(k, 7, { dimensions: { ending: 8, story: 8 } })), metas, { ending: 2 });
+    const p = buildProfile(ks.map((k) => R(k, 7, { dimensions: { ending: 4, story: 4 } })), metas, { ending: 2 });
     const end = p.dimensions.find((d) => d.id === 'ending')!, story = p.dimensions.find((d) => d.id === 'story')!;
     expect(end.importance / story.importance).toBeCloseTo(2, 1);
   });
@@ -74,7 +76,7 @@ describe('Generación del ranking', () => {
   it('excluye vistas, pendientes y rechazadas', () => {
     const want = { ...R(keysOf('thriller')[7], 0), overall: undefined, watched: false, list: 'want' as const };
     const abandoned = { ...R(keysOf('thriller')[8], 0), overall: undefined, watched: false, list: 'abandoned' as const };
-    const rs = [...keysOf('thriller').slice(0, 5).map((k) => R(k, 9)), { ...R(keysOf('thriller')[6], 0), overall: undefined, watched: false, list: 'not_interested' as const }, want, abandoned];
+    const rs = [...keysOf('thriller').slice(0, 5).map((k) => R(k, 9)), { ...R(keysOf('thriller')[6], 0), overall: undefined, watched: false, notInterested: true }, want, abandoned];
     const items = ranked(rs, { limit: 200 });
     const keys = new Set(items.map((i) => i.key));
     for (const r of rs.slice(0, 7)) if (r.key !== want.key) expect(keys.has(r.key), r.key).toBe(false); // vistas, rechazada

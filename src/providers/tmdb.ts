@@ -156,7 +156,8 @@ export class TmdbClient {
    * Devuelve metadata y snapshot de disponibilidad por separado.
    */
   async details(type: MediaType, id: number, language: string, country: string): Promise<{ meta: TitleMeta; availability: AvailabilitySnapshot; related: SearchResult[] }> {
-    const append = ['keywords', 'credits', 'recommendations', 'similar', 'watch/providers'].join(',');
+    // Series: aggregate_credits informa en cuántos episodios participó cada actor (participación real)
+    const append = ['keywords', type === 'tv' ? 'aggregate_credits' : 'credits', 'recommendations', 'similar', 'watch/providers'].join(',');
     const d = await this.get<any>(`/${type}/${id}`, { language, append_to_response: append });
     if (!d || typeof d.id !== 'number') throw new ProviderError('bad_response', 'Ficha sin id');
     const meta = mapDetails(d, type, language);
@@ -211,14 +212,26 @@ export function metaFromSearch(r: SearchResult, genreNames: Map<number, string>)
   };
 }
 
+/** Versión del mapeo de fichas: las guardadas con una versión menor se vuelven a pedir. */
+export const META_VERSION = 2;
+
 export function mapDetails(d: any, type: MediaType, language: string): TitleMeta {
   const missing: string[] = [];
   const genres: Named[] = Array.isArray(d.genres) ? d.genres.filter((g: any) => g?.id) : [];
   const kwRaw = type === 'movie' ? d.keywords?.keywords : d.keywords?.results;
   const keywords: Named[] = Array.isArray(kwRaw) ? kwRaw.filter((k: any) => k?.id) : [];
-  const cast: Person[] = Array.isArray(d.credits?.cast)
-    ? d.credits.cast.slice(0, 8).map((c: any) => ({ id: c.id, name: c.name, role: c.character }))
-    : [];
+  const agg = type === 'tv' && Array.isArray(d.aggregate_credits?.cast) ? d.aggregate_credits.cast : null;
+  const castRaw: any[] = agg ?? (Array.isArray(d.credits?.cast) ? d.credits.cast : []);
+  const cast: Person[] = castRaw
+    .filter((c: any) => typeof c?.id === 'number')
+    .map((c: any, i: number) => ({
+      id: c.id, name: c.name,
+      role: c.character ?? c.roles?.[0]?.character,
+      order: typeof c.order === 'number' ? c.order : i,
+      episodes: typeof c.total_episode_count === 'number' ? c.total_episode_count : undefined,
+    }))
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 8);
   let directors: Person[] = [];
   if (type === 'movie') {
     directors = (d.credits?.crew ?? []).filter((c: any) => c.job === 'Director').map((c: any) => ({ id: c.id, name: c.name, role: 'Dirección' }));
@@ -256,6 +269,9 @@ export function mapDetails(d: any, type: MediaType, language: string): TitleMeta
     originalLanguage: d.original_language,
     originCountry: d.origin_country ?? (Array.isArray(d.production_countries) ? d.production_countries.map((c: any) => c.iso_3166_1) : undefined),
     voteAverage: d.vote_average, voteCount: d.vote_count, popularity: d.popularity,
+    collection: d.belongs_to_collection?.id ? { id: d.belongs_to_collection.id, name: d.belongs_to_collection.name } : undefined,
+    totalEpisodes: type === 'tv' && typeof d.number_of_episodes === 'number' ? d.number_of_episodes : undefined,
+    metaVersion: META_VERSION,
     related: [...new Set(related)],
     completeness: 'full', missing, source: TMDB_SOURCE, fetchedAt: Date.now(),
   };

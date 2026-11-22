@@ -1,9 +1,9 @@
 import { db } from '../db/db';
 import { migrateRating } from '../db/migrations';
 
-export const EXPORT_FORMAT = 'cine-match-export/2';
+export const EXPORT_FORMAT = 'cine-match-export/3';
 /** Formatos que se pueden importar (las exportaciones v1 se migran al importar) */
-export const IMPORT_FORMATS = ['cine-match-export/1', 'cine-match-export/2'];
+export const IMPORT_FORMATS = ['cine-match-export/1', 'cine-match-export/2', 'cine-match-export/3'];
 
 /** Exporta datos personales (no incluye la clave de TMDB). */
 export async function exportData() {

@@ -15,7 +15,30 @@ export const FAMILY_WEIGHT: Record<string, number> = {
   len: 0.3, // duración (ritmo/compromiso)
   lang: 0.35, // idioma original
   seas: 0.25, // extensión de la serie (complejidad/compromiso)
+  end: 0.5, // características del final derivadas de palabras clave de TMDB (nunca se muestran: spoilers)
 };
+
+/**
+ * Características del final que TMDB publica como palabras clave (fuente verificable, curada por la
+ * comunidad). Sólo se usan para aprender del aspecto «Final o desenlace» y nunca se muestran.
+ * Si un título no tiene ninguna, ese componente simplemente no existe para él.
+ */
+export const ENDING_TRAITS: { id: string; pattern: RegExp }[] = [
+  { id: 'twist', pattern: /plot twist|twist ending|surprise ending|shocking ending|unexpected ending|twist$/i },
+  { id: 'open', pattern: /open ending|open-ended|inconclusive ending/i },
+  { id: 'ambiguous', pattern: /ambiguous ending|ambiguity/i },
+  { id: 'tragic', pattern: /tragic ending|sad ending|downer ending|unhappy ending/i },
+  { id: 'happy', pattern: /happy ending|uplifting ending|feel-good ending/i },
+  { id: 'bittersweet', pattern: /bittersweet/i },
+  { id: 'cliffhanger', pattern: /cliffhanger/i },
+  { id: 'emotional', pattern: /emotional ending|tearjerker|tear jerker/i },
+];
+
+export function endingTraits(t: Pick<TitleMeta, 'keywords'>): string[] {
+  const out = new Set<string>();
+  for (const k of t.keywords) for (const e of ENDING_TRAITS) if (e.pattern.test(k.name)) out.add(e.id);
+  return [...out];
+}
 
 export const family = (f: string) => f.slice(0, f.indexOf(':'));
 
@@ -28,6 +51,7 @@ export function rawFeatures(t: TitleMeta): string[] {
   for (const k of t.keywords.slice(0, 25)) fs.add(`k:${k.id}`);
   for (const d of t.directors.slice(0, 3)) fs.add(`d:${d.id}`);
   for (const c of t.cast.slice(0, 5)) fs.add(`c:${c.id}`);
+  for (const e of endingTraits(t)) fs.add(`end:${e}`);
   fs.add(`t:${t.type}`);
   if (t.year) fs.add(`era:${Math.floor(t.year / 10) * 10}`);
   if (t.runtime) {

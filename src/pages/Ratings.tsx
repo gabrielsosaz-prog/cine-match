@@ -1,20 +1,22 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { LIST_LABELS } from '../constants';
+import { DIMENSIONS, LIST_LABELS, RETIRED_DIMENSIONS } from '../constants';
 import { db } from '../db/db';
-import { hasScore, migrateRating } from '../db/migrations';
+import { aspectCompletion, hasScore, migrateRating } from '../db/migrations';
 import { useApp } from '../hooks/useApp';
-import { setWatched } from '../services/ratings';
+import { setNotInterested, setWatched } from '../services/ratings';
 import type { ListStatus, MediaType, Rating, TitleMeta } from '../types';
-import { Card, Chip, Empty, Poster, TitleLink, TypeBadge } from '../ui/components';
+import { Card, Chip, CompletionRing, Empty, Poster, TitleLink, TypeBadge } from '../ui/components';
+import RatingEditor from '../ui/RatingEditor';
 import { num, relTime } from '../ui/format';
 
-type Sort = 'recent' | 'score' | 'title';
-type View = 'all' | 'watched' | 'unwatched' | 'scored' | ListStatus;
+type Sort = 'recent' | 'score' | 'title' | 'completion-desc' | 'completion-asc';
+export type View = 'all' | 'watched' | 'unwatched' | 'scored' | 'complete' | 'incomplete' | 'dismissed' | ListStatus;
 
 const VIEWS: [View, string][] = [
   ['all', 'Todos'], ['watched', 'Vistos'], ['unwatched', 'No vistos'], ['scored', 'Puntuados'],
-  ['want', LIST_LABELS.want], ['watching', LIST_LABELS.watching], ['abandoned', LIST_LABELS.abandoned], ['not_interested', LIST_LABELS.not_interested],
+  ['complete', 'Aspectos completos'], ['incomplete', 'Aspectos incompletos'],
+  ['want', LIST_LABELS.want], ['watching', LIST_LABELS.watching], ['abandoned', LIST_LABELS.abandoned], ['dismissed', 'Descartados'],
 ];
 
 export function matchesView(r: Rating, v: View) {
@@ -22,7 +24,20 @@ export function matchesView(r: Rating, v: View) {
   if (v === 'watched') return r.watched;
   if (v === 'unwatched') return !r.watched;
   if (v === 'scored') return hasScore(r);
+  if (v === 'complete') return aspectCompletion(r).percent === 100;
+  // Incompletos: títulos que valoraste (vista o con nota) y a los que les faltan aspectos
+  if (v === 'incomplete') return aspectCompletion(r).percent < 100 && (r.watched || r.overall !== undefined || Object.keys(r.dimensions).length > 0);
+  if (v === 'dismissed') return Boolean(r.notInterested);
   return r.list === v;
+}
+
+export function sortRatings(rs: Rating[], sort: Sort, title: (r: Rating) => string): Rating[] {
+  const pct = (r: Rating) => aspectCompletion(r).percent;
+  return [...rs].sort((a, b) => sort === 'recent' ? b.updatedAt - a.updatedAt
+    : sort === 'score' ? (b.overall ?? -1) - (a.overall ?? -1)
+    : sort === 'completion-desc' ? pct(b) - pct(a) || b.updatedAt - a.updatedAt
+    : sort === 'completion-asc' ? pct(a) - pct(b) || b.updatedAt - a.updatedAt
+    : title(a).localeCompare(title(b)));
 }
 
 export default function Ratings() {
@@ -35,10 +50,13 @@ export default function Ratings() {
   const [sort, setSort] = useState<Sort>('recent');
   const tmap = new Map(titles.filter(Boolean).map((t) => [t!.key, t!]));
 
+  const [editingKey, setEditingKey] = useState<string>();
   const rows = useMemo(() => {
     const r = ratings.filter((x) => matchesView(x, view) && (type === 'all' || tmap.get(x.key)?.type === type));
-    return r.sort((a, b) => sort === 'recent' ? b.updatedAt - a.updatedAt : sort === 'score' ? (b.overall ?? -1) - (a.overall ?? -1) : (tmap.get(a.key)?.title ?? '').localeCompare(tmap.get(b.key)?.title ?? ''));
+    return sortRatings(r, sort, (x) => tmap.get(x.key)?.title ?? '');
   }, [ratings, titles, view, type, sort]);
+  const editing = ratings.find((r) => r.key === editingKey);
+  const editingMeta = editing ? tmap.get(editing.key) : undefined;
 
   const scored = ratings.filter((r) => r.overall !== undefined);
   const avg = scored.length ? scored.reduce((a, r) => a + r.overall!, 0) / scored.length : NaN;
@@ -75,15 +93,30 @@ export default function Ratings() {
         <Chip active={type === 'tv'} onClick={() => setType('tv')}>Series</Chip>
         <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="ml-auto rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10" aria-label="Ordenar">
           <option value="recent">Recientes</option><option value="score">Mejor nota</option><option value="title">Título</option>
+          <option value="completion-desc">Más aspectos completados</option><option value="completion-asc">Menos aspectos completados</option>
         </select>
       </div>
       {rows.length === 0 && <Empty>No hay títulos en esta vista. Buscá algo y marcalo como visto o puntualo.</Empty>}
-      <ul className="space-y-2">{rows.map((r) => <RatingRow key={r.id} r={r} t={tmap.get(r.key)} profileId={profileId} />)}</ul>
+      <p className="text-[11px] text-slate-500">El porcentaje indica cuántos de los {DIMENSIONS.length} aspectos puntuaste. Es sólo informativo: no hace falta llegar al 100 %.</p>
+      <ul className="space-y-2">{rows.map((r) => <RatingRow key={r.id} r={r} t={tmap.get(r.key)} profileId={profileId} onComplete={() => setEditingKey(r.key)} />)}</ul>
+      {editing && (
+        <div className="fixed inset-0 z-30 flex items-end bg-black/60" role="dialog" aria-modal="true" aria-label="Completar aspectos" data-testid="aspects-sheet"
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingKey(undefined); }}>
+          <div className="safe-bottom mx-auto max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-ink-900 p-4 ring-1 ring-white/10">
+            <div className="mb-2 font-semibold">{editingMeta?.title ?? editing.key}</div>
+            <p className="mb-2 text-[11px] text-slate-400">Resaltamos los aspectos que faltan. Completá sólo los que quieras.</p>
+            <RatingEditor profileId={profileId} k={editing.key} existing={editing} isTv={editingMeta?.type === 'tv'} title={editingMeta} openAspects highlightMissing
+              onCancel={() => setEditingKey(undefined)} onSaved={() => setEditingKey(undefined)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function RatingRow({ r, t, profileId }: { r: Rating; t?: TitleMeta; profileId: string }) {
+function RatingRow({ r, t, profileId, onComplete }: { r: Rating; t?: TitleMeta; profileId: string; onComplete: () => void }) {
+  const c = aspectCompletion(r);
+  const retired = Object.keys(r.legacy?.dimensions10 ?? {}).filter((k) => RETIRED_DIMENSIONS[k]);
   return (
     <li data-testid="rating-row" className="flex items-center gap-2 rounded-2xl bg-ink-900 p-2.5 ring-1 ring-white/5">
       <TitleLink k={r.key} className="flex min-w-0 flex-1 items-center gap-3">
@@ -93,13 +126,22 @@ function RatingRow({ r, t, profileId }: { r: Rating; t?: TitleMeta; profileId: s
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
             {t && <TypeBadge type={t.type} />}
             {r.list && <span>{LIST_LABELS[r.list]}</span>}
+            {r.notInterested && <span className="text-red-300">Descartado</span>}
             <span>· {relTime(r.updatedAt)}</span>
           </div>
           {r.abandonReason && <div className="text-[11px] text-slate-500">Motivo: {r.abandonReason}</div>}
-          {Object.keys(r.dimensions).length > 0 && <div className="text-[11px] text-slate-500">{Object.keys(r.dimensions).length} aspectos puntuados</div>}
+          {r.comment && <div className="truncate text-[11px] italic text-slate-400">«{r.comment}»</div>}
+          {retired.length > 0 && <div className="text-[10px] text-slate-500">Conservado de la versión anterior: {retired.map((k) => RETIRED_DIMENSIONS[k]).join(' y ')}</div>}
         </div>
         <div className="text-xl font-bold text-accent" data-testid="row-score">{r.overall ?? '—'}</div>
       </TitleLink>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <button type="button" onClick={onComplete} data-testid="row-complete" aria-label={c.percent < 100 ? `Completar aspectos faltantes (${c.done} de ${c.total})` : `Editar aspectos (${c.done} de ${c.total})`}
+          className="flex items-center gap-1 rounded-lg bg-ink-800 px-1.5 py-1 ring-1 ring-white/10"><CompletionRing {...c} />{c.percent < 100 && <span className="text-[10px] text-accent">＋</span>}</button>
+        {r.notInterested
+          ? <button type="button" data-testid="row-undo-dismiss" onClick={() => setNotInterested(profileId, r.key, false)} className="rounded-lg bg-ink-800 px-2 py-1 text-[11px] text-accent ring-1 ring-white/10">Volver a recomendar</button>
+          : null}
+      </div>
       <button type="button" aria-pressed={r.watched} data-testid="row-watched" onClick={() => setWatched(profileId, r.key, !r.watched)}
         className={`shrink-0 rounded-lg px-2 py-1.5 text-[11px] font-semibold ${r.watched ? 'bg-emerald-500/20 text-emerald-300' : 'bg-ink-800 text-slate-400 ring-1 ring-white/10'}`}>
         {r.watched ? '✓ Vista' : 'No vista'}

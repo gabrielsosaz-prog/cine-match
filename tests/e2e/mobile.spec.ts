@@ -61,17 +61,17 @@ test('flujo completo en Android: configurar, incorporar, recomendar, buscar y va
   await page.getByTestId('search-input').fill('Scifi Film');
   await page.getByTestId('search-result').filter({ hasText: 'Scifi Film' }).first().click();
   await expect(page.getByText('Dónde verla (AR)')).toBeVisible();
-  await page.getByTestId('overall').getByRole('button', { name: 'Valoración general: 9' }).click();
-  await page.getByRole('button', { name: /Puntuar aspectos/ }).click();
-  await page.getByTestId('dim-suspense').getByRole('button', { name: /: 10$/ }).click();
-  await page.getByTestId('dim-ending').getByRole('button', { name: /: 7$/ }).click();
+  await page.getByTestId('overall').getByRole('button', { name: 'Valoración general (1-10): 9' }).click();
+  await page.getByTestId('toggle-aspects').click();
+  await page.getByTestId('dim-suspense').getByRole('radio', { name: /5 estrellas$/ }).click();
+  await page.getByTestId('dim-ending').getByRole('radio', { name: /4 estrellas$/ }).click();
   await page.getByTestId('save-rating').click();
-  await expect(page.getByTestId('save-status')).toContainText('Ranking actualizado');
+  await expect(page.getByTestId('save-status')).toContainText('Modelo recalculado');
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-ficha.png`, fullPage: true });
 
   // Modificar la valoración
-  await page.getByTestId('overall').getByRole('button', { name: 'Valoración general: 6' }).click();
+  await page.getByTestId('overall').getByRole('button', { name: 'Valoración general (1-10): 6' }).click();
   await page.getByTestId('save-rating').click();
   await expect(page.getByTestId('save-status')).toContainText('Guardado');
 
@@ -171,12 +171,13 @@ test('v2: filtro de vistos y acciones rápidas sin salir del ranking', async ({ 
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-v2-acciones.png` });
   await card.getByRole('button', { name: 'Nota general 9' }).click();
-  await expect(page.getByTestId('rank-notice')).toBeVisible({ timeout: 15000 });
+  await expect(card.getByTestId('quick-after-save')).toBeVisible({ timeout: 15000 });
   await expect(page).toHaveURL(/#\/$/);
   const scoredCard = page.getByTestId('rec-item').filter({ hasText: scoredName });
   await expect(scoredCard).toHaveCount(1); // puntuar no la marca como vista
-  await expect(scoredCard.getByTestId('quick-watched')).toHaveText(/Marcar vista/);
+  await expect(scoredCard.getByTestId('quick-watched')).toHaveAttribute('aria-pressed', 'false');
   await expect(scoredCard).toContainText('tu nota');
+  await scoredCard.getByTestId('quick-done').click();
 
   // Panel de aspectos dentro del ranking, editando la valoración existente
   await scoredCard.evaluate((e) => e.scrollIntoView({ block: 'center' }));
@@ -184,14 +185,14 @@ test('v2: filtro de vistos y acciones rápidas sin salir del ranking', async ({ 
   const sheet = page.getByTestId('aspects-sheet');
   await expect(sheet).toBeVisible();
   await expect(sheet.getByTestId('overall')).toContainText('9');
-  await sheet.getByTestId('dim-acting').getByRole('button', { name: /: 8$/ }).click();
-  await sheet.getByTestId('dim-pacing').getByRole('button', { name: /: 4$/ }).click();
+  await sheet.getByTestId('dim-acting').getByRole('radio', { name: /4 estrellas$/ }).click();
+  await sheet.getByTestId('dim-pacing').getByRole('radio', { name: /2 estrellas$/ }).click();
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-v2-aspectos.png` });
   await sheet.getByTestId('save-rating').click();
   await expect(sheet).toBeHidden({ timeout: 15000 });
   await expect(page).toHaveURL(/#\/$/);
-  await expect(page.getByTestId('rec-item').filter({ hasText: scoredName }).getByTestId('quick-aspects')).toContainText('(2)');
+  await expect(page.getByTestId('rec-item').filter({ hasText: scoredName }).getByTestId('quick-aspects')).toContainText('2/7');
 
   // Combinado con plataforma y tipo
   await page.getByTestId('filter-tv').click();
@@ -243,7 +244,9 @@ test('v2: las valoraciones de la versión anterior siguen apareciendo', async ({
   const old = rows.filter({ hasText: 'Película antigua' });
   await expect(old.getByTestId('row-score')).toHaveText('9');
   await expect(old.getByTestId('row-watched')).toHaveText(/Vista/);
-  await expect(old).toContainText('2 aspectos');
+  // story 10 → 5 estrellas; «Personajes» (retirado) se conserva como respaldo
+  await expect(old.getByTestId('completion')).toHaveAttribute('data-percent', '14');
+  await expect(old).toContainText('Conservado de la versión anterior: Personajes');
   await expect(rows.filter({ hasText: 'Serie pendiente' })).toContainText('Quiero verla');
   await expect(rows.filter({ hasText: 'Película abandonada' })).toContainText('Ritmo muy lento');
   await page.getByTestId('view-watched').click();
@@ -253,4 +256,141 @@ test('v2: las valoraciones de la versión anterior siguen apareciendo', async ({
   await old.getByTestId('row-watched').click();
   await expect(old.getByTestId('row-watched')).toHaveText('No vista');
   await expect(old.getByTestId('row-score')).toHaveText('9');
+});
+
+// ---------------- v2.1 ----------------
+test('v2.1: puntuar varios títulos seguidos sin que desaparezcan; actualizar el orden a mano', async ({ page }, info) => {
+  await onboardQuick(page);
+  const items = page.getByTestId('rec-item');
+  const before = await items.evaluateAll((els) => els.map((e) => e.getAttribute('data-key')));
+  // Puntuar tres tarjetas seguidas (sólo nota general)
+  for (const i of [0, 1, 2]) {
+    const card = items.nth(i);
+    await card.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+    await card.getByTestId('quick-score').click();
+    await card.getByRole('button', { name: `Nota general ${7 + i}` }).click();
+    await expect(card.getByTestId('quick-after-save')).toBeVisible({ timeout: 15000 });
+    await card.getByTestId('quick-done').click();
+  }
+  // Marcar una como vista con el filtro «No vistos»: sigue visible durante la interacción
+  await items.nth(3).getByTestId('quick-watched').click();
+  await expect(page.getByTestId('pending-changes')).toBeVisible();
+  const during = await items.evaluateAll((els) => els.map((e) => e.getAttribute('data-key')));
+  expect(during.slice(0, 6)).toEqual(before.slice(0, 6)); // nada desapareció ni se reordenó
+  await expect(page.getByTestId('pending-changes')).toContainText('todavía no se reflejan', { timeout: 15000 });
+  await noHorizontalScroll(page);
+  await page.screenshot({ path: `test-results/${info.project.name}-v21-pendientes.png` });
+  // Actualizar ranking: aplica el orden nuevo y saca la vista del filtro «No vistos»
+  await page.getByTestId('apply-ranking').click();
+  await expect(page.getByTestId('pending-changes')).toBeHidden({ timeout: 15000 });
+  await expect(page.getByTestId('rank-notice')).toBeVisible();
+  await expect(page.locator(`[data-testid="rec-item"][data-key="${before[3]}"]`)).toHaveCount(0);
+});
+
+test('v2.1: estrellas, «Otros» y borrador ante un cierre accidental', async ({ page }, info) => {
+  await onboardQuick(page);
+  const card = page.getByTestId('rec-item').nth(1);
+  const key = await card.getAttribute('data-key');
+  await card.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await card.getByTestId('quick-score').click();
+  await card.getByRole('button', { name: 'Nota general 8' }).click();
+  await card.getByTestId('quick-complete').click();
+  const sheet = page.getByTestId('aspects-sheet');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByTestId('dim-story')).toBeVisible();
+  // Orden exacto de los siete aspectos
+  const labels = await sheet.locator('[data-testid^="dim-"]:not([data-testid$="-clear"])').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
+  expect(labels).toEqual(['dim-story', 'dim-acting', 'dim-ending', 'dim-emotion', 'dim-visuals', 'dim-pacing', 'dim-suspense']);
+  await expect(sheet).not.toContainText('Originalidad');
+  await expect(sheet).not.toContainText('Personajes');
+  await sheet.getByTestId('dim-story').getByRole('radio', { name: /5 estrellas$/ }).click();
+  await sheet.getByTestId('dim-ending').getByRole('radio', { name: /3 estrellas$/ }).click();
+  await sheet.getByTestId('dim-ending-clear').click(); // quitar una estrella ya asignada
+  await sheet.getByTestId('comment').fill('Me gustó la idea de que en realidad vivimos dentro de una simulación.');
+  await expect(sheet.getByTestId('comment-interpretation')).toContainText('realidad simulada');
+  await noHorizontalScroll(page);
+  await page.screenshot({ path: `test-results/${info.project.name}-v21-estrellas.png` });
+  // Cierre accidental tocando fuera: el borrador se conserva
+  await page.screenshot({ path: `test-results/${info.project.name}-v21-antes-de-cerrar.png` });
+  await page.mouse.click(10, 50);
+  await expect(sheet).toBeHidden();
+  const c2 = page.locator(`[data-testid="rec-item"][data-key="${key}"]`);
+  await expect(c2).toContainText('borrador');
+  await c2.getByTestId('quick-aspects').click();
+  await expect(page.getByTestId('draft-restored')).toBeVisible();
+  await expect(page.getByTestId('comment')).toHaveValue(/simulación/);
+  await page.getByTestId('save-rating').click();
+  await expect(sheet).toBeHidden({ timeout: 15000 });
+  await expect(c2.getByTestId('quick-aspects')).toContainText('1/7');
+  await expect(c2).not.toContainText('borrador');
+});
+
+test('v2.1: «No me interesa», descartados y reversión', async ({ page }) => {
+  await onboardQuick(page);
+  const card = page.getByTestId('rec-item').nth(2);
+  const key = await card.getAttribute('data-key');
+  const name = await titleOf(card);
+  await card.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await card.getByTestId('quick-not-interested').click();
+  await expect(card.getByTestId('dismissed-note')).toBeVisible();
+  await expect(card).toHaveAttribute('data-dismissed', 'true'); // sigue visible hasta actualizar
+  await card.getByTestId('undo-not-interested').click();
+  await expect(card.getByTestId('quick-not-interested')).toBeVisible();
+  await card.getByTestId('quick-not-interested').click();
+  await page.getByTestId('apply-ranking').click();
+  await expect(page.locator(`[data-testid="rec-item"][data-key="${key}"]`)).toHaveCount(0, { timeout: 15000 });
+  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await page.getByTestId('view-dismissed').click();
+  const row = page.getByTestId('rating-row').filter({ hasText: name });
+  await expect(row).toBeVisible();
+  await row.getByTestId('row-undo-dismiss').click();
+  await expect(page.getByTestId('rating-row').filter({ hasText: name })).toHaveCount(0);
+});
+
+test('v2.1: panel de filtros combinables con indicador y limpieza', async ({ page }, info) => {
+  await onboardQuick(page);
+  await page.getByTestId('filters-toggle').click();
+  const panel = page.getByTestId('filters-panel');
+  await expect(panel).toBeVisible();
+  await expect(page.getByTestId('filters-mode')).toHaveText('Recomendaciones generales');
+  await panel.getByTestId('panel-movie').click();
+  await panel.getByTestId('filter-year-min').fill('2000');
+  await expect(page.getByTestId('filters-count')).toHaveText('2');
+  await noHorizontalScroll(page);
+  await page.screenshot({ path: `test-results/${info.project.name}-v21-filtros.png`, fullPage: true });
+  const n = await page.getByTestId('rec-item').count();
+  for (let i = 0; i < Math.min(n, 5); i++) {
+    const t = page.getByTestId('rec-item').nth(i);
+    await expect(t).toContainText('Película');
+    const year = Number((await t.innerText()).match(/\b(19|20)\d{2}\b/)?.[0]);
+    expect(year).toBeGreaterThanOrEqual(2000);
+  }
+  // Un año imposible deja sin resultados y explica qué filtro restringe
+  await panel.getByTestId('filter-year-min').fill('2090');
+  await expect(page.getByTestId('filters-empty')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(/Sin «Desde 2090» habría/)).toBeVisible();
+  // Se conserva al navegar
+  await page.getByRole('link', { name: /Buscar/ }).click();
+  await page.goBack();
+  await expect(page.getByTestId('filters-count')).toHaveText('2');
+  await page.getByTestId('reset-general').click();
+  await expect(page.getByTestId('filters-mode')).toHaveText('Recomendaciones generales');
+  await expect(page.getByTestId('rec-item').first()).toBeVisible();
+});
+
+test('v2.1: porcentaje de aspectos y acceso a los faltantes', async ({ page }) => {
+  await onboardQuick(page);
+  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  const row = page.getByTestId('rating-row').first();
+  await expect(row.getByTestId('completion')).toHaveAttribute('data-percent', '0');
+  await row.getByTestId('row-complete').click();
+  const sheet = page.getByTestId('aspects-sheet');
+  await sheet.getByTestId('dim-story').getByRole('radio', { name: /4 estrellas$/ }).click();
+  await sheet.getByTestId('dim-acting').getByRole('radio', { name: /3 estrellas$/ }).click();
+  await sheet.getByTestId('dim-emotion').getByRole('radio', { name: /2 estrellas$/ }).click();
+  await sheet.getByTestId('save-rating').click();
+  await expect(sheet).toBeHidden({ timeout: 15000 });
+  await page.getByTestId('view-incomplete').click();
+  await expect(page.locator('[data-testid="completion"][data-percent="43"]')).toHaveCount(1);
+  await noHorizontalScroll(page);
 });

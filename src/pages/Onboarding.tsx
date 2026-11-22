@@ -44,7 +44,7 @@ function QuickRate({ r, profileId, onDone }: { r: SearchResult; profileId: strin
         <div className="min-w-0">
           <div className="font-medium leading-tight">{r.title}</div>
           <div className="flex items-center gap-1 text-xs text-slate-400"><TypeBadge type={r.type} />{r.year}</div>
-          {existing && <div className="text-xs text-accent">{existing.overall ? `Vista · tu nota: ${existing.overall}` : existing.list === 'want' ? 'Quiero verla' : existing.list === 'not_interested' ? 'No me interesa' : existing.watched ? 'Vista' : ''}</div>}
+          {existing && <div className="text-xs text-accent">{existing.overall ? `Vista · tu nota: ${existing.overall}` : existing.list === 'want' ? 'Quiero verla' : existing.notInterested ? 'No me interesa' : existing.watched ? 'Vista' : ''}</div>}
         </div>
       </div>
       <div className="mt-2 flex gap-0.5">
@@ -54,7 +54,7 @@ function QuickRate({ r, profileId, onDone }: { r: SearchResult; profileId: strin
       </div>
       <div className="mt-1.5 flex gap-1.5 text-xs">
         <button onClick={() => set({ list: 'want', watched: false })} className="rounded-full bg-ink-800 px-2.5 py-1">Quiero verla</button>
-        <button onClick={() => set({ list: 'not_interested' })} className="rounded-full bg-ink-800 px-2.5 py-1">No me interesa</button>
+        <button onClick={() => set({ notInterested: true })} className="rounded-full bg-ink-800 px-2.5 py-1">No me interesa</button>
         <button onClick={() => set({ watched: true })} className="rounded-full bg-ink-800 px-2.5 py-1">Vista, sin nota</button>
       </div>
     </div>

@@ -40,6 +40,11 @@ export class CineDB extends Dexie {
     this.version(2)
       .stores({ ratings: 'id, profileId, key, updatedAt, [profileId+list]' })
       .upgrade((tx) => tx.table('ratings').toCollection().modify((r: any, ref: { value: unknown }) => { ref.value = migrateRating(r); }));
+    // v3 (Cine Match v2.1): aspectos en estrellas 1-5 con respaldo de las notas 1-10, «No me interesa» propio
+    // y comentario «Otros». Mismos índices; la migración es idempotente y no borra registros.
+    this.version(3)
+      .stores({ ratings: 'id, profileId, key, updatedAt, [profileId+list]' })
+      .upgrade((tx) => tx.table('ratings').toCollection().modify((r: any, ref: { value: unknown }) => { ref.value = migrateRating(r); }));
   }
 }
 

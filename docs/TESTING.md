@@ -1,4 +1,15 @@
-# Resultados de pruebas (v2.0)
+# Resultados de pruebas (v2.1)
+
+## Resumen v2.1
+
+- Vitest: **111/111 OK** (31 nuevas en `v21.test.ts`: conversión de escala, migración real de una base v2 de IndexedDB e importación de exportes v2, aspectos opcionales y quitar estrellas, peso cero de aspectos nunca puntuados, actores, finales, «Otros», «No me interesa» y reversión, sagas, excepciones positivas, filtros combinados, completitud, mapeo de TMDB).
+- Playwright Android (Pixel 7 y 360 px): **24/24 OK**, incluidos: puntuar varios títulos seguidos sin que desaparezcan ni se reordenen, aviso de cambios pendientes y «Actualizar ranking», estrellas en el orden pedido, «Otros» con interpretación visible, borrador tras un cierre accidental, «No me interesa» con deshacer y sección Descartados, panel de filtros con indicador, persistencia al navegar y diagnóstico sin resultados, porcentaje de aspectos y acceso a los faltantes, base v1 sembrada en el navegador.
+- Escenarios sintéticos (`docs/v21-scenarios.json`): influencia del suspenso 0,15 → 0,32 → 0,67 con 1, 3 y 8 títulos; actor con 1 vs 4 actuaciones de 5★: aporte 0,15 vs 0,41; finales con giro 8,9 vs 8,14; comentario sobre la simulación: título con realidad virtual 7,31 → 7,82, sin relación 0; descartar Endgame: misma saga −0,71, acción no relacionada −0,05; descartes de superhéroes 1/3/5: −0,31/−0,65/−0,84; con Batman puntuadas 9: Batman −0,15 vs otro superhéroe −0,70.
+- Evaluación offline sintética: NDCG@10 0,785 · Recall@10 0,93 · cobertura 0,505.
+
+**Son pruebas sintéticas**: verifican comportamiento, no la calidad predictiva con usuarios reales.
+
+## Detalle v2.0
 
 ## Unitarias e integración (Vitest) — 80/80 OK
 

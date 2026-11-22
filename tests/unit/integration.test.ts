@@ -92,7 +92,7 @@ describe('v2: visto, rechazo y aprendizaje en el flujo completo', () => {
     const { run } = await rateAndLearn(P, hits[1].key, { watched: true });
     expect(run).toBeUndefined(); // «vista» no es señal de gusto
     expect((await latestRun(P))!.id).toBe(before.id);
-    const rej = await rateAndLearn(P, hits[2].key, { list: 'not_interested' });
+    const rej = await rateAndLearn(P, hits[2].key, { notInterested: true });
     expect(rej.run!.items.some((i) => i.key === hits[2].key)).toBe(false);
   });
 });

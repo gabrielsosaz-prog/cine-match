@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import Dexie from 'dexie';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CineDB, useTestDb } from '../../src/db/db';
-import { migrateRating } from '../../src/db/migrations';
+import { migrateRating, tenToStars } from '../../src/db/migrations';
 import { ensureBootstrap, listRatings, saveRating } from '../../src/db/repo';
 import { buildProfile } from '../../src/engine/profile';
 import { rank, scoreCandidates } from '../../src/engine/recommender';
@@ -45,27 +45,30 @@ describe('Migración de datos de la v1', () => {
     await ensureBootstrap();
     const rs = new Map((await listRatings(P)).map((r) => [r.key, r]));
     expect(rs.size).toBe(6);
-    expect(rs.get('movie:1')).toMatchObject({ watched: true, overall: 9, dimensions: { story: 10, suspense: 8 }, createdAt: 1000, updatedAt: 2000, schema: 2 });
-    expect(rs.get('movie:2')).toMatchObject({ watched: true, overall: undefined });
+    // v2.1: los aspectos pasan a estrellas (10→5, 8→4) y el original 1-10 queda respaldado
+    expect(rs.get('movie:1')).toMatchObject({ watched: true, overall: 9, dimensions: { story: 5, suspense: 4 }, legacy: { dimensions10: { story: 10, suspense: 8 }, fromSchema: 1 }, createdAt: 1000, updatedAt: 2000, schema: 3 });
+    expect(rs.get('movie:2')).toMatchObject({ watched: true });
+    expect(rs.get('movie:2')!.overall).toBeUndefined();
     expect(rs.get('tv:3')).toMatchObject({ watched: false, list: 'want' });
     expect(rs.get('tv:4')).toMatchObject({ watched: false, list: 'watching', overall: 7 });
     expect(rs.get('movie:5')).toMatchObject({ list: 'abandoned', abandonReason: 'Ritmo muy lento', overall: 3 });
-    expect(rs.get('tv:6')).toMatchObject({ list: 'not_interested' });
+    expect(rs.get('tv:6')).toMatchObject({ notInterested: true, watched: false });
+    expect(rs.get('tv:6')!.list).toBeUndefined();
     for (const r of rs.values()) expect((r as any).status).toBeUndefined();
     // El índice nuevo funciona sobre datos migrados
     expect(await dbv2.ratings.where('[profileId+list]').equals([P, 'want']).count()).toBe(1);
     expect((await dbv2.profiles.get(P))?.name).toBe('Principal');
   });
 
-  it('importa exportaciones v1 y vuelve a exportar en formato v2', async () => {
+  it('importa exportaciones v1 y vuelve a exportar en el formato actual', async () => {
     useTestDb(`imp-${Date.now()}`); await ensureBootstrap();
     const r = await importData({ format: 'cine-match-export/1', ratings: [v1('movie:9', 'rated', { overall: 8 }), v1('tv:8', 'want')] });
     expect(r.ratings).toBe(2);
     const all = await listRatings(P);
     expect(all.find((x) => x.key === 'movie:9')).toMatchObject({ watched: true, overall: 8 });
     const out = await exportData();
-    expect(out.format).toBe('cine-match-export/2');
-    expect(out.ratings.every((x: Rating) => x.schema === 2)).toBe(true);
+    expect(out.format).toBe('cine-match-export/3');
+    expect(out.ratings.every((x: Rating) => x.schema === 3)).toBe(true);
   });
 
   it('migrateRating es idempotente', () => {
@@ -94,8 +97,11 @@ describe('Filtro de vistos del ranking', () => {
 let metas: Map<TitleKey, TitleMeta>, byKey: Map<TitleKey, FakeTitle>;
 beforeAll(async () => ({ metas, byKey } = await syntheticMetas(20)));
 const keysOf = (c: string) => [...byKey].filter(([, t]) => t.cluster === c).map(([k]) => k);
+// Los escenarios se escriben en escala 1-10 (como en la v2.0) y se convierten a estrellas con la misma
+// transformación documentada que usa la migración.
+const stars = (d: DimensionScores) => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, tenToStars(v!)])) as DimensionScores;
 const R = (key: TitleKey, overall: number | undefined, dims: DimensionScores = {}, extra: Partial<Rating> = {}): Rating =>
-  ({ id: `p|${key}`, profileId: 'p', key, watched: true, overall, dimensions: dims, createdAt: 0, updatedAt: 0, schema: 2, ...extra });
+  ({ id: `p|${key}`, profileId: 'p', key, watched: true, overall, dimensions: stars(dims), createdAt: 0, updatedAt: 0, schema: 3, ...extra });
 const avgPred = (ratings: Rating[], cands: TitleKey[]) => {
   const profile = buildProfile(ratings, metas);
   const s = scoreCandidates({ profile, ratings, titles: metas, candidates: cands });
@@ -183,8 +189,8 @@ describe('Aprendizaje con puntuaciones por aspecto', () => {
     const th = keysOf('thriller');
     const rs = th.slice(0, 8).map((k) => R(k, 9, { suspense: 10, ending: 9 }));
     const items = rank({ profile: buildProfile(rs, metas), ratings: rs, titles: metas, candidates: th.slice(8), limit: 5 });
-    expect(items[0].dimensionEstimates?.suspense).toBeGreaterThan(8);
-    expect(items[0].explanation.join(' ')).toMatch(/suspenso e intriga/);
+    expect(items[0].dimensionEstimates?.suspense).toBeGreaterThan(4); // estrellas
+    expect(items[0].explanation.join(' ')).toMatch(/suspenso o intriga/);
     expect(items[0].explanation.join(' ')).not.toMatch(/actuaciones/); // nunca puntuado
   });
 
@@ -209,9 +215,9 @@ describe('Aprendizaje con puntuaciones por aspecto', () => {
   });
 });
 
-it('la base v2 abre vacía sin errores', async () => {
+it('la base nueva abre vacía sin errores (versión 3)', async () => {
   const d = new CineDB(`fresh-${Date.now()}`);
   await d.open();
-  expect(d.verno).toBe(2);
+  expect(d.verno).toBe(3);
   d.close();
 });

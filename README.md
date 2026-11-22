@@ -51,7 +51,28 @@ Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se 
 - **Acciones rápidas en cada tarjeta**: vista con un toque, nota general en línea, panel de aspectos y edición, sin salir del ranking. Se recalcula al guardar, pero el orden no cambia mientras editás.
 - **Migración automática** de los datos v1 (sin pérdida) y exportación `cine-match-export/2`, que también importa archivos v1.
 
-### Motor de recomendaciones (`hybrid-aspects-2.0.0`)
+### Novedades v2.1
+
+- **Aspectos con estrellas (1 a 5)**, siete y en este orden: Trama y guion, Actuaciones, Final o desenlace, Impacto emocional, Dirección y calidad visual, Ritmo narrativo, Suspenso o intriga. Todos opcionales; se pueden quitar (✕). La nota general 1-10 no cambia y sigue siendo independiente.
+- **Migración v3 (Dexie 3)**: los aspectos 1-10 se convierten con `estrellas = redondear(1 + (nota − 1) × 4 / 9)` (1→1 … 10→5; conserva extremos y orden). Los valores originales, incluidos Personajes y Originalidad, quedan en `legacy.dimensions10` y no se usan en el ranking. Notas generales, vistos y listas no se tocan. Importa exportaciones v1, v2 y v3.
+- **«Otros: ¿Qué te gustó o no te gustó?»**: texto libre que se guarda y analiza sólo en el dispositivo (ver más abajo).
+- **«No me interesa»** como cuarta acción rápida, independiente de vista, nota, aspectos y «Quiero verla». Se revierte desde Valoraciones → Descartados.
+- **Las tarjetas no desaparecen al puntuar**: nota general → la tarjeta queda → se ofrece completar aspectos y «Otros» → «Listo». El modelo se recalcula solo; el orden visible cambia únicamente con **Actualizar ranking** (un aviso indica cambios pendientes). Los cambios sin guardar del panel quedan como borrador si se cierra por accidente.
+- **Filtros avanzados** combinables (tipo, géneros incluidos/excluidos, años, plataformas, vistos, duración, afinidad mínima), con indicador, «Limpiar filtros» y «Restablecer generales». Se aplican al conjunto de candidatos antes de ordenar; si no hay resultados se indica qué filtro restringe y se puede buscar más en TMDB con esos filtros.
+- **Porcentaje de aspectos completados** (aspectos / 7 × 100) en Valoraciones, con filtros, orden y acceso directo a los faltantes.
+
+### Motor de recomendaciones (`hybrid-aspects-2.1.0`)
+
+Sobre el modelo de afinidad de la v2.0 (no es un promedio):
+
+- **Peso por aspecto**: influencia = proporción aprendida (regresión ridge, peso manual) × confianza, con confianza = n/(n+4) × consistencia (correlación con la nota general). Un aspecto nunca puntuado aporta **0**; ausencia ≠ nota baja.
+- **Actores**: se aprende de las estrellas de Actuaciones. El crédito se reparte según la participación real (orden en los créditos; en series, proporción de episodios de `aggregate_credits`), con contracción por actor (una sola actuación no alcanza para un sesgo fuerte), evidencia negativa y confianza por cantidad de observaciones. Se explica sólo con 2+ títulos.
+- **Finales**: rasgos de final (giro, abierto, ambiguo, trágico, feliz, agridulce, cliffhanger, emotivo) sólo si TMDB los publica como palabras clave; se usan únicamente para aprender del aspecto Final y nunca se muestran (spoilers). Sin esos datos, el componente no existe.
+- **«Otros»**: extractor local y determinista (`local-rules-1`): cláusulas, polaridad con negación y contrastes («pero», «aunque»), léxico curado de ~50 conceptos con sinónimos en español vinculados a palabras clave y géneros de TMDB, menciones a aspectos y a actores del reparto. Los conceptos se acumulan entre comentarios y suben o bajan títulos que los tratan según TMDB; la explicación lo indica. **No es comprensión semántica**: lo que no está en el léxico no se reconoce. La interfaz `PreferenceExtractor` permite sumar embeddings o un modelo de lenguaje; uno remoto requiere tu autorización y credenciales (no está activado).
+- **Descartes jerárquicos**: título (excluido) → saga (colección oficial de TMDB) → subgénero/temática (palabras clave) → género (contracción fuerte). La evidencia positiva diluye la penalización y un rasgo específico que te gustó sin descartes (misma saga, palabra clave como «batman», mismo director) es una excepción positiva. «No me interesa» no alimenta el perfil de gustos.
+
+### Motor v2.0 (base que se conserva)
+
 
 1. **Rasgos de cada título**: géneros, palabras clave, dirección/creación, reparto, tipo, década, duración, temporadas, idioma; ponderados por familia × IDF.
 2. **Afinidad general**: desvío de tus notas generales respecto de tu media por rasgo, con contracción bayesiana (λ=2,5) y recorte (±3,5) para que una nota extrema aislada no distorsione.

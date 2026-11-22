@@ -1,9 +1,12 @@
 import { DIMENSIONS } from '../constants';
 import type { DimensionId, DimensionScores, ProfileSettings, Rating, RecommendationItem, TitleKey, TitleMeta } from '../types';
 import { computeIdf, cosine, describeFeatures, family, FAMILY_WEIGHT, featureLabel, rawFeatures, weightedVector, type FeatureVec } from './features';
-import { buildProfile, LEARNING, type UserProfile } from './profile';
+import { buildProfile, LEARNING, participation, type UserProfile } from './profile';
+import { conceptsOfTitle } from './comments';
+import { rejectionPenalty, type RejectionResult } from './rejections';
+import { SPOILER_PATTERN } from './keywordsEs';
 
-export const ALGORITHM_VERSION = 'hybrid-aspects-2.0.0';
+export const ALGORITHM_VERSION = 'hybrid-aspects-2.1.0';
 
 /** Interfaz modular: cualquier motor que la implemente puede reemplazar al actual. */
 export interface RecommenderEngine {
@@ -30,6 +33,8 @@ export const PARAMS = {
   knnGain: 1.3,
   aspectGain: 1.4, // canal por aspectos (afinidad por aspecto × importancia del aspecto)
   aspectEstimateGain: 1.8,
+  actorGain: 0.8, // afinidad por actores (Actuaciones), moderada y con confianza por cantidad de observaciones
+  commentGain: 0.9, // preferencias temáticas de «Otros»
   qualityGain: 0.3,
   knnK: 10,
   mmrLambda: 0.8,
@@ -48,6 +53,9 @@ interface Scored {
   novelty: number;
   aspects: { d: DimensionId; dev: number; evidence: number; weighted: number }[];
   dimensionEstimates: DimensionScores;
+  actors: { id: number; name: string; c: number; count: number }[];
+  concepts: { id: string; label: string; c: number; sources: TitleKey[] }[];
+  rejection: RejectionResult;
 }
 
 function bayesQuality(t: TitleMeta): number {
@@ -104,17 +112,50 @@ export function scoreCandidates(input: RankInput): Scored[] {
       for (const [f, w] of vec) { const fa = dmap.get(f); if (!fa) continue; dn += w * fa.affinity; dd += w; dev_ += Math.min(fa.evidence, 4) * (FAMILY_WEIGHT[family(f)] ?? 0.3); }
       if (!dd) continue;
       const dev = dn / (dd + 1.5);
-      aspects.push({ d: ds.id, dev, evidence: dev_, weighted: ds.share * dev });
-      aspectChannel += ds.share * dev;
-      if (dev_ >= 1.5) dimensionEstimates[ds.id] = Math.round(Math.max(1, Math.min(10, ds.mean + PARAMS.aspectEstimateGain * dev)) * 10) / 10;
+      // Peso personalizado: 0 si nunca puntuaste el aspecto; crece con la cantidad y consistencia de la evidencia
+      aspects.push({ d: ds.id, dev, evidence: dev_, weighted: ds.weight * dev });
+      aspectChannel += ds.weight * dev;
+      if (dev_ >= 1.5) dimensionEstimates[ds.id] = Math.round(Math.max(1, Math.min(5, 1 + ((ds.mean + PARAMS.aspectEstimateGain * dev - 1) * 4) / 9)) * 10) / 10;
     }
     aspects.sort((a, b) => Math.abs(b.weighted) - Math.abs(a.weighted));
+    // 3b) Actores: afinidad aprendida de Actuaciones, ponderada por la participación del actor en ESTE título y
+    //     por la confianza (cantidad de observaciones). Un actor visto una sola vez aporta poco.
+    let actorNum = 0, actorDen = 1;
+    const actors: Scored['actors'] = [];
+    for (const p of t.cast.slice(0, 8)) {
+      const a = profile.actors.get(p.id);
+      const part = participation(p, t);
+      actorDen += part;
+      if (!a) continue;
+      const conf = a.count / (a.count + 1);
+      const c = part * a.affinity * conf;
+      actorNum += c;
+      actors.push({ id: p.id, name: p.name, c, count: a.count });
+    }
+    const actorChannel = actorNum / actorDen;
+    actors.sort((a, b) => Math.abs(b.c) - Math.abs(a.c));
+    // 3c) Comentarios «Otros»: conceptos que mencionaste, relacionados con palabras clave y géneros de TMDB del candidato
+    const concepts: Scored['concepts'] = [];
+    let commentChannel = 0;
+    if (profile.concepts.size) {
+      for (const id of conceptsOfTitle(t, (n) => SPOILER_PATTERN.test(n))) {
+        const cp = profile.concepts.get(id);
+        if (!cp) continue;
+        concepts.push({ id, label: cp.label, c: cp.score, sources: cp.sources.filter((x) => x.key !== key && Math.sign(x.polarity) === Math.sign(cp.score)).map((x) => x.key) });
+      }
+      concepts.sort((a, b) => Math.abs(b.c) - Math.abs(a.c));
+      // Rendimientos decrecientes: varios conceptos suman, pero no linealmente
+      commentChannel = concepts.reduce((acc, c, i) => acc + c.c / (1 + i), 0) / Math.max(1, Math.sqrt(concepts.length));
+    }
+    // 3d) Descartes jerárquicos (saga → subgénero → género), con excepciones positivas
+    const rejection = rejectionPenalty(t, profile.rejections);
     // 4) Calidad general (sólo como desempate suave; no domina el ranking)
     const quality = bayesQuality(t);
-    const pred = Math.max(1, Math.min(10, profile.mean + PARAMS.contentGain * content + PARAMS.knnGain * knn + PARAMS.aspectGain * aspectChannel + PARAMS.qualityGain * (quality - 6.6)));
+    const pred = Math.max(1, Math.min(10, profile.mean + PARAMS.contentGain * content + PARAMS.knnGain * knn + PARAMS.aspectGain * aspectChannel
+      + PARAMS.actorGain * actorChannel + PARAMS.commentGain * commentChannel + rejection.penalty + PARAMS.qualityGain * (quality - 6.6)));
     const simMass = neigh.reduce((a, n) => a + n.sim, 0);
     const confidence = (1 - Math.exp(-(evid + 3 * simMass) / 8)) * (1 - Math.exp(-profile.ratedCount / 6));
-    out.push({ key, pred, confidence, vec, contributions: contributions.sort((a, b) => Math.abs(b.c) - Math.abs(a.c)), neighbors: neigh.map(({ key, sim, dev }) => ({ key, sim, dev })), quality, novelty: 1 - Math.min(1, evid / 6), aspects, dimensionEstimates });
+    out.push({ key, pred, confidence, vec, contributions: contributions.sort((a, b) => Math.abs(b.c) - Math.abs(a.c)), neighbors: neigh.map(({ key, sim, dev }) => ({ key, sim, dev })), quality, novelty: 1 - Math.min(1, evid / 6), aspects, dimensionEstimates, actors, concepts, rejection });
   }
   return out;
 }
@@ -155,15 +196,32 @@ export function explain(s: Scored, input: RankInput, info: ReturnType<typeof des
   }
   // Aspectos: lo que más pesa en tus notas y cómo te resultan títulos con estos rasgos
   const label = (d: DimensionId) => DIMENSIONS.find((x) => x.id === d)!.label.toLowerCase();
-  const topImp = [...profile.dimensions].filter((d) => d.count > 0).sort((a, b) => b.share - a.share).slice(0, 3).map((d) => d.id);
+  const topImp = [...profile.dimensions].filter((d) => d.count > 0).sort((a, b) => b.weight - a.weight).slice(0, 3).map((d) => d.id);
   const posAsp = s.aspects.filter((a) => a.dev > 0.25 && a.evidence >= 1.5 && s.dimensionEstimates[a.d] !== undefined).slice(0, 2);
   if (posAsp.length) {
-    const parts = posAsp.map((a) => `${label(a.d)} (≈${fmt(s.dimensionEstimates[a.d]!)})`);
+    const parts = posAsp.map((a) => `${label(a.d)} (≈${fmt(s.dimensionEstimates[a.d]!)}★)`);
     const key = posAsp.find((a) => topImp.includes(a.d));
     lines.push(`En títulos con rasgos parecidos puntuás alto ${list(parts)}${key ? `; ${label(key.d)} es de lo que más pesa en tus notas` : ''}.`);
   }
   const negAsp = s.aspects.filter((a) => a.dev < -0.35 && a.evidence >= 1.5 && s.dimensionEstimates[a.d] !== undefined).slice(0, 1);
-  if (negAsp.length && !exploration) lines.push(`Ojo: en títulos parecidos solés puntuar bajo ${label(negAsp[0].d)} (≈${fmt(s.dimensionEstimates[negAsp[0].d]!)}).`);
+  if (negAsp.length && !exploration) lines.push(`Ojo: en títulos parecidos solés puntuar bajo ${label(negAsp[0].d)} (≈${fmt(s.dimensionEstimates[negAsp[0].d]!)}★).`);
+  // Actores con evidencia repetida (nunca por una única actuación)
+  const goodActors = s.actors.filter((a) => a.c > 0.15 && a.count >= 2).slice(0, 2);
+  if (goodActors.length) lines.push(`Actúa ${list(goodActors.map((a) => a.name))}: puntuaste alto sus actuaciones en ${goodActors[0].count} títulos.`);
+  // Comentarios «Otros»
+  const posC = s.concepts.filter((c) => c.c > 0.2).slice(0, 2);
+  if (posC.length) {
+    const src = posC[0].sources.map((k) => titles.get(k)?.title).filter(Boolean).slice(0, 2) as string[];
+    lines.push(`Según tus comentarios en «Otros», te interesan ${list(posC.map((c) => `«${c.label}»`))}${src.length ? ` (lo escribiste sobre ${list(src)})` : ''}, y este título lo trata según TMDB.`);
+  }
+  const negC = s.concepts.filter((c) => c.c < -0.2).slice(0, 1);
+  if (negC.length && !exploration) lines.push(`En tus comentarios dijiste que no te gusta «${negC[0].label}», que aparece en este título.`);
+  if (s.rejection.penalty < -0.25 && !exploration) {
+    const r = s.rejection;
+    if (r.level === 'collection') lines.push(`Baja un poco: descartaste otros títulos de la saga ${r.collectionName}.`);
+    else if (r.level === 'keyword') lines.push(`Baja un poco: descartaste varios títulos con ${list(r.keywordIds.map((id) => featureLabel(`k:${id}`, info)).filter((l) => !/^k:/.test(l)).slice(0, 2)) || 'rasgos parecidos'}.`);
+    else lines.push(`Baja un poco: descartaste varios títulos de ${featureLabel(`g:${r.genreIds[0]}`, info)}.`);
+  }
   const neg = s.contributions.filter((c) => c.c < -0.15 && !info.get(c.f)?.spoiler && ['g', 'k'].includes(family(c.f))).slice(0, 2);
   if (neg.length && !exploration) lines.push(`A tener en cuenta: incluye ${list(neg.map((n) => featureLabel(n.f, info)))}, que solés puntuar más bajo.`);
   if (!lines.length || (lines.length === 1 && exploration)) {
@@ -178,7 +236,7 @@ export function explain(s: Scored, input: RankInput, info: ReturnType<typeof des
 export function rank(input: RankInput): RecommendationItem[] {
   const limit = input.limit ?? 30;
   // Rechazadas y abandonadas nunca se recomiendan; las vistas se excluyen salvo que se pidan explícitamente
-  const excluded = new Set(input.ratings.filter((r) => r.list === 'not_interested' || r.list === 'abandoned' || (!input.includeWatched && r.watched)).map((r) => r.key));
+  const excluded = new Set(input.ratings.filter((r) => r.notInterested || r.list === 'abandoned' || (!input.includeWatched && r.watched)).map((r) => r.key));
   const excludedGenres = new Set(input.settings?.excludedGenres ?? []);
   const candidates = [...new Set(input.candidates)].filter((k) => !excluded.has(k) && input.titles.has(k))
     .filter((k) => !input.titles.get(k)!.genres.some((g) => excludedGenres.has(g.id)));
@@ -222,6 +280,7 @@ export function rank(input: RankInput): RecommendationItem[] {
     exploration,
     provisional: input.profile.ratedCount < 5,
     dimensionEstimates: s.dimensionEstimates,
+    rejectionPenalty: s.rejection.penalty < 0 ? Math.round(s.rejection.penalty * 100) / 100 : undefined,
   }));
 }
 

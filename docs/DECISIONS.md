@@ -11,3 +11,8 @@
 - **v2: «vista» separada de la nota.** El estado único de v1 mezclaba consumo y gusto. Ahora `watched` es un booleano y las listas (quiero verla, viéndola, abandonada, no me interesa) van aparte. Migración Dexie v2: «vista»/«puntuada» → vista; el resto → lista; notas, aspectos y fechas se conservan.
 - **v2: aspectos como canal propio del modelo, no como promedio.** La nota general sigue siendo la señal principal; los aspectos aportan afinidades por rasgo y su importancia se aprende por regresión ridge sobre tu historial. Un aspecto sin nota es dato faltante.
 - **v2: no reordenar mientras se edita.** El ranking visible se congela durante la edición y se actualiza al cerrar, para no mover tarjetas bajo el dedo.
+- **v2.1: estrellas para aspectos, nota general intacta.** Escala más simple en el celular. Conversión lineal documentada con respaldo de los valores originales; el motor vuelve a llevar las estrellas a 1-10 sólo para calcular.
+- **v2.1: «No me interesa» como campo propio.** Antes era un valor de la lista y competía con «Quiero verla». Se modela aparte de los gustos: descartar sin ver no es una mala nota.
+- **v2.1: «Otros» con reglas locales y no con IA externa.** Embeddings en el dispositivo (~25 MB) son costosos en gama media y un LLM externo enviaría texto personal a terceros y requiere credenciales y pagos. Se dejó una interfaz para sumarlos con autorización.
+- **v2.1: sagas sólo con la colección oficial de TMDB.** No se infieren relaciones entre franquicias.
+- **v2.1: orden visible separado del recálculo.** El modelo se actualiza después de cada valoración, pero el orden en pantalla sólo cambia al tocar «Actualizar ranking», para poder puntuar varias tarjetas seguidas.

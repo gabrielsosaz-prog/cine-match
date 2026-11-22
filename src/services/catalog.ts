@@ -2,7 +2,7 @@ import { db } from '../db/db';
 import { getConfig } from '../db/repo';
 import { METADATA_TTL_MS } from '../constants';
 import { ProviderError } from '../providers/errors';
-import { TmdbClient, metaFromSearch, type SearchResult, type FetchLike } from '../providers/tmdb';
+import { META_VERSION, TmdbClient, metaFromSearch, type SearchResult, type FetchLike } from '../providers/tmdb';
 import type { AvailabilitySnapshot, MediaType, Named, TitleKey, TitleMeta } from '../types';
 import { parseKey } from '../types';
 import { diffAvailability, needsRefresh } from './availability';
@@ -63,7 +63,7 @@ export async function saveAvailability(snap: AvailabilitySnapshot) {
 export async function getTitle(key: TitleKey, opts: { language: string; country: string; force?: boolean }): Promise<{ meta?: TitleMeta; availability?: AvailabilitySnapshot; error?: unknown }> {
   const cached = await db.titles.get(key);
   const avail = await db.availability.get(`${key}|${opts.country}`);
-  const fresh = cached && cached.completeness === 'full' && Date.now() - cached.fetchedAt < METADATA_TTL_MS;
+  const fresh = cached && cached.completeness === 'full' && (cached.metaVersion ?? 1) >= META_VERSION && Date.now() - cached.fetchedAt < METADATA_TTL_MS;
   if (fresh && !opts.force && !needsRefresh(avail)) return { meta: cached, availability: avail };
   try {
     const { type, id } = parseKey(key);
@@ -114,7 +114,7 @@ export async function refreshAvailability(keys: TitleKey[], country: string, max
   return { checked: stale.length, failed };
 }
 
-export async function discoverCandidates(opts: { type: MediaType; language: string; country: string; providerIds: number[]; genres?: number[]; page?: number; sort?: string; minVotes?: number }): Promise<SearchResult[]> {
+export async function discoverCandidates(opts: { type: MediaType; language: string; country: string; providerIds: number[]; genres?: number[]; page?: number; sort?: string; minVotes?: number; extra?: Record<string, string | number | undefined> }): Promise<SearchResult[]> {
   const client = await getClient();
   const results = await client.discover(opts.type, {
     language: opts.language,
@@ -125,6 +125,7 @@ export async function discoverCandidates(opts: { type: MediaType; language: stri
     sort_by: opts.sort ?? 'popularity.desc',
     'vote_count.gte': opts.minVotes ?? 150,
     page: opts.page ?? 1,
+    ...(opts.extra ?? {}),
   });
   const names = await genreNames(opts.language);
   const have = await db.titles.bulkGet(results.map((r) => r.key));

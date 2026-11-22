@@ -3,6 +3,7 @@ import type {
   AppConfig, DimensionScores, ListStatus, Profile, ProfileSettings, Rating, TitleKey,
 } from '../types';
 import { cleanDimensions, hasScore, migrateRating } from './migrations';
+import { COMMENT_MAX } from '../constants';
 
 export const DEFAULT_PROFILE_ID = 'p-principal';
 
@@ -75,8 +76,11 @@ const clampScore = (v: unknown): number | undefined => {
 export interface RatingPatch {
   watched?: boolean;
   list?: ListStatus | null;
+  /** «No me interesa», independiente de vista, nota, aspectos y listas */
+  notInterested?: boolean;
   overall?: number | null;
-  dimensions?: DimensionScores; // reemplaza el conjunto de aspectos
+  dimensions?: DimensionScores; // estrellas 1-5; reemplaza el conjunto de aspectos
+  comment?: string | null;
   abandonReason?: string | null;
 }
 
@@ -86,7 +90,7 @@ export async function saveRating(profileId: string, key: TitleKey, patch: Rating
   const prevRaw = await db.ratings.get(id);
   const prev = prevRaw ? migrateRating(prevRaw) : undefined;
   const now = Date.now();
-  const next: Rating = prev ? { ...prev } : { id, profileId, key, watched: false, dimensions: {}, createdAt: now, updatedAt: now, schema: 2 };
+  const next: Rating = prev ? { ...prev } : { id, profileId, key, watched: false, dimensions: {}, createdAt: now, updatedAt: now, schema: 3 };
   if (patch.watched !== undefined) {
     if (patch.watched && !next.watched) next.watchedAt = now;
     if (!patch.watched) next.watchedAt = undefined;
@@ -95,10 +99,21 @@ export async function saveRating(profileId: string, key: TitleKey, patch: Rating
   if (patch.list !== undefined) next.list = patch.list ?? undefined;
   if (patch.overall !== undefined) next.overall = patch.overall === null ? undefined : clampScore(patch.overall);
   if (patch.dimensions !== undefined) next.dimensions = cleanDimensions(patch.dimensions);
+  if (patch.notInterested !== undefined) {
+    if (patch.notInterested && !next.notInterested) next.notInterestedAt = now;
+    next.notInterested = patch.notInterested || undefined;
+    if (!patch.notInterested) delete next.notInterestedAt;
+  }
+  if (patch.comment !== undefined) {
+    const c = (patch.comment ?? '').trim().slice(0, COMMENT_MAX);
+    next.comment = c || undefined;
+  }
   if (patch.abandonReason !== undefined) next.abandonReason = patch.abandonReason ?? undefined;
   if (next.list !== 'abandoned') next.abandonReason = undefined;
   next.updatedAt = now;
-  if (!next.watched && !next.list && !hasScore(next)) {
+  for (const k of Object.keys(next) as (keyof Rating)[]) if (next[k] === undefined) delete next[k];
+  // Un registro sin contenido se elimina, salvo que conserve datos de versiones anteriores (recuperables)
+  if (!next.watched && !next.list && !next.notInterested && !next.comment && !hasScore(next) && !next.legacy) {
     await db.ratings.delete(id);
     return undefined;
   }

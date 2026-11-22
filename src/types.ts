@@ -11,7 +11,13 @@ export const parseKey = (key: TitleKey): { type: MediaType; id: number } => {
   return { type: type as MediaType, id: Number(id) };
 };
 
-export interface Person { id: number; name: string; role?: string }
+export interface Person {
+  id: number; name: string; role?: string;
+  /** Orden de aparición en los créditos de TMDB (0 = protagonista) */
+  order?: number;
+  /** Series: episodios en los que participó (TMDB aggregate_credits) */
+  episodes?: number;
+}
 export interface Named { id: number; name: string }
 
 export interface TitleMeta {
@@ -39,6 +45,12 @@ export interface TitleMeta {
   voteAverage?: number;
   voteCount?: number;
   popularity?: number;
+  /** Saga o colección de TMDB (belongs_to_collection; sólo películas) */
+  collection?: Named;
+  /** Series: total de episodios (para medir la participación real de cada actor) */
+  totalEpisodes?: number;
+  /** Versión del mapeo de la ficha (2 = incluye colección y participación del reparto) */
+  metaVersion?: number;
   /** Ids de títulos recomendados/similares según TMDB (para generar candidatos) */
   related?: TitleKey[];
   /** 'full' = ficha completa (keywords, créditos); 'basic' = sólo datos de búsqueda */
@@ -85,24 +97,28 @@ export interface AvailabilityEvent {
 
 export type PlatformId = 'netflix' | 'prime' | 'disney' | 'max';
 
-/** Seguimiento opcional, independiente de la marca de visto y de la puntuación. */
-export type ListStatus = 'want' | 'watching' | 'abandoned' | 'not_interested';
+/** Seguimiento opcional, independiente de la marca de visto, la puntuación y «No me interesa». */
+export type ListStatus = 'want' | 'watching' | 'abandoned';
 
 /** Estados combinados de la v1 (sólo para migrar datos y exportaciones antiguas). */
 export type LegacyStatus = 'rated' | 'watched' | 'want' | 'watching' | 'abandoned' | 'not_interested';
 
-export type DimensionId =
-  | 'story'
-  | 'pacing'
-  | 'characters'
-  | 'suspense'
-  | 'originality'
-  | 'emotion'
-  | 'acting'
-  | 'visuals'
-  | 'ending';
+/** Los siete aspectos de la v2.1 (Personajes y Originalidad se retiraron; sus datos quedan en `legacy`). */
+export type DimensionId = 'story' | 'acting' | 'ending' | 'emotion' | 'visuals' | 'pacing' | 'suspense';
 
+/** Estrellas 1-5 por aspecto. Ausente = sin valorar (no es una nota baja). */
 export type DimensionScores = Partial<Record<DimensionId, number>>;
+
+/** Respaldo de datos anteriores a la v2.1, para recuperación. El motor no lo usa. */
+export interface LegacyRatingData {
+  /** Aspectos originales en escala 1-10 (incluye Personajes y Originalidad) */
+  dimensions10?: Record<string, number>;
+  /** Esquema del que se migró */
+  fromSchema: number;
+  migratedAt: number;
+  /** Estado combinado de la v1, si existía */
+  status?: string;
+}
 
 export interface SeasonRating {
   season: number;
@@ -112,8 +128,8 @@ export interface SeasonRating {
 }
 
 /**
- * Registro del usuario sobre un título (esquema v2).
- * `watched`, `list` y las puntuaciones son independientes entre sí.
+ * Registro del usuario sobre un título (esquema v3, Cine Match v2.1).
+ * `watched`, `list`, `notInterested`, la nota general, los aspectos y el comentario son independientes.
  */
 export interface Rating {
   id: string; // `${profileId}|${key}`
@@ -122,18 +138,25 @@ export interface Rating {
   /** Marca explícita de visto. No implica satisfacción. */
   watched: boolean;
   watchedAt?: number;
-  /** Quiero verla, viéndola, abandonada o no me interesa (opcional) */
+  /** Quiero verla, viéndola o abandonada (opcional) */
   list?: ListStatus;
-  /** Valoración general 1-10, independiente de la media de dimensiones */
+  /** «No me interesa»: descarte sin haberla visto. No es una valoración negativa. */
+  notInterested?: boolean;
+  notInterestedAt?: number;
+  /** Valoración general 1-10, independiente de las estrellas */
   overall?: number;
-  /** Puntuaciones opcionales por aspecto (1-10). Ausente ≠ baja. */
+  /** Estrellas opcionales por aspecto (1-5). Ausente ≠ baja. */
   dimensions: DimensionScores;
+  /** Campo libre «Otros: ¿Qué te gustó o no te gustó?». Se guarda y analiza sólo en el dispositivo. */
+  comment?: string;
+  /** Datos de versiones anteriores conservados para recuperación (no se usan en el ranking) */
+  legacy?: LegacyRatingData;
   abandonReason?: string;
   /** Preparado para valoraciones por temporada (la UI usa la global) */
   seasons?: SeasonRating[];
   createdAt: number;
   updatedAt: number;
-  schema: 2;
+  schema: 3;
 }
 
 export interface Profile {
@@ -171,6 +194,8 @@ export interface RecommendationItem {
   confidenceLabel: 'baja' | 'media' | 'alta';
   explanation: string[];
   exploration: boolean;
+  /** Ajuste aplicado por descartes («No me interesa») de títulos relacionados (≤ 0) */
+  rejectionPenalty?: number;
   provisional: boolean;
   /** Notas estimadas por aspecto (sólo donde hay evidencia) */
   dimensionEstimates?: DimensionScores;
@@ -187,6 +212,8 @@ export interface RecommendationRun {
   items: RecommendationItem[];
   /** Conjunto de candidatos evaluados (permite recalcular rápido tras cada valoración) */
   pool: TitleKey[];
+  /** Candidatos con disponibilidad confirmada en tus plataformas (base de los filtros avanzados) */
+  eligible?: TitleKey[];
   /** Error del proveedor durante la generación, si lo hubo */
   warning?: string;
 }

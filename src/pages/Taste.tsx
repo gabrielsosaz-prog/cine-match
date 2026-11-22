@@ -69,17 +69,31 @@ export default function Taste() {
       <Card><h2 className="mb-2 font-semibold">Características rechazadas</h2>{rejected.length ? <Bars items={rejected} /> : <p className="text-sm text-slate-400">Nada rechazado por ahora.</p>}</Card>
       <Card>
         <h2 className="mb-1 font-semibold">Dimensiones</h2>
-        <p className="mb-2 text-[11px] text-slate-400">Tu promedio en cada aspecto y su peso: cuánto explica tu nota general (regresión sobre tu historial, mezclada con un peso parejo mientras haya pocos datos). 1,00 = peso promedio. Podés ajustarlo a mano.</p>
+        <p className="mb-2 text-[11px] text-slate-400">Tu promedio en estrellas y la influencia personalizada de cada aspecto en el ranking. Un aspecto que nunca puntuaste no influye (0 %); la influencia crece a medida que lo puntuás y según cuánto acompaña a tu nota general. Podés ajustar el peso a mano.</p>
         <ul className="space-y-3">
           {profile.dimensions.map((d) => (
             <li key={d.id} className="text-sm" data-testid={`dimstat-${d.id}`}>
-              <div className="flex justify-between"><span>{DIMENSIONS.find((x) => x.id === d.id)!.label}</span><span className="text-slate-400">{d.count ? `${num(d.mean)} · ${d.count}` : 'sin datos'} · peso {num(d.importance, 2)}{d.learned !== null ? ' (aprendido)' : ''}</span></div>
+              <div className="flex justify-between"><span>{DIMENSIONS.find((x) => x.id === d.id)!.label}</span><span className="text-slate-400">{d.count ? `${num(1 + ((d.mean - 1) * 4) / 9)}★ · ${d.count}` : 'sin datos'} · influencia {Math.round(d.weight * 100)} %{d.learned !== null ? ' (aprendida)' : ''}</span></div>
               <input type="range" min={0} max={2} step={0.25} value={settings.dimensionWeights[d.id] ?? 1} onChange={(e) => setWeight(d.id, Number(e.target.value))} className="w-full accent-amber-400" aria-label={`Peso manual de ${d.id}`} />
             </li>
           ))}
         </ul>
         <button onClick={() => refreshRecommendations(profileId, { trigger: 'ajuste de pesos' })} className="mt-2 text-sm text-accent underline">Recalcular ranking con estos pesos</button>
       </Card>
+      {(() => {
+        const acts = [...profile.actors.values()].filter((a) => a.count >= 2 && Math.abs(a.affinity) > 0.2).sort((a, b) => b.affinity - a.affinity).slice(0, 8);
+        const cps = [...profile.concepts.values()].filter((c) => Math.abs(c.score) > 0.15).sort((a, b) => b.score - a.score).slice(0, 8);
+        const rej = profile.rejections;
+        return (
+          <Card data-testid="taste-v21">
+            <h2 className="mb-1 font-semibold">Actores, comentarios y descartes</h2>
+            <p className="mb-2 text-[11px] text-slate-400">Actores: a partir de tus estrellas en Actuaciones (dos o más títulos, ponderando cuánto participa cada uno). Comentarios: lo que se reconoce en «Otros» con reglas locales.</p>
+            {acts.length ? <Bars items={acts.map((a) => ({ label: a.name, value: a.affinity, note: `${a.count} títulos` }))} /> : <p className="text-sm text-slate-400">Puntuá Actuaciones en varios títulos con el mismo actor para ver patrones.</p>}
+            {cps.length > 0 && <div className="mt-3"><Bars items={cps.map((c) => ({ label: `«${c.label}»`, value: c.score, note: `${c.count} ${c.count === 1 ? 'comentario' : 'comentarios'}` }))} /></div>}
+            <p className="mt-2 text-[11px] text-slate-400">Descartaste {rej.count} {rej.count === 1 ? 'título' : 'títulos'} con «No me interesa». Bajan con moderación los de la misma saga y, si se repite, los del mismo subgénero; un solo descarte casi no afecta a un género.</p>
+          </Card>
+        );
+      })()}
       <Card data-testid="aspect-patterns">
         <h2 className="mb-1 font-semibold">Patrones por aspecto</h2>
         <p className="mb-2 text-[11px] text-slate-400">Qué rasgos se asocian con tus notas altas o bajas en cada aspecto (sólo títulos donde puntuaste ese aspecto).</p>

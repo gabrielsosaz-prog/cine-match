@@ -7,41 +7,41 @@
         "drama": 8.37
       },
       "suspensoAltoEnThrillers": {
-        "thriller": 9.04,
-        "drama": 8.15
+        "thriller": 8.74,
+        "drama": 8.09
       },
       "emocionAltaEnDramas": {
-        "thriller": 8.09,
-        "drama": 9.16
+        "thriller": 8.02,
+        "drama": 8.84
       }
     },
     "Escenario 2: importancia aprendida": {
-      "actuaciones": 1.91,
-      "ritmo": 0.09,
+      "actuaciones": 1.86,
+      "ritmo": 0.14,
       "promedio": 1
     },
     "Escenario 3: aspecto ausente": {
       "dramasSinAspectos": 8.37,
-      "dramasConSuspensoSoloEnThrillers": 8.45
+      "dramasConSuspensoSoloEnThrillers": 8.44
     },
     "Escenario 4: una nota de suspenso de 1 entre ocho de 9": {
-      "afinidadAntes": 0.42,
-      "afinidadDespues": 0.42
+      "afinidadAntes": 0.75,
+      "afinidadDespues": 0.75
     },
     "Escenario 5: editar el suspenso de títulos ya valorados (con historial donde el suspenso pesa)": {
       "pesoDelSuspenso": 1,
       "thrillers": {
-        "base": 9.45,
-        "suspensoBajadoA3": 7.34
+        "base": 9.24,
+        "suspensoBajadoA3": 8.23
       },
       "cienciaFiccion": {
-        "base": 9.22,
-        "suspensoSubidoA10": 9.99
+        "base": 9.18,
+        "suspensoSubidoA10": 9.86
       },
       "cienciaFiccionEnTop10": {
-        "base": 5,
-        "suspensoBajoEnThrillers": 8,
-        "suspensoAltoEnCienciaFiccion": 8
+        "base": 6,
+        "suspensoBajoEnThrillers": 7,
+        "suspensoAltoEnCienciaFiccion": 7
       }
     }
   }

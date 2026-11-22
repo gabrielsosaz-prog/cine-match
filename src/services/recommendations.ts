@@ -4,7 +4,9 @@ import { getSettings, listRatings } from '../db/repo';
 import { featureLabel, describeFeatures } from '../engine/features';
 import { hybridEngine, type RecommenderEngine } from '../engine/recommender';
 import { friendlyError } from '../providers/errors';
-import type { ProfileSettings, Rating, RecommendationRun, TitleKey, TitleMeta } from '../types';
+import { META_VERSION } from '../providers/tmdb';
+import type { MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
+import { diagnose, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
 import { matchesPlatforms } from './availability';
 import { discoverCandidates, ensureFullTitles, getTitle, refreshAvailability } from './catalog';
 
@@ -47,7 +49,30 @@ async function buildPool(ratings: Rating[], settings: ProfileSettings, titles: M
   return { pool: [...pool], warning };
 }
 
-export interface RefreshOptions { trigger: string; rebuildPool?: boolean; extraKeys?: TitleKey[] }
+/** Búsqueda adicional en TMDB para los filtros avanzados (p. ej. «series de ciencia ficción desde 2015 en Netflix»). */
+export interface DiscoverHints { types: MediaType[]; genres: number[]; excludeGenres: number[]; yearMin?: number; yearMax?: number; platforms: PlatformId[]; runtimeMin?: number; runtimeMax?: number }
+export interface RefreshOptions { trigger: string; rebuildPool?: boolean; extraKeys?: TitleKey[]; discover?: DiscoverHints }
+
+async function discoverWithHints(h: DiscoverHints, settings: ProfileSettings): Promise<TitleKey[]> {
+  const plats = h.platforms.length ? h.platforms : settings.platforms;
+  const ids = PLATFORMS.filter((p) => plats.includes(p.id)).flatMap((p) => p.tmdbIds);
+  const out: TitleKey[] = [];
+  const types = h.types.length ? h.types : (['movie', 'tv'] as MediaType[]);
+  await Promise.all(types.flatMap((type) => ['vote_average.desc', 'popularity.desc'].map(async (sort) => {
+    const dateField = type === 'movie' ? 'primary_release_date' : 'first_air_date';
+    const r = await discoverCandidates({
+      type, language: settings.language, country: settings.country, providerIds: ids, genres: h.genres, sort, minVotes: sort === 'vote_average.desc' ? 200 : 50,
+      extra: {
+        [`${dateField}.gte`]: h.yearMin ? `${h.yearMin}-01-01` : undefined,
+        [`${dateField}.lte`]: h.yearMax ? `${h.yearMax}-12-31` : undefined,
+        without_genres: h.excludeGenres.length ? h.excludeGenres.join(',') : undefined,
+        'with_runtime.gte': h.runtimeMin, 'with_runtime.lte': h.runtimeMax,
+      },
+    });
+    out.push(...r.map((x) => x.key));
+  })));
+  return out;
+}
 
 /**
  * Aprendizaje continuo: recalcula perfil y ranking. Se llama después de cada valoración
@@ -61,7 +86,7 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   // Asegurar fichas completas del historial (rasgos para aprender)
   const histKeys = ratings.map((r) => r.key);
   let titles = await titleMap(histKeys);
-  const needFull = histKeys.filter((k) => titles.get(k)?.completeness !== 'full');
+  const needFull = histKeys.filter((k) => titles.get(k)?.completeness !== 'full' || (titles.get(k)?.metaVersion ?? 1) < META_VERSION);
   if (needFull.length) { try { await ensureFullTitles(needFull, opts, 25); } catch { /* se usan datos básicos */ } titles = await titleMap(histKeys); }
 
   let pool: TitleKey[] = last?.pool ?? [];
@@ -73,8 +98,13 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
     warning = built.warning;
   }
   for (const k of o.extraKeys ?? []) for (const r of titles.get(k)?.related ?? []) if (!pool.includes(r)) pool.push(r);
-  // Rechazadas/abandonadas fuera; vistas y puntuadas se evalúan aparte para el filtro «vistos»
-  const blocked = new Set(ratings.filter((r) => r.list === 'not_interested' || r.list === 'abandoned').map((r) => r.key));
+  let hinted: TitleKey[] = [];
+  if (o.discover) {
+    try { hinted = await discoverWithHints(o.discover, settings); } catch (e) { warning ??= friendlyError(e); }
+    pool = [...new Set([...hinted, ...pool])];
+  }
+  // Descartadas y abandonadas fuera; vistas y puntuadas se evalúan aparte para el filtro «vistos»
+  const blocked = new Set(ratings.filter((r) => r.notInterested || r.list === 'abandoned').map((r) => r.key));
   const watchedKeys = ratings.filter((r) => r.watched && !blocked.has(r.key)).map((r) => r.key);
   pool = [...new Set([...pool, ...ratings.filter((r) => !r.watched).map((r) => r.key)])].filter((k) => !blocked.has(k));
 
@@ -83,19 +113,19 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   const profile = engine.buildProfile(ratings, all, settings);
   const pre = engine.rank({ profile, ratings, titles: all, candidates: pool.filter((k) => all.has(k)), settings, limit: 60 });
   const unknown = pool.filter((k) => !all.has(k)).slice(0, 25);
-  const toFetch = [...pre.map((p) => p.key).filter((k) => all.get(k)?.completeness !== 'full'), ...unknown].slice(0, 45);
+  const toFetch = [...hinted.filter((k) => all.get(k)?.completeness !== 'full').slice(0, 20), ...pre.map((p) => p.key).filter((k) => all.get(k)?.completeness !== 'full'), ...unknown].slice(0, 60);
   if (toFetch.length) {
-    try { await ensureFullTitles(toFetch, opts, 45); } catch (e) { warning ??= friendlyError(e); }
+    try { await ensureFullTitles(toFetch, opts, 60); } catch (e) { warning ??= friendlyError(e); }
     all = await titleMap([...histKeys, ...pool]);
   }
-  const keysForAvail = [...new Set([...pre.map((p) => p.key), ...unknown, ...watchedKeys])];
-  try { await refreshAvailability(keysForAvail, settings.country, 40); } catch (e) { warning ??= friendlyError(e); }
+  const keysForAvail = [...new Set([...hinted.slice(0, 40), ...pre.map((p) => p.key), ...unknown, ...watchedKeys])];
+  try { await refreshAvailability(keysForAvail, settings.country, 60); } catch (e) { warning ??= friendlyError(e); }
   const snaps = await db.availability.bulkGet(keysForAvail.map((k) => `${k}|${settings.country}`));
   const availOk = new Set(keysForAvail.filter((_, i) => matchesPlatforms(snaps[i], settings.platforms, settings.includeUnconfirmed)));
 
   const profile2 = engine.buildProfile(ratings, all, settings);
   const seed = Math.floor(Date.now() / 86400000) + profileId.length;
-  const unwatched = engine.rank({ profile: profile2, ratings, titles: all, candidates: [...availOk], settings, limit: 40, seed });
+  const unwatched = engine.rank({ profile: profile2, ratings, titles: all, candidates: [...availOk], settings, limit: 60, seed });
   const watchedSet = new Set(watchedKeys);
   const watchedRanked = engine.rank({ profile: profile2, ratings, titles: all, candidates: watchedKeys.filter((k) => availOk.has(k)), settings, limit: 40, seed, includeWatched: true })
     .filter((i) => watchedSet.has(i.key)).map((i) => ({ ...i, exploration: false }));
@@ -104,6 +134,7 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   const run: RecommendationRun = {
     profileId, algorithmVersion: engine.version, createdAt: Date.now(), trigger: o.trigger,
     ratingsCount: profile2.ratedCount, country: settings.country, items, pool, warning,
+    eligible: [...availOk].filter((k) => !blocked.has(k)),
   };
   run.id = await db.runs.add(run);
   // Mantener sólo los últimos 20 cálculos
@@ -131,4 +162,31 @@ async function recordSnapshot(profileId: string, profile: ReturnType<Recommender
 export async function loadTitleWithRelated(key: TitleKey, settings: ProfileSettings) {
   const res = await getTitle(key, { language: settings.language, country: settings.country });
   return res;
+}
+
+/**
+ * Ranking con filtros avanzados: filtra el conjunto de candidatos (con disponibilidad confirmada) y lo
+ * ordena con el mismo motor y el mismo perfil. No guarda nada ni cambia lo aprendido: es una vista temporal.
+ */
+export async function rankWithFilters(profileId: string, run: RecommendationRun, f: RankFilters): Promise<{ items: RecommendationItem[]; candidates: number; diagnostics: { id: string; count: number }[] }> {
+  const settings = await getSettings(profileId);
+  const ratings = await listRatings(profileId);
+  const byKey = new Map(ratings.map((r) => [r.key, r]));
+  const base = [...new Set([...(run.eligible ?? []), ...run.items.map((i) => i.key)])];
+  const all = await titleMap([...ratings.map((r) => r.key), ...base]);
+  const snaps = await db.availability.bulkGet(base.map((k) => `${k}|${settings.country}`));
+  const cands: Candidate[] = base.map((k, i) => ({ meta: all.get(k)!, snap: snaps[i], rating: byKey.get(k) }))
+    .filter((c) => c.meta && !c.rating?.notInterested && c.rating?.list !== 'abandoned');
+  const pass = cands.filter((c) => matchesContent(c, f) && matchesWatched(c, f));
+  const profile = engine.buildProfile(ratings, all, settings);
+  const seed = Math.floor(Date.now() / 86400000) + profileId.length;
+  let items = engine.rank({ profile, ratings, titles: all, candidates: pass.map((c) => c.meta.key), settings, limit: 60, seed, includeWatched: f.watched !== 'unwatched' });
+  if (f.minScore) items = items.filter((i) => i.score >= f.minScore!);
+  items = items.map((it, i) => ({ ...it, rank: i + 1 }));
+  let diagnostics: { id: string; count: number }[] = [];
+  if (!items.length) {
+    const scores = new Map(engine.rank({ profile, ratings, titles: all, candidates: cands.map((c) => c.meta.key), settings, limit: 200, includeWatched: true }).map((i) => [i.key, i.score]));
+    diagnostics = diagnose(cands.map((c) => ({ ...c, score: scores.get(c.meta.key) })), f);
+  }
+  return { items, candidates: pass.length, diagnostics };
 }
