@@ -304,12 +304,13 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
   }
   let all = await titleMap([...ratings.map((r) => r.key), ...base]);
   // Filtro por país: las listas de TMDB (descubrir, tendencias) no traen el país de las películas. Antes de filtrar
-  // se completa con el catálogo narrativo y, si falta, con la ficha completa (hasta 60). Lo que siga sin datos se
-  // trata según la regla explícita (no pasa «incluir», sí pasa «excluir»).
-  if (f.includeCountries?.length || f.excludeCountries?.length) {
-    const idx = getNarrativeIndex();
+  // se completa con el catálogo narrativo y, si falta, con la ficha completa (hasta 60 por vez). Lo que siga sin
+  // datos se trata según la regla explícita (no pasa «incluir», sí pasa «excluir»).
+  const fillCountries = async (keys: TitleKey[]) => {
+    if (!f.includeCountries?.length && !f.excludeCountries?.length) return;
+    const idx = getNarrativeIndex() ?? (await narrativeReady(5000));
     const missing: TitleKey[] = [];
-    for (const k of base) {
+    for (const k of keys) {
       const m = all.get(k);
       if (!m || countriesOf(m).length) continue;
       const c = idx?.get(k)?.countries;
@@ -321,7 +322,8 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
       const fresh = await titleMap(missing.slice(0, 60));
       for (const [k, m] of fresh) if (countriesOf(m).length) all.set(k, m);
     }
-  }
+  };
+  await fillCountries(base);
   const candidatesOf = async (keys: TitleKey[]) => {
     const snaps = await db.availability.bulkGet(keys.map((k) => `${k}|${settings.country}`));
     return keys.map((k, i) => ({ meta: all.get(k)!, snap: snaps[i], rating: byKey.get(k) }) as Candidate)
@@ -343,6 +345,7 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
       try { await refreshAvailability(extra, settings.country, 60); } catch (e) { warning ??= friendlyError(e); }
       base = [...base, ...extra];
       all = await titleMap([...ratings.map((r) => r.key), ...base]);
+      await fillCountries(base);
       cands = await candidatesOf(base);
       const okAvail = new Set(cands.filter((c) => extra.includes(c.meta.key) && matchesPlatforms(c.snap, settings.platforms, settings.includeUnconfirmed)).map((c) => c.meta.key));
       cands = cands.filter((c) => !extra.includes(c.meta.key) || okAvail.has(c.meta.key));

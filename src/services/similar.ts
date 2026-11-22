@@ -10,7 +10,7 @@ import { friendlyError } from '../providers/errors';
 import type { RecommendationItem, TitleKey, TitleMeta } from '../types';
 import { matchesPlatforms } from './availability';
 import { discoverCandidates, ensureFullTitles, genreNames, getTitle } from './catalog';
-import { matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
+import { countriesOf, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
 import { loadNarrativeIndex, metaFromCatalog, narrativeCatalogError } from './narrativeCatalog';
 import { latestRun, predictFor } from './recommendations';
 
@@ -166,7 +166,10 @@ export async function findSimilar(profileId: string, refKeys: TitleKey[], f: Ran
   const snaps = await db.availability.bulkGet(keys.map((k) => `${k}|${settings.country}`));
   const snapOf = new Map(keys.map((k, i) => [k, snaps[i]]));
   const passing = scored.filter((x) => {
-    const c: Candidate = { meta: metas.get(x.key)!, snap: snapOf.get(x.key), rating: byKey.get(x.key) };
+    let meta = metas.get(x.key)!;
+    // Las listas de TMDB no traen el país de las películas: se completa con el catálogo narrativo si hace falta
+    if (!countriesOf(meta).length && idx?.get(x.key)?.countries.length) meta = { ...meta, productionCountries: idx.get(x.key)!.countries };
+    const c: Candidate = { meta, snap: snapOf.get(x.key), rating: byKey.get(x.key) };
     if (c.rating?.notInterested) return false;
     if (o.onlyMyPlatforms !== false && !matchesPlatforms(c.snap, settings.platforms, settings.includeUnconfirmed)) return false;
     return matchesContent(c, f) && matchesWatched(c, f);
