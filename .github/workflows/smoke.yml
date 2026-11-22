@@ -21,7 +21,7 @@ jobs:
           EXPECTED_SHA: ${{ github.event.sha || github.sha }}
         run: |
           set -u
-          candidates="${INPUT_URL:-} https://cine-match.vercel.app https://cine-match-gabrielsosaz-prog.vercel.app https://cine-match-gabrielsosaz-progs-projects.vercel.app https://cine-match-git-main-gabrielsosaz-prog.vercel.app"
+          candidates="${INPUT_URL:-} https://cine-match-pied-tau.vercel.app https://cine-match.vercel.app https://cine-match-gabrielsosaz-prog.vercel.app https://cine-match-gabrielsosaz-progs-projects.vercel.app https://cine-match-git-main-gabrielsosaz-prog.vercel.app"
           APP=""
           for u in $candidates; do
             [ -z "$u" ] && continue
