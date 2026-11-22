@@ -16,3 +16,10 @@
 - **v2.1: «Otros» con reglas locales y no con IA externa.** Embeddings en el dispositivo (~25 MB) son costosos en gama media y un LLM externo enviaría texto personal a terceros y requiere credenciales y pagos. Se dejó una interfaz para sumarlos con autorización.
 - **v2.1: sagas sólo con la colección oficial de TMDB.** No se infieren relaciones entre franquicias.
 - **v2.1: orden visible separado del recálculo.** El modelo se actualiza después de cada valoración, pero el orden en pantalla sólo cambia al tocar «Actualizar ranking», para poder puntuar varias tarjetas seguidas.
+- **v3.0: guardar y recalcular, separados.** El error intermitente «procesando» venía de que guardar esperaba el recálculo completo (descarga de fichas y disponibilidad sin tiempo máximo). Ahora el guardado es local, atómico y confirmado; el recálculo va a una cola única en segundo plano.
+- **v3.0: «cargando» no es «vacío».** Las pantallas usaban `useLiveQuery(...) ?? []`: una lectura demorada se veía como «sin valoraciones». Un almacén compartido conserva lo último confirmado y nunca lo reemplaza por vacío.
+- **v3.0: PWA en modo «prompt».** El modo «autoUpdate» podía recargar la app durante un guardado. La primera vez, quien tenga instalada la versión anterior recibe la v3 al cerrar y reabrir la app.
+- **v3.0: pesos por validación cruzada y no fijos.** Los pesos de canal se re-estiman sólo con datos fuera de muestra y regularizados hacia valores justificados, con topes; con pocos datos se usan los previos.
+- **v3.0: similitud de sinopsis léxica.** Local y gratuita; se declara que no es semántica. Embeddings: postergados (costo/peso).
+- **v3.0: sin FilmAffinity.** No tiene API pública; sólo se muestra la nota de TMDB.
+- **v3.0: actores con tope.** Sus filmografías entran como candidatos, pero nunca más de 2 títulos del mismo actor en el top 10.

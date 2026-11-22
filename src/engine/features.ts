@@ -9,6 +9,7 @@ export const FAMILY_WEIGHT: Record<string, number> = {
   g: 1.0, // género / subgénero
   k: 0.9, // temáticas y elementos narrativos (palabras clave)
   d: 0.8, // dirección / creación
+  w: 0.6, // guion / autoría (créditos de TMDB del departamento «Writing»)
   c: 0.45, // reparto principal
   t: 0.3, // película o serie
   era: 0.25, // década
@@ -50,6 +51,7 @@ export function rawFeatures(t: TitleMeta): string[] {
   for (const g of t.genres) fs.add(`g:${g.id}`);
   for (const k of t.keywords.slice(0, 25)) fs.add(`k:${k.id}`);
   for (const d of t.directors.slice(0, 3)) fs.add(`d:${d.id}`);
+  for (const w of (t.writers ?? []).slice(0, 4)) fs.add(`w:${w.id}`);
   for (const c of t.cast.slice(0, 5)) fs.add(`c:${c.id}`);
   for (const e of endingTraits(t)) fs.add(`end:${e}`);
   fs.add(`t:${t.type}`);
@@ -73,6 +75,7 @@ export function describeFeatures(titles: TitleMeta[]): Map<string, FeatureInfo> 
     for (const g of t.genres) info.set(`g:${g.id}`, { label: g.name, family: 'g', spoiler: false });
     for (const k of t.keywords) info.set(`k:${k.id}`, { label: keywordLabel(k.name), family: 'k', spoiler: SPOILER_PATTERN.test(k.name) });
     for (const d of t.directors) info.set(`d:${d.id}`, { label: d.name, family: 'd', spoiler: false });
+    for (const w of t.writers ?? []) info.set(`w:${w.id}`, { label: w.name, family: 'w', spoiler: false });
     for (const c of t.cast) info.set(`c:${c.id}`, { label: c.name, family: 'c', spoiler: false });
   }
   info.set('t:movie', { label: 'películas', family: 't', spoiler: false });
@@ -101,9 +104,15 @@ export function computeIdf(corpus: string[][]): Map<string, number> {
   return idf;
 }
 
-export function weightedVector(fs: string[], idf: Map<string, number>): FeatureVec {
+/**
+ * Pesos de familia para comparar títulos entre sí (similitud). v3.0: el género pesa menos que los rasgos
+ * específicos (temáticas, autores): dos títulos del mismo género pueden no parecerse en nada.
+ */
+export const SIMILARITY_WEIGHT: Record<string, number> = { ...FAMILY_WEIGHT, g: 0.5, k: 1.0, d: 0.8, w: 0.7, c: 0.5 };
+
+export function weightedVector(fs: string[], idf: Map<string, number>, weights: Record<string, number> = SIMILARITY_WEIGHT): FeatureVec {
   const v: FeatureVec = new Map();
-  for (const f of fs) v.set(f, (FAMILY_WEIGHT[family(f)] ?? 0.3) * (idf.get(f) ?? 1));
+  for (const f of fs) v.set(f, (weights[family(f)] ?? 0.3) * (idf.get(f) ?? 1));
   return v;
 }
 

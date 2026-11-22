@@ -22,14 +22,14 @@ describe('Flujo completo con proveedor simulado', () => {
   it('buscar → valorar → ranking con versión del algoritmo → re-ranking', async () => {
     const hits = await searchTitles('Thriller Film', 'es-MX');
     expect(hits.length).toBeGreaterThan(2);
-    const first = await rateAndLearn(P, hits[0].key, { overall: 9, dimensions: { suspense: 10 } });
+    const first = await rateAndLearn(P, hits[0].key, { overall: 9, dimensions: { suspense: 10 } }, { wait: true });
     expect(first.run?.algorithmVersion).toMatch(/^hybrid/);
     expect(first.run!.items.length).toBeGreaterThan(0);
     // Puntuar no marca «vista»: el título sigue en el ranking de no vistos hasta que el usuario lo marque
     expect(first.run!.items.some((i) => i.key === hits[0].key)).toBe(true);
     const logs = await db.logs.where('type').equals('rating_saved').toArray();
     expect(logs[0].algorithmVersion).toBe(first.run!.algorithmVersion);
-    const second = await rateAndLearn(P, hits[1].key, { overall: 2 });
+    const second = await rateAndLearn(P, hits[1].key, { overall: 2 }, { wait: true });
     expect(second.run!.createdAt).toBeGreaterThanOrEqual(first.run!.createdAt);
     expect(second.run!.items.map((i) => i.key).join()).not.toBe(first.run!.items.map((i) => i.key).join());
     expect(await db.snapshots.count()).toBeGreaterThanOrEqual(2);
@@ -87,12 +87,12 @@ describe('Flujo completo con proveedor simulado', () => {
 describe('v2: visto, rechazo y aprendizaje en el flujo completo', () => {
   it('marcar vista no recalcula ni cambia el perfil; rechazar sí excluye', async () => {
     const hits = await searchTitles('Comedy Film', 'es-MX');
-    await rateAndLearn(P, hits[0].key, { overall: 8 });
+    await rateAndLearn(P, hits[0].key, { overall: 8 }, { wait: true });
     const before = (await latestRun(P))!;
     const { run } = await rateAndLearn(P, hits[1].key, { watched: true });
     expect(run).toBeUndefined(); // «vista» no es señal de gusto
     expect((await latestRun(P))!.id).toBe(before.id);
-    const rej = await rateAndLearn(P, hits[2].key, { notInterested: true });
+    const rej = await rateAndLearn(P, hits[2].key, { notInterested: true }, { wait: true });
     expect(rej.run!.items.some((i) => i.key === hits[2].key)).toBe(false);
   });
 });

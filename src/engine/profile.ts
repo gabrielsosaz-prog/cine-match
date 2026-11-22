@@ -32,6 +32,8 @@ export const LEARNING = {
   dimEvidence: 4, // el peso personalizado de un aspecto crece como n / (n + 4): 0 si nunca lo puntuaste
   actorShrinkage: 2.5, // λ por actor: una sola actuación bien valorada no alcanza para un sesgo fuerte
   commentActorWeight: 0.7, // peso de una mención positiva/negativa a un actor en «Otros»
+  /** v3.0: si no puntuaste Actuaciones, la nota general cuenta como evidencia DÉBIL sobre el reparto principal */
+  actorOverallWeight: 0.35,
 };
 
 /**
@@ -45,7 +47,7 @@ export function participation(p: Person, t: TitleMeta): number {
   return byOrder;
 }
 
-export interface ActorAffinity { id: number; name: string; affinity: number; evidence: number; count: number; positive: number; negative: number }
+export interface ActorAffinity { id: number; name: string; affinity: number; evidence: number; count: number; positive: number; negative: number; /** observaciones con estrellas de Actuaciones */ actingCount: number }
 
 export interface Signal {
   key: TitleKey;
@@ -91,6 +93,8 @@ export interface UserProfile {
   concepts: Map<string, ConceptPreference>;
   /** Descartes («No me interesa») por saga, subgénero y género */
   rejections: RejectionModel;
+  /** v3.0: pesos por canal (previos o aprendidos por validación cruzada); los asigna el motor */
+  channelWeights?: import('./recommender').ChannelWeights;
 }
 
 function pearson(xs: number[], ys: number[]): number | null {
@@ -286,18 +290,23 @@ export function buildProfile(ratings: Rating[], titles: Map<TitleKey, TitleMeta>
   // Actores: sólo con las estrellas de Actuaciones. El crédito se reparte según la participación real de cada
   // persona (protagonistas más que secundarios), con contracción por actor y evidencia negativa incluida.
   const actingMean = dims.find((d) => d.id === 'acting')!.mean;
-  const actAcc = new Map<number, { s: number; w: number; n: number; pos: number; neg: number; name: string }>();
-  const addActor = (p: Person, w: number, dev: number) => {
-    const a = actAcc.get(p.id) ?? { s: 0, w: 0, n: 0, pos: 0, neg: 0, name: p.name };
-    a.s += w * dev; a.w += w; a.n += 1; if (dev > 0) a.pos++; else if (dev < 0) a.neg++; actAcc.set(p.id, a);
+  const actAcc = new Map<number, { s: number; w: number; n: number; pos: number; neg: number; name: string; acting: number }>();
+  const addActor = (p: Person, w: number, dev: number, acting = false) => {
+    const a = actAcc.get(p.id) ?? { s: 0, w: 0, n: 0, pos: 0, neg: 0, name: p.name, acting: 0 };
+    a.s += w * dev; a.w += w; a.n += 1; if (dev > 0) a.pos++; else if (dev < 0) a.neg++; if (acting) a.acting++; actAcc.set(p.id, a);
   };
-  if (!Number.isNaN(actingMean)) {
-    for (const r of ratings) {
-      const v = dimValue(r, 'acting');
-      const t = titles.get(r.key);
-      if (v === undefined || !t) continue;
+  for (const r of ratings) {
+    const t = titles.get(r.key);
+    if (!t) continue;
+    const v = Number.isNaN(actingMean) ? undefined : dimValue(r, 'acting');
+    if (v !== undefined) {
       const dev = clip(v - actingMean);
-      for (const p of t.cast.slice(0, 8)) addActor(p, participation(p, t), dev);
+      for (const p of t.cast.slice(0, 8)) addActor(p, participation(p, t), dev, true);
+    } else if (r.overall !== undefined && !isRejection(r)) {
+      // Sin estrellas de Actuaciones: la nota general dice algo (poco) del reparto principal. Ausente ≠ negativo:
+      // sólo se usa la nota que diste, nunca se supone una nota baja.
+      const dev = clip(r.overall - mean);
+      for (const p of t.cast.slice(0, 4)) addActor(p, LEARNING.actorOverallWeight * participation(p, t), dev);
     }
   }
   const { concepts, people } = buildConceptProfile(ratings, titles);
@@ -308,7 +317,7 @@ export function buildProfile(ratings: Rating[], titles: Map<TitleKey, TitleMeta>
     addActor(person, LEARNING.commentActorWeight, clip(c.score * 4));
   }
   const actors = new Map<number, ActorAffinity>();
-  for (const [id, a] of actAcc) actors.set(id, { id, name: a.name, affinity: a.s / (a.w + LEARNING.actorShrinkage), evidence: a.w, count: a.n, positive: a.pos, negative: a.neg });
+  for (const [id, a] of actAcc) actors.set(id, { id, name: a.name, affinity: a.s / (a.w + LEARNING.actorShrinkage), evidence: a.w, count: a.n, positive: a.pos, negative: a.neg, actingCount: a.acting });
 
   const liked = signals.filter((s) => (s.kind === 'overall' || s.kind === 'aspects') && s.value >= mean + 0.5).map((s) => s.key);
   const rejections = buildRejectionModel(ratings, titles, liked);

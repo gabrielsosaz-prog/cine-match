@@ -32,7 +32,8 @@ export default defineConfig(({ mode }) => ({
     tmdbDevProxy(loadEnv(mode, process.cwd(), '').TMDB_READ_ACCESS_TOKEN),
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // v3.0: «prompt» en lugar de «autoUpdate»: una versión nueva nunca recarga la app en medio de un guardado.
+      registerType: 'prompt',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Cine Match AI',

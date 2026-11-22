@@ -84,12 +84,21 @@ export interface RatingPatch {
   abandonReason?: string | null;
 }
 
-/** Guarda o modifica. Si el registro queda vacío (no vista, sin lista ni notas) se elimina. */
+/**
+ * Guarda o modifica. Si el registro queda vacío (no vista, sin lista ni notas) se elimina.
+ * Lectura y escritura ocurren en UNA transacción: dos acciones rápidas sobre el mismo título
+ * (p. ej. «Vista» y una nota) se aplican en orden y ninguna pisa a la otra.
+ */
 export async function saveRating(profileId: string, key: TitleKey, patch: RatingPatch): Promise<Rating | undefined> {
+  return db.transaction('rw', db.ratings, async () => applyPatch(profileId, key, patch));
+}
+
+async function applyPatch(profileId: string, key: TitleKey, patch: RatingPatch): Promise<Rating | undefined> {
   const id = `${profileId}|${key}`;
   const prevRaw = await db.ratings.get(id);
   const prev = prevRaw ? migrateRating(prevRaw) : undefined;
-  const now = Date.now();
+  // Marca de tiempo estrictamente creciente por registro: permite confirmar cuál escritura quedó guardada
+  const now = Math.max(Date.now(), (prev?.updatedAt ?? 0) + 1);
   const next: Rating = prev ? { ...prev } : { id, profileId, key, watched: false, dimensions: {}, createdAt: now, updatedAt: now, schema: 3 };
   if (patch.watched !== undefined) {
     if (patch.watched && !next.watched) next.watchedAt = now;

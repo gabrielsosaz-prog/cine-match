@@ -303,7 +303,9 @@ describe('7. Comentarios «Otros»', () => {
     t.cast[0].name = 'Keanu Reeves';
     const p = buildProfile([R(t.key, 8, {}, { comment: 'La actuación de Keanu Reeves es impecable' })], mapOf([t]));
     expect(p.actors.get(11)!.affinity).toBeGreaterThan(0);
-    expect(p.actors.get(12)).toBeUndefined();
+    // v3.0: el resto del reparto recibe sólo evidencia débil de la nota general (sin estrellas de Actuaciones)
+    expect(p.actors.get(12)!.actingCount).toBe(0);
+    expect(p.actors.get(12)!.affinity).toBeLessThan(p.actors.get(11)!.affinity / 2);
   });
 });
 
@@ -437,7 +439,7 @@ describe('17. TMDB', () => {
       credits: { cast: [{ id: 2, name: 'B', order: 1 }, { id: 1, name: 'A', order: 0 }], crew: [] }, keywords: { keywords: [{ id: 9715, name: 'superhero' }] } }, 'movie', 'es-MX');
     expect(m.collection).toEqual({ id: 86311, name: 'The Avengers Collection' });
     expect(m.cast.map((c) => c.id)).toEqual([1, 2]);
-    expect(m.metaVersion).toBe(2);
+    expect(m.metaVersion).toBe(3);
   });
   it('el proxy sigue limitando rutas (los parámetros nuevos de discover son sólo de filtrado)', () => {
     expect(ALLOWED_PATH.test('/discover/movie')).toBe(true);

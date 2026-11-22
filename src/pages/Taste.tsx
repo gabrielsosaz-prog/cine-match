@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useRatings } from '../hooks/useRatings';
 import { DIMENSIONS } from '../constants';
 import { db } from '../db/db';
 import { updateSettings } from '../db/repo';
 import { describeFeatures, family, featureLabel } from '../engine/features';
-import { migrateRating } from '../db/migrations';
 import { useApp } from '../hooks/useApp';
-import { getEngine, refreshRecommendations } from '../services/recommendations';
+import { getEngine } from '../services/recommendations';
+import { requestRecompute } from '../services/recompute';
 import type { DimensionId, TitleKey, TitleMeta } from '../types';
 import { Card, Empty } from '../ui/components';
 import { num } from '../ui/format';
@@ -29,8 +30,8 @@ function Bars({ items }: { items: { label: string; value: number; note: string }
 
 export default function Taste() {
   const { profileId, settings } = useApp();
-  const rawRatings = useLiveQuery(() => db.ratings.where('profileId').equals(profileId).toArray(), [profileId]);
-  const ratings = useMemo(() => (rawRatings ?? []).map(migrateRating), [rawRatings]);
+  const rs = useRatings(profileId);
+  const ratings = rs.ratings;
   const titles = useLiveQuery(() => db.titles.bulkGet(ratings.map((r) => r.key)), [ratings]) ?? [];
   const snapshots = useLiveQuery(() => db.snapshots.where('profileId').equals(profileId).sortBy('at'), [profileId]) ?? [];
   const { profile, info } = useMemo(() => {
@@ -78,7 +79,7 @@ export default function Taste() {
             </li>
           ))}
         </ul>
-        <button onClick={() => refreshRecommendations(profileId, { trigger: 'ajuste de pesos' })} className="mt-2 text-sm text-accent underline">Recalcular ranking con estos pesos</button>
+        <button onClick={() => requestRecompute(profileId, { trigger: 'ajuste de pesos' })} className="mt-2 text-sm text-accent underline">Recalcular ranking con estos pesos</button>
       </Card>
       {(() => {
         const acts = [...profile.actors.values()].filter((a) => a.count >= 2 && Math.abs(a.affinity) > 0.2).sort((a, b) => b.affinity - a.affinity).slice(0, 8);

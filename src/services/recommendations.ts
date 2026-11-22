@@ -8,7 +8,8 @@ import { META_VERSION } from '../providers/tmdb';
 import type { MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
 import { diagnose, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
 import { matchesPlatforms } from './availability';
-import { discoverCandidates, ensureFullTitles, getTitle, refreshAvailability } from './catalog';
+import { discoverCandidates, ensureFullTitles, getTitle, personFilmography, refreshAvailability } from './catalog';
+import type { UserProfile } from '../engine/profile';
 
 let engine: RecommenderEngine = hybridEngine;
 /** Permite sustituir el motor sin tocar el resto de la app */
@@ -22,8 +23,37 @@ async function titleMap(keys: TitleKey[]): Promise<Map<TitleKey, TitleMeta>> {
   return new Map(metas.filter((m): m is TitleMeta => Boolean(m)).map((m) => [m.key, m]));
 }
 
-/** Genera el conjunto de candidatos: relacionados de lo que te gustó + descubrimiento por plataforma. */
-async function buildPool(ratings: Rating[], settings: ProfileSettings, titles: Map<TitleKey, TitleMeta>): Promise<{ pool: TitleKey[]; warning?: string }> {
+/**
+ * v3.0 — Actores como fuente de candidatos. Antes, las películas de un actor que te gustó sólo podían aparecer si
+ * TMDB las listaba como «relacionadas» con algo que puntuaste (casi nunca: p. ej. Volver al futuro → otras de
+ * Michael J. Fox). Ahora, para los actores con afinidad positiva y evidencia repetida (≥ 2 títulos), se consulta su
+ * filmografía en TMDB (por id único) y se suman sus títulos de ficción más votados. Con tope por actor y por
+ * cantidad de actores para que no monopolicen; el ranking además limita títulos por actor en el top 10.
+ */
+export const ACTOR_DISCOVERY = { maxActors: 4, perActor: 8, minAffinity: 0.2, minCount: 2, minVotes: 80 };
+export async function actorCandidates(profile: UserProfile, settings: ProfileSettings): Promise<{ keys: TitleKey[]; actors: { id: number; name: string; added: number }[]; warning?: string }> {
+  const top = [...profile.actors.values()].filter((a) => a.affinity >= ACTOR_DISCOVERY.minAffinity && a.count >= ACTOR_DISCOVERY.minCount)
+    .sort((a, b) => b.affinity * Math.log(1 + b.count) - a.affinity * Math.log(1 + a.count)).slice(0, ACTOR_DISCOVERY.maxActors);
+  const keys: TitleKey[] = [];
+  const actors: { id: number; name: string; added: number }[] = [];
+  let warning: string | undefined;
+  for (const a of top) {
+    try {
+      const credits = await personFilmography(a.id, settings.language, { role: 'cast', fiction: true });
+      // Papeles relevantes primero (orden en los créditos / episodios), luego los más votados
+      const pick = credits.filter((c) => (c.voteCount ?? 0) >= ACTOR_DISCOVERY.minVotes)
+        .map((c) => ({ c, s: (c.voteCount ?? 0) * (c.order === undefined || c.order <= 4 || (c.episodes ?? 0) >= 8 ? 1 : 0.25) }))
+        .sort((x, y) => y.s - x.s).map((x) => x.c.key);
+      const uniq = [...new Set(pick)].slice(0, ACTOR_DISCOVERY.perActor);
+      keys.push(...uniq);
+      actors.push({ id: a.id, name: a.name, added: uniq.length });
+    } catch (e) { warning ??= friendlyError(e); }
+  }
+  return { keys: [...new Set(keys)], actors, warning };
+}
+
+/** Genera el conjunto de candidatos: relacionados de lo que te gustó + descubrimiento por plataforma + actores. */
+async function buildPool(ratings: Rating[], settings: ProfileSettings, titles: Map<TitleKey, TitleMeta>): Promise<{ pool: TitleKey[]; warning?: string; priority: TitleKey[] }> {
   const opts = { language: settings.language, country: settings.country };
   const pool = new Set<TitleKey>();
   let warning: string | undefined;
@@ -46,22 +76,26 @@ async function buildPool(ratings: Rating[], settings: ProfileSettings, titles: M
   const results = await Promise.allSettled(jobs);
   const failed = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
   if (failed.length) warning = friendlyError(failed[0].reason);
-  return { pool: [...pool], warning };
+  const act = await actorCandidates(profile, settings);
+  for (const k of act.keys) pool.add(k);
+  warning ??= act.warning;
+  return { pool: [...pool], warning, priority: act.keys };
 }
 
 /** Búsqueda adicional en TMDB para los filtros avanzados (p. ej. «series de ciencia ficción desde 2015 en Netflix»). */
 export interface DiscoverHints { types: MediaType[]; genres: number[]; excludeGenres: number[]; yearMin?: number; yearMax?: number; platforms: PlatformId[]; runtimeMin?: number; runtimeMax?: number }
-export interface RefreshOptions { trigger: string; rebuildPool?: boolean; extraKeys?: TitleKey[]; discover?: DiscoverHints }
+export interface RefreshOptions { trigger: string; rebuildPool?: boolean; extraKeys?: TitleKey[]; discover?: DiscoverHints; actorDiscovery?: boolean }
 
-async function discoverWithHints(h: DiscoverHints, settings: ProfileSettings): Promise<TitleKey[]> {
+async function discoverWithHints(h: DiscoverHints, settings: ProfileSettings, pages = 1): Promise<TitleKey[]> {
   const plats = h.platforms.length ? h.platforms : settings.platforms;
   const ids = PLATFORMS.filter((p) => plats.includes(p.id)).flatMap((p) => p.tmdbIds);
   const out: TitleKey[] = [];
   const types = h.types.length ? h.types : (['movie', 'tv'] as MediaType[]);
-  await Promise.all(types.flatMap((type) => ['vote_average.desc', 'popularity.desc'].map(async (sort) => {
+  const pageList = Array.from({ length: Math.max(1, Math.min(3, pages)) }, (_, i) => i + 1);
+  await Promise.all(types.flatMap((type) => ['vote_average.desc', 'popularity.desc'].flatMap((sort) => pageList.map(async (page) => {
     const dateField = type === 'movie' ? 'primary_release_date' : 'first_air_date';
     const r = await discoverCandidates({
-      type, language: settings.language, country: settings.country, providerIds: ids, genres: h.genres, sort, minVotes: sort === 'vote_average.desc' ? 200 : 50,
+      type, language: settings.language, country: settings.country, providerIds: ids, genres: h.genres, sort, minVotes: sort === 'vote_average.desc' ? 200 : 50, page,
       extra: {
         [`${dateField}.gte`]: h.yearMin ? `${h.yearMin}-01-01` : undefined,
         [`${dateField}.lte`]: h.yearMax ? `${h.yearMax}-12-31` : undefined,
@@ -70,8 +104,8 @@ async function discoverWithHints(h: DiscoverHints, settings: ProfileSettings): P
       },
     });
     out.push(...r.map((x) => x.key));
-  })));
-  return out;
+  }))));
+  return [...new Set(out)];
 }
 
 /**
@@ -91,11 +125,17 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
 
   let pool: TitleKey[] = last?.pool ?? [];
   let warning: string | undefined;
+  let priority: TitleKey[] = [];
   const stalePool = !last || Date.now() - last.createdAt > 24 * 3600 * 1000 || last.country !== settings.country || pool.length < 20;
   if (o.rebuildPool || stalePool) {
     const built = await buildPool(ratings, settings, titles);
-    if (built.pool.length) pool = built.pool;
+    if (built.pool.length) pool = [...new Set([...built.pool, ...(last?.country === settings.country ? (last?.pool ?? []).slice(0, 150) : [])])];
     warning = built.warning;
+    priority = built.priority;
+  } else if (o.actorDiscovery) {
+    const act = await actorCandidates(engine.buildProfile(ratings, titles, settings), settings);
+    priority = act.keys;
+    pool = [...new Set([...pool, ...act.keys])];
   }
   for (const k of o.extraKeys ?? []) for (const r of titles.get(k)?.related ?? []) if (!pool.includes(r)) pool.push(r);
   let hinted: TitleKey[] = [];
@@ -111,23 +151,26 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   // Preselección con datos disponibles y luego ficha completa sólo para los mejores
   let all = await titleMap([...histKeys, ...pool]);
   const profile = engine.buildProfile(ratings, all, settings);
-  const pre = engine.rank({ profile, ratings, titles: all, candidates: pool.filter((k) => all.has(k)), settings, limit: 60 });
+  // v3.0: preselección más amplia (120) para que los filtros tengan dónde elegir sin perder títulos
+  const pre = engine.rank({ profile, ratings, titles: all, candidates: pool.filter((k) => all.has(k)), settings, limit: 120 });
   const unknown = pool.filter((k) => !all.has(k)).slice(0, 25);
-  const toFetch = [...hinted.filter((k) => all.get(k)?.completeness !== 'full').slice(0, 20), ...pre.map((p) => p.key).filter((k) => all.get(k)?.completeness !== 'full'), ...unknown].slice(0, 60);
+  const notFull = (k: TitleKey) => all.get(k)?.completeness !== 'full' || (all.get(k)?.metaVersion ?? 1) < META_VERSION;
+  const toFetch = [...new Set([...priority.filter(notFull).slice(0, 16), ...hinted.filter(notFull).slice(0, 20), ...pre.map((p) => p.key).filter(notFull), ...unknown])].slice(0, 80);
   if (toFetch.length) {
-    try { await ensureFullTitles(toFetch, opts, 60); } catch (e) { warning ??= friendlyError(e); }
+    try { await ensureFullTitles(toFetch, opts, 80); } catch (e) { warning ??= friendlyError(e); }
     all = await titleMap([...histKeys, ...pool]);
   }
-  const keysForAvail = [...new Set([...hinted.slice(0, 40), ...pre.map((p) => p.key), ...unknown, ...watchedKeys])];
-  try { await refreshAvailability(keysForAvail, settings.country, 60); } catch (e) { warning ??= friendlyError(e); }
+  const keysForAvail = [...new Set([...priority, ...hinted.slice(0, 40), ...pre.map((p) => p.key), ...unknown, ...watchedKeys])];
+  try { await refreshAvailability(keysForAvail, settings.country, 100); } catch (e) { warning ??= friendlyError(e); }
   const snaps = await db.availability.bulkGet(keysForAvail.map((k) => `${k}|${settings.country}`));
   const availOk = new Set(keysForAvail.filter((_, i) => matchesPlatforms(snaps[i], settings.platforms, settings.includeUnconfirmed)));
 
   const profile2 = engine.buildProfile(ratings, all, settings);
   const seed = Math.floor(Date.now() / 86400000) + profileId.length;
-  const unwatched = engine.rank({ profile: profile2, ratings, titles: all, candidates: [...availOk], settings, limit: 60, seed });
+  // v3.0: se guarda un ranking largo (se muestra de a 10 con «Ver más»), no sólo los primeros 60
+  const unwatched = engine.rank({ profile: profile2, ratings, titles: all, candidates: [...availOk], settings, limit: 200, seed });
   const watchedSet = new Set(watchedKeys);
-  const watchedRanked = engine.rank({ profile: profile2, ratings, titles: all, candidates: watchedKeys.filter((k) => availOk.has(k)), settings, limit: 40, seed, includeWatched: true })
+  const watchedRanked = engine.rank({ profile: profile2, ratings, titles: all, candidates: watchedKeys.filter((k) => availOk.has(k)), settings, limit: 80, seed, includeWatched: true })
     .filter((i) => watchedSet.has(i.key)).map((i) => ({ ...i, exploration: false }));
   const items = [...unwatched, ...watchedRanked];
 
@@ -137,17 +180,17 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
     eligible: [...availOk].filter((k) => !blocked.has(k)),
   };
   run.id = await db.runs.add(run);
-  // Mantener sólo los últimos 20 cálculos
-  const old = await db.runs.where('profileId').equals(profileId).sortBy('createdAt');
-  if (old.length > 20) await db.runs.bulkDelete(old.slice(0, old.length - 20).map((r) => r.id!));
+  // Mantener sólo los últimos 5 cálculos (cada uno guarda el conjunto de candidatos); se borran por clave
+  const ids = await db.runs.where('profileId').equals(profileId).primaryKeys();
+  if (ids.length > 5) await db.runs.bulkDelete(ids.slice(0, ids.length - 5));
   await recordSnapshot(profileId, profile2, all);
   await db.logs.add({ profileId, at: Date.now(), type: 'recs_updated', algorithmVersion: engine.version, detail: `${o.trigger}: ${items.length} recomendaciones` });
   return run;
 }
 
+/** Último ranking: lectura directa por índice (no carga todos los cálculos guardados). */
 export async function latestRun(profileId: string): Promise<RecommendationRun | undefined> {
-  const runs = await db.runs.where('profileId').equals(profileId).sortBy('createdAt');
-  return runs[runs.length - 1];
+  return db.runs.where('profileId').equals(profileId).last();
 }
 
 async function recordSnapshot(profileId: string, profile: ReturnType<RecommenderEngine['buildProfile']>, titles: Map<TitleKey, TitleMeta>) {
@@ -164,29 +207,114 @@ export async function loadTitleWithRelated(key: TitleKey, settings: ProfileSetti
   return res;
 }
 
+export function hintsFromFilters(f: RankFilters): DiscoverHints {
+  return { types: f.types, genres: f.includeGenres, excludeGenres: f.excludeGenres, yearMin: f.yearMin, yearMax: f.yearMax, platforms: f.platforms, runtimeMin: f.runtimeMin, runtimeMax: f.runtimeMax };
+}
+
+/** Por debajo de esta cantidad de candidatos filtrados se busca automáticamente en TMDB */
+export const FEW_CANDIDATES = 20;
+const discoverCache = new Map<string, { at: number; keys: TitleKey[] }>();
+
+export interface FilteredResult {
+  items: RecommendationItem[];
+  candidates: number;
+  diagnostics: { id: string; count: number }[];
+  /** títulos sumados por búsqueda automática en TMDB para estos filtros */
+  discovered: number;
+  /** títulos de la persona elegida que no están en tus plataformas (no se muestran) */
+  outsidePlatforms?: number;
+  warning?: string;
+}
+
 /**
- * Ranking con filtros avanzados: filtra el conjunto de candidatos (con disponibilidad confirmada) y lo
- * ordena con el mismo motor y el mismo perfil. No guarda nada ni cambia lo aprendido: es una vista temporal.
+ * Ranking con filtros avanzados. v3.0 separa:
+ *  1. DESCUBRIMIENTO: el conjunto de candidatos (ranking guardado + elegibles; si quedan pocos, búsqueda en TMDB
+ *     con los mismos filtros, respetando paginación y límites; si se eligió una persona, su filmografía);
+ *  2. FILTRADO: los filtros sólo seleccionan, nunca recortan por posición;
+ *  3. AFINIDAD: el mismo motor y el mismo perfil puntúan a todos los que pasan;
+ *  4. ORDEN: se ordena TODO el subconjunto (sin tope), así un título que cumple el filtro nunca desaparece por
+ *     cambiar de vista. La pantalla lo muestra de a 10.
+ * No guarda nada ni cambia lo aprendido: es una vista temporal.
  */
-export async function rankWithFilters(profileId: string, run: RecommendationRun, f: RankFilters): Promise<{ items: RecommendationItem[]; candidates: number; diagnostics: { id: string; count: number }[] }> {
+export async function rankWithFilters(profileId: string, run: RecommendationRun, f: RankFilters, opts: { discover?: boolean } = {}): Promise<FilteredResult> {
   const settings = await getSettings(profileId);
   const ratings = await listRatings(profileId);
   const byKey = new Map(ratings.map((r) => [r.key, r]));
-  const base = [...new Set([...(run.eligible ?? []), ...run.items.map((i) => i.key)])];
-  const all = await titleMap([...ratings.map((r) => r.key), ...base]);
-  const snaps = await db.availability.bulkGet(base.map((k) => `${k}|${settings.country}`));
-  const cands: Candidate[] = base.map((k, i) => ({ meta: all.get(k)!, snap: snaps[i], rating: byKey.get(k) }))
-    .filter((c) => c.meta && !c.rating?.notInterested && c.rating?.list !== 'abandoned');
-  const pass = cands.filter((c) => matchesContent(c, f) && matchesWatched(c, f));
+  let warning: string | undefined;
+  let base: TitleKey[];
+  let outsidePlatforms: number | undefined;
+  const lowEvidence = new Set<TitleKey>();
+  if (f.person) {
+    // Filmografía de la persona elegida (id único de TMDB), combinable con el resto de los filtros
+    let credits: TitleKey[] = [];
+    try {
+      const role = f.person.department && f.person.department !== 'Acting' ? 'any' : 'cast';
+      const list = await personFilmography(f.person.id, settings.language, { role, fiction: true });
+      credits = [...new Set(list.sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0)).map((c) => c.key))];
+    } catch (e) { warning = friendlyError(e); }
+    try { await refreshAvailability(credits, settings.country, 80); } catch (e) { warning ??= friendlyError(e); }
+    const snaps0 = await db.availability.bulkGet(credits.map((k) => `${k}|${settings.country}`));
+    base = credits.filter((_, i) => matchesPlatforms(snaps0[i], settings.platforms, settings.includeUnconfirmed));
+    outsidePlatforms = credits.length - base.length;
+  } else {
+    base = [...new Set([...(run.eligible ?? []), ...run.items.map((i) => i.key)])];
+  }
+  let all = await titleMap([...ratings.map((r) => r.key), ...base]);
+  const candidatesOf = async (keys: TitleKey[]) => {
+    const snaps = await db.availability.bulkGet(keys.map((k) => `${k}|${settings.country}`));
+    return keys.map((k, i) => ({ meta: all.get(k)!, snap: snaps[i], rating: byKey.get(k) }) as Candidate)
+      .filter((c) => c.meta && !c.rating?.notInterested && c.rating?.list !== 'abandoned');
+  };
+  let cands = await candidatesOf(base);
+  let pass = cands.filter((c) => matchesContent(c, f) && matchesWatched(c, f));
+  let discovered = 0;
+  if (!f.person && pass.length < FEW_CANDIDATES && opts.discover !== false) {
+    // Pocos candidatos locales (p. ej. sólo Terror sin historial de terror): buscar en TMDB con estos filtros
+    const ck = `${settings.country}|${settings.platforms.join(',')}|${JSON.stringify(hintsFromFilters(f))}`;
+    let found = discoverCache.get(ck);
+    if (!found || Date.now() - found.at > 3600 * 1000) {
+      try { found = { at: Date.now(), keys: await discoverWithHints(hintsFromFilters(f), settings, 2) }; discoverCache.set(ck, found); }
+      catch (e) { warning ??= friendlyError(e); }
+    }
+    const extra = (found?.keys ?? []).filter((k) => !base.includes(k));
+    if (extra.length) {
+      try { await refreshAvailability(extra, settings.country, 60); } catch (e) { warning ??= friendlyError(e); }
+      base = [...base, ...extra];
+      all = await titleMap([...ratings.map((r) => r.key), ...base]);
+      cands = await candidatesOf(base);
+      const okAvail = new Set(cands.filter((c) => extra.includes(c.meta.key) && matchesPlatforms(c.snap, settings.platforms, settings.includeUnconfirmed)).map((c) => c.meta.key));
+      cands = cands.filter((c) => !extra.includes(c.meta.key) || okAvail.has(c.meta.key));
+      pass = cands.filter((c) => matchesContent(c, f) && matchesWatched(c, f));
+      for (const k of okAvail) lowEvidence.add(k);
+      discovered = pass.filter((c) => okAvail.has(c.meta.key)).length;
+    }
+  }
   const profile = engine.buildProfile(ratings, all, settings);
   const seed = Math.floor(Date.now() / 86400000) + profileId.length;
-  let items = engine.rank({ profile, ratings, titles: all, candidates: pass.map((c) => c.meta.key), settings, limit: 60, seed, includeWatched: f.watched !== 'unwatched' });
+  let items = engine.rank({ profile, ratings, titles: all, candidates: pass.map((c) => c.meta.key), settings, limit: pass.length, seed, includeWatched: f.watched !== 'unwatched', lowEvidence });
   if (f.minScore) items = items.filter((i) => i.score >= f.minScore!);
   items = items.map((it, i) => ({ ...it, rank: i + 1 }));
   let diagnostics: { id: string; count: number }[] = [];
   if (!items.length) {
-    const scores = new Map(engine.rank({ profile, ratings, titles: all, candidates: cands.map((c) => c.meta.key), settings, limit: 200, includeWatched: true }).map((i) => [i.key, i.score]));
+    const scores = new Map(engine.rank({ profile, ratings, titles: all, candidates: cands.map((c) => c.meta.key), settings, limit: 400, includeWatched: true }).map((i) => [i.key, i.score]));
     diagnostics = diagnose(cands.map((c) => ({ ...c, score: scores.get(c.meta.key) })), f);
   }
-  return { items, candidates: pass.length, diagnostics };
+  return { items, candidates: pass.length, diagnostics, discovered, outsidePlatforms, warning };
+}
+
+/**
+ * Estimación «Para vos» de títulos puntuales (ficha, Similares). Con `holdOut`, el título se estima SIN su propia
+ * valoración (así la estimación de algo que ya puntuaste no es un eco de tu nota).
+ */
+export async function predictFor(profileId: string, keys: TitleKey[], o: { holdOut?: boolean } = {}): Promise<Map<TitleKey, RecommendationItem>> {
+  const settings = await getSettings(profileId);
+  const ratings = await listRatings(profileId);
+  const target = new Set(keys);
+  const train = o.holdOut ? ratings.filter((r) => !target.has(r.key)) : ratings;
+  const all = await titleMap([...ratings.map((r) => r.key), ...keys]);
+  const profile = engine.buildProfile(train, all, settings);
+  // Para estimar no se excluyen vistos/descartados: la exclusión es del ranking, no de la estimación
+  const neutral = train.filter((r) => !target.has(r.key));
+  const items = engine.rank({ profile, ratings: neutral, titles: all, candidates: keys.filter((k) => all.has(k)), settings, limit: keys.length, includeWatched: true });
+  return new Map(items.map((i) => [i.key, i]));
 }

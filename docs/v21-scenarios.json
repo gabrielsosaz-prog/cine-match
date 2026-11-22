@@ -9,21 +9,21 @@
     "Escenario actor: películas con el actor A": {
       "afinidadConUnaActuacion": 1,
       "afinidadConCuatro": 1.75,
-      "prediccionSinDatos": 7.06,
-      "conUnaActuacion5Estrellas": 7.25,
-      "conCuatro": 7.61,
-      "tituloSinElActor": 7.2,
+      "prediccionSinDatos": 7,
+      "conUnaActuacion5Estrellas": 7.2,
+      "conCuatro": 7.54,
+      "tituloSinElActor": 7.13,
       "aporteActorUna": 0.15,
       "aporteActorCuatro": 0.41
     },
     "Escenario final: finales con giro puntuados 5★ vs. otros 2★": {
-      "conGiro": 8.9,
-      "sinDatosDeFinal": 8.14
+      "conGiro": 8.92,
+      "sinDatosDeFinal": 7.89
     },
     "Escenario «Otros»: comentario sobre la simulación en un título puntuado 9": {
       "tituloConRealidadVirtual": {
-        "antes": 7.31,
-        "despues": 7.82
+        "antes": 7.16,
+        "despues": 7.68
       },
       "tituloSinRelacion": {
         "cambio": 0
@@ -41,8 +41,8 @@
     "Escenario excepción: rechazos de superhéroes + Batman puntuadas 9": {
       "penalizacionBatman": -0.15,
       "penalizacionOtroSuperheroe": -0.7,
-      "prediccionBatman": 9.53,
-      "prediccionOtroSuperheroe": 8.52
+      "prediccionBatman": 9.57,
+      "prediccionOtroSuperheroe": 8.56
     }
   }
 }

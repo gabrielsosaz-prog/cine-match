@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useRatings } from '../hooks/useRatings';
 import { COUNTRIES, PLATFORMS } from '../constants';
 import { db } from '../db/db';
 import { saveRating, updateSettings } from '../db/repo';
 import { useApp } from '../hooks/useApp';
 import { friendlyError } from '../providers/errors';
 import { discoverCandidates } from '../services/catalog';
-import { refreshRecommendations } from '../services/recommendations';
+import { requestRecompute } from '../services/recompute';
 import type { PlatformId, TitleKey } from '../types';
 import type { RatingPatch } from '../db/repo';
 import { migrateRating } from '../db/migrations';
@@ -70,7 +71,7 @@ export default function Onboarding() {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const { hits } = useSearch(q, settings.language, settings.country);
-  const count = useLiveQuery(() => db.ratings.where('profileId').equals(profileId).count(), [profileId]) ?? 0;
+  const count = useRatings(profileId).ratings.length;
   useEffect(() => {
     if (step !== 2 || picks.length) return;
     const base = { language: settings.language, country: settings.country, providerIds: [] as number[], sort: 'vote_count.desc', minVotes: 2000 };
@@ -81,7 +82,7 @@ export default function Onboarding() {
   const finish = async () => {
     setBusy(true);
     await updateSettings(profileId, { onboarded: true });
-    await refreshRecommendations(profileId, { trigger: 'incorporación', rebuildPool: true }).catch(() => undefined);
+    await requestRecompute(profileId, { trigger: 'incorporación', rebuildPool: true, actorDiscovery: true });
     setBusy(false);
     nav('/');
   };

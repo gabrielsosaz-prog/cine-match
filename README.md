@@ -61,7 +61,50 @@ Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se 
 - **Filtros avanzados** combinables (tipo, géneros incluidos/excluidos, años, plataformas, vistos, duración, afinidad mínima), con indicador, «Limpiar filtros» y «Restablecer generales». Se aplican al conjunto de candidatos antes de ordenar; si no hay resultados se indica qué filtro restringe y se puede buscar más en TMDB con esos filtros.
 - **Porcentaje de aspectos completados** (aspectos / 7 × 100) en Valoraciones, con filtros, orden y acceso directo a los faltantes.
 
-### Motor de recomendaciones (`hybrid-aspects-2.1.0`)
+### Novedades v3.0
+
+**Correcciones críticas**
+- **Guardado confiable**: guardar ya no espera al recálculo del modelo (que usa la red). Primero se persiste en una transacción atómica, se **confirma releyendo la base** (máx. 10 s, con error claro) y recién después se recalcula en segundo plano, en una **cola única** que agrupa pedidos seguidos. Un error nunca deja «procesando», muestra un aviso no bloqueante, conserva el borrador y no toca lo guardado. Cada consulta a TMDB tiene un tiempo máximo (15 s).
+- **Datos siempre visibles**: las pantallas leen las valoraciones desde un almacén compartido que distingue «cargando», «tardando» y «error» de «vacío», conserva lo último confirmado si la base se cierra y reconecta sola. Pantallas con error muestran «Reintentar» en lugar de quedar en blanco.
+- **Actualizaciones de la PWA sin recargas en medio de un guardado**: aviso «Hay una versión nueva» y se aplica al tocar «Actualizar» o al pasar a segundo plano sin operaciones pendientes. Se pide almacenamiento persistente.
+- **Años en Android**: campo de texto con teclado numérico que acepta escritura parcial y valida al tener 4 cifras.
+- **Filtros**: descubrimiento → filtrado → afinidad → orden, separados. Se ordena **todo** el subconjunto filtrado (sin tope), así ningún título que cumple el filtro desaparece al cambiar de vista. Con menos de 20 candidatos se busca en TMDB con los mismos filtros (2 páginas por orden, con caché de 1 h) y esos títulos se marcan «provisional» si hay poca evidencia.
+- **10 recomendaciones y «Ver más»** de a 10. Ranking guardado de hasta 200 títulos.
+- **Orden persistente** en Inicio (Para vos, Público, Año, Título + dirección), Valoraciones (campo, dirección, vista y tipo) y Similares, hasta que lo cambies o lo restablezcas.
+
+**Motor `hybrid-channels-3.0.0`** (ver «Motor» más abajo), **actores** como fuente de candidatos y **filtro por actor/actriz/dirección** con id único de TMDB, **dos notas** (Público TMDB y «Para vos») y la sección **Similares**.
+
+### Motor de recomendaciones (`hybrid-channels-3.0.0`)
+
+La estimación «Para vos» = tu media + Σ peso × canal. Canales separados, cada uno en puntos sobre tu media:
+
+| Canal | Qué mide | Peso previo | Tope |
+|---|---|---|---|
+| Temáticas (A) | palabras clave de TMDB y rasgos de final | 1,0 | 2,5 |
+| «Otros» (A′) | conceptos de tus comentarios | 0,9 | 2 |
+| Aspectos (B) | afinidad por aspecto × importancia aprendida | 1,4 | 3 |
+| Actores (C) | Actuaciones (y, débil, la nota general) × participación | 0,8 | 2 |
+| Dirección y guion (D) | directores, creadores y guionistas (crew «Writing») | 0,7 | 2 |
+| Similitud (E) | kNN con tu historial: rasgos + sinopsis **léxica** (TF-IDF, no semántica) | 1,3 | 3 |
+| Géneros (F) | acotado: aporte máximo ±1 punto | 0,6 | 0,9 |
+| Formato | tipo, década, duración, idioma | 0,4 | 0,8 |
+| Descartes (G) | modelo jerárquico con excepciones positivas | 1 | fijo |
+| Público (H) | calidad bayesiana de TMDB, auxiliar | 0,3 | 0,35 |
+| Exploración (I) | 1 de cada 6 posiciones + diversidad MMR | — | — |
+
+- **Pesos justificados**: los previos son los valores validados en v2.1 repartidos entre canales. Con ≥ 12 valoraciones se re-estiman por **validación cruzada de 5 grupos** sobre tus notas (cada título se predice sin haber visto su nota) y regresión ridge **hacia el previo** (equivale a 10 valoraciones), no negativa y con topes. Ausencia de datos = canal en 0 (desconocido, no negativo).
+- **Género sin dominar**: en la similitud entre títulos el género pesa la mitad que las temáticas, y su canal está acotado.
+- **Diagnóstico**: cada recomendación guarda el aporte por canal; se ve en «¿Por qué esta estimación?» (ficha) y al abrir la explicación de una tarjeta. Es una descomposición del cálculo, no una medida de precisión.
+- **Actores**: los actores con afinidad ≥ 0,2 y ≥ 2 títulos (máx. 4) aportan hasta 8 títulos de ficción de su filmografía (`/person/{id}/combined_credits`) al conjunto de candidatos; en el top 10, máximo 2 títulos impulsados por el mismo actor.
+
+### Notas visibles
+- **TMDB**: promedio de votos del público (0-10), con «s/d» si hay menos de 20 votos. FilmAffinity, IMDb y otros no tienen API pública autorizada y sustentable: no se muestran (no se hace scraping).
+- **Para vos**: estimación 1-10 de cuánto lo disfrutarías. No es tu nota, ni la confianza, ni una probabilidad. «provisional» con poca evidencia; «info insuficiente» si casi no hay datos. La confianza se muestra aparte. En títulos ya puntuados se ve «Tu nota» y, en la ficha, la estimación calculada **sin** tu nota.
+
+### Similares
+Elegí 1-5 referencias. Se arma un perfil temporal con lo que comparten (temáticas, dirección, guion, reparto, subgéneros, sinopsis léxica), ponderando cada referencia por tu nota si la puntuaste y atenuando rasgos que solés puntuar bajo. Candidatos: relacionados de TMDB + descubrimiento por palabras clave, reparto y equipo + tus candidatos. Cada resultado muestra similitud (%) y «Para vos» por separado, explicación, disponibilidad y acciones rápidas; se excluyen las referencias y aplican los filtros. Sin ≥ 5 valoraciones se avisa que no está personalizado.
+
+### Motor v2.1 (`hybrid-aspects-2.1.0`, se conserva dentro de los canales)
 
 Sobre el modelo de afinidad de la v2.0 (no es un promedio):
 
@@ -92,6 +135,7 @@ La nota estimada es una afinidad en escala 1-10, no una probabilidad.
 - **Disponibilidad (JustWatch vía TMDB)**: real. Limitaciones: TMDB no informa fechas de alta/baja; la app detecta cambios comparando verificaciones y muestra el intervalo. Los datos pueden tener días de atraso respecto de JustWatch. Se refresca automáticamente cada 24 h para lo que estás viendo; más de 7 días se marca «desactualizada»; errores o países sin datos se muestran como «no confirmada». Atribución a JustWatch obligatoria (incluida).
 - **APIs pagas descartadas**: Streaming Availability (RapidAPI) y Watchmode tienen fechas de expiración y más detalle, pero son pagas o con cupos bajos; se pueden sumar implementando otra fuente de disponibilidad.
 - No hay scraping de ningún sitio.
+- **v3.0**: el proxy permite además `search/person` y `person/{id}/combined_credits`, y los parámetros `with_keywords`, `with_cast`, `with_crew`, `with_people`. La similitud de sinopsis es léxica; una similitud semántica requeriría un modelo de embeddings (no activado sin autorización).
 
 ## Pruebas
 

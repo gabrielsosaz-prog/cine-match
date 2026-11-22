@@ -36,6 +36,8 @@ export interface TitleMeta {
   keywords: Named[];
   cast: Person[];
   directors: Person[]; // directores (películas) o creadores (series)
+  /** Guion / autoría (TMDB crew, departamento «Writing»). v3.0 */
+  writers?: Person[];
   runtime?: number; // minutos (película) o duración típica de episodio (serie)
   seasons?: { number: number; name: string; episodes?: number; airDate?: string }[];
   numberOfSeasons?: number;
@@ -199,7 +201,16 @@ export interface RecommendationItem {
   provisional: boolean;
   /** Notas estimadas por aspecto (sólo donde hay evidencia) */
   dimensionEstimates?: DimensionScores;
+  /** v3.0: aporte de cada canal del motor (diagnóstico; puntos sobre tu media) */
+  channels?: ChannelContribution[];
+  /** v3.0: tu media al momento del cálculo (base de la estimación) */
+  base?: number;
+  /** v3.0: candidato incorporado por búsqueda extra en TMDB con poca evidencia propia */
+  lowEvidence?: boolean;
 }
+
+export type ChannelId = 'theme' | 'comments' | 'aspects' | 'actors' | 'crew' | 'similar' | 'genre' | 'format' | 'rejection' | 'quality';
+export interface ChannelContribution { id: ChannelId; value: number; weight: number; contribution: number; evidence: number }
 
 export interface RecommendationRun {
   id?: number;

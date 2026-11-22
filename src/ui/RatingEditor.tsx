@@ -30,7 +30,7 @@ const same = (a: Draft, b: Draft) => JSON.stringify({ ...a, at: 0 }) === JSON.st
  */
 export default function RatingEditor({ profileId, k, existing, isTv, title, openAspects, highlightMissing, onSaved, onCancel }: {
   profileId: string; k: TitleKey; existing?: Rating; isTv: boolean; title?: TitleMeta; openAspects?: boolean; highlightMissing?: boolean;
-  onSaved?: (r: { rating?: Rating; run?: RecommendationRun }) => void; onCancel?: () => void;
+  onSaved?: (r: { rating?: Rating; run?: RecommendationRun; recompute?: Promise<RecommendationRun | undefined> }) => void; onCancel?: () => void;
 }) {
   const initial = useMemo(() => fromRating(existing), [existing?.updatedAt, k]);
   const [d, setD] = useState<Draft>(initial);
@@ -56,17 +56,36 @@ export default function RatingEditor({ profileId, k, existing, isTv, title, open
     return getExtractor().extract(d.comment, { title, overall: d.overall }).filter((p) => p.kind !== 'aspect' || p.strength === 1);
   }, [d.comment, d.overall, title]);
 
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  const [err, setErr] = useState<string>();
   const save = async () => {
-    setBusy(true); setMsg(undefined);
+    if (busy) return; // evita dobles toques mientras se confirma el guardado
+    setBusy(true); setMsg(undefined); setErr(undefined);
     const patch: RatingPatch = {
       watched: d.watched, list: d.list ?? null, notInterested: d.notInterested, overall: d.overall ?? null,
       dimensions: d.dims, comment: d.comment, abandonReason: d.reason || null,
     };
-    const res = await rateAndLearn(profileId, k, patch);
-    clearDraft(profileId, k);
-    setBusy(false); setRestored(false);
-    setMsg(res.rating ? (res.run ? 'Guardado. Modelo recalculado.' : 'Guardado.') : 'Sin datos para guardar: se quitó el registro.');
-    onSaved?.(res);
+    try {
+      // 1) Persistir y confirmar (sin red). 2) El modelo se recalcula aparte, sin bloquear la pantalla.
+      const res = await rateAndLearn(profileId, k, patch);
+      clearDraft(profileId, k);
+      if (!alive.current) { onSaved?.(res); return; }
+      setRestored(false);
+      setMsg(res.rating ? (res.recompute ? 'Guardado. Recalculando el modelo en segundo plano…' : 'Guardado.') : 'Sin datos para guardar: se quitó el registro.');
+      onSaved?.(res);
+      res.recompute?.then((run) => { if (alive.current) setMsg(run ? 'Guardado. Modelo recalculado.' : 'Guardado. El modelo no se pudo recalcular ahora; se reintenta en el próximo cambio.'); });
+    } catch (e) {
+      // El borrador queda en el dispositivo: no se pierde lo que escribiste y los datos anteriores no se tocan
+      if (alive.current) setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  };
+  const remove = async () => {
+    setErr(undefined);
+    try { await removeAndLearn(profileId, k); clearDraft(profileId, k); setMsg('Registro eliminado.'); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
   const discard = () => { clearDraft(profileId, k); setD(initial); setRestored(false); };
   const dimLabel = (id: string) => DIMENSIONS.find((x) => x.id === id)?.label.toLowerCase() ?? id;
@@ -122,9 +141,14 @@ export default function RatingEditor({ profileId, k, existing, isTv, title, open
       <div className="sticky bottom-0 -mx-1 flex gap-2 bg-ink-900 px-1 py-2">
         <button onClick={save} disabled={busy} data-testid="save-rating" className="flex-1 rounded-xl bg-accent py-2.5 font-semibold text-ink-950 disabled:opacity-50">{busy ? 'Guardando…' : existing ? 'Guardar cambios' : 'Guardar'}</button>
         {onCancel && <button onClick={onCancel} data-testid="close-editor" className="rounded-xl bg-ink-800 px-3 text-sm ring-1 ring-white/10">{dirty ? 'Cerrar (queda el borrador)' : 'Cerrar'}</button>}
-        {existing && !onCancel && <button onClick={async () => { clearDraft(profileId, k); await removeAndLearn(profileId, k); setMsg('Registro eliminado.'); }} className="rounded-xl bg-ink-800 px-3 text-sm text-red-300 ring-1 ring-white/10">Borrar</button>}
+        {existing && !onCancel && <button onClick={remove} className="rounded-xl bg-ink-800 px-3 text-sm text-red-300 ring-1 ring-white/10">Borrar</button>}
       </div>
       {msg && <p role="status" data-testid="save-status" className="text-sm text-emerald-300">{msg}</p>}
+      {err && (
+        <p role="alert" data-testid="save-error" className="rounded-lg bg-red-500/10 p-2 text-sm text-red-200">
+          {err} Tus cambios quedaron como borrador. <button type="button" onClick={save} className="font-semibold underline">Reintentar</button>
+        </p>
+      )}
     </div>
   );
 }

@@ -1,16 +1,21 @@
 import { useMemo, useState } from 'react';
+import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DIMENSIONS, LIST_LABELS, RETIRED_DIMENSIONS } from '../constants';
 import { db } from '../db/db';
-import { aspectCompletion, hasScore, migrateRating } from '../db/migrations';
+import { aspectCompletion, hasScore } from '../db/migrations';
+import { useRatings } from '../hooks/useRatings';
 import { useApp } from '../hooks/useApp';
 import { setNotInterested, setWatched } from '../services/ratings';
+import { safely } from '../services/notices';
 import type { ListStatus, MediaType, Rating, TitleMeta } from '../types';
-import { Card, Chip, CompletionRing, Empty, Poster, TitleLink, TypeBadge } from '../ui/components';
+import { Card, Chip, CompletionRing, DataStatus, Empty, Poster, TitleLink, TypeBadge } from '../ui/components';
 import RatingEditor from '../ui/RatingEditor';
 import { num, relTime } from '../ui/format';
 
-type Sort = 'recent' | 'score' | 'title' | 'completion-desc' | 'completion-asc';
+export type Sort = 'recent' | 'score' | 'title' | 'completion-desc' | 'completion-asc';
+export type Dir = 'asc' | 'desc';
+const SORTS = ['recent', 'score', 'title', 'completion-desc', 'completion-asc'] as const;
 export type View = 'all' | 'watched' | 'unwatched' | 'scored' | 'complete' | 'incomplete' | 'dismissed' | ListStatus;
 
 const VIEWS: [View, string][] = [
@@ -31,30 +36,39 @@ export function matchesView(r: Rating, v: View) {
   return r.list === v;
 }
 
-export function sortRatings(rs: Rating[], sort: Sort, title: (r: Rating) => string): Rating[] {
+/** Dirección natural de cada orden (la que se usa con «desc» = predeterminada) */
+export function sortRatings(rs: Rating[], sort: Sort, title: (r: Rating) => string, dir: Dir = sort === 'title' ? 'asc' : 'desc'): Rating[] {
   const pct = (r: Rating) => aspectCompletion(r).percent;
-  return [...rs].sort((a, b) => sort === 'recent' ? b.updatedAt - a.updatedAt
+  // Comparación en sentido «descendente natural»; el título A-Z es el ascendente
+  const cmp = (a: Rating, b: Rating) => sort === 'recent' ? b.updatedAt - a.updatedAt
     : sort === 'score' ? (b.overall ?? -1) - (a.overall ?? -1)
     : sort === 'completion-desc' ? pct(b) - pct(a) || b.updatedAt - a.updatedAt
     : sort === 'completion-asc' ? pct(a) - pct(b) || b.updatedAt - a.updatedAt
-    : title(a).localeCompare(title(b)));
+    : title(b).localeCompare(title(a), 'es');
+  // Desempate estable por clave: editar un título no lo hace «saltar» entre posiciones equivalentes
+  return [...rs].sort((a, b) => (dir === 'desc' ? cmp(a, b) : -cmp(a, b)) || a.key.localeCompare(b.key));
 }
+
+const dirLabel = (s: Sort, d: Dir) => s === 'title' ? (d === 'asc' ? 'A→Z' : 'Z→A') : s === 'recent' ? (d === 'desc' ? 'Nuevos primero' : 'Antiguos primero') : (d === 'desc' ? '↓ Mayor' : '↑ Menor');
 
 export default function Ratings() {
   const { profileId } = useApp();
-  const raw = useLiveQuery(() => db.ratings.where('profileId').equals(profileId).toArray(), [profileId]);
-  const ratings = useMemo(() => (raw ?? []).map(migrateRating), [raw]);
+  const rs = useRatings(profileId);
+  const ratings = rs.ratings;
   const titles = useLiveQuery(() => db.titles.bulkGet(ratings.map((r) => r.key)), [ratings]) ?? [];
-  const [view, setView] = useState<View>('all');
-  const [type, setType] = useState<MediaType | 'all'>('all');
-  const [sort, setSort] = useState<Sort>('recent');
+  // Vista, tipo, orden y dirección se conservan al editar un título, al navegar y al recargar
+  const [view, setView] = usePersistentState<View>(`cine-match:ratings-view:${profileId}`, 'all', oneOf(VIEWS.map(([v]) => v)));
+  const [type, setType] = usePersistentState<MediaType | 'all'>(`cine-match:ratings-type:${profileId}`, 'all', oneOf(['all', 'movie', 'tv'] as const));
+  const [sort, setSortRaw] = usePersistentState<Sort>(`cine-match:ratings-sort:${profileId}`, 'recent', oneOf(SORTS));
+  const [dir, setDir] = usePersistentState<Dir>(`cine-match:ratings-dir:${profileId}`, 'desc', oneOf(['asc', 'desc'] as const));
+  const setSort = (s: Sort) => { setSortRaw(s); setDir(s === 'title' ? 'asc' : 'desc'); };
   const tmap = new Map(titles.filter(Boolean).map((t) => [t!.key, t!]));
 
   const [editingKey, setEditingKey] = useState<string>();
   const rows = useMemo(() => {
     const r = ratings.filter((x) => matchesView(x, view) && (type === 'all' || tmap.get(x.key)?.type === type));
-    return sortRatings(r, sort, (x) => tmap.get(x.key)?.title ?? '');
-  }, [ratings, titles, view, type, sort]);
+    return sortRatings(r, sort, (x) => tmap.get(x.key)?.title ?? '', dir);
+  }, [ratings, titles, view, type, sort, dir]);
   const editing = ratings.find((r) => r.key === editingKey);
   const editingMeta = editing ? tmap.get(editing.key) : undefined;
 
@@ -88,15 +102,23 @@ export default function Ratings() {
         {VIEWS.map(([v, l]) => <Chip key={v} testId={`view-${v}`} active={view === v} onClick={() => setView(v)}>{l}</Chip>)}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Chip active={type === 'all'} onClick={() => setType('all')}>Todo</Chip>
-        <Chip active={type === 'movie'} onClick={() => setType('movie')}>Películas</Chip>
-        <Chip active={type === 'tv'} onClick={() => setType('tv')}>Series</Chip>
-        <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="ml-auto rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10" aria-label="Ordenar">
-          <option value="recent">Recientes</option><option value="score">Mejor nota</option><option value="title">Título</option>
-          <option value="completion-desc">Más aspectos completados</option><option value="completion-asc">Menos aspectos completados</option>
-        </select>
+        <Chip active={type === 'all'} onClick={() => setType('all')} testId="ratings-type-all">Todo</Chip>
+        <Chip active={type === 'movie'} onClick={() => setType('movie')} testId="ratings-type-movie">Películas</Chip>
+        <Chip active={type === 'tv'} onClick={() => setType('tv')} testId="ratings-type-tv">Series</Chip>
+        <div className="ml-auto flex items-center gap-1">
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10" aria-label="Ordenar" data-testid="ratings-sort">
+            <option value="recent">Recientes</option><option value="score">Nota</option><option value="title">Título</option>
+            <option value="completion-desc">Más aspectos completados</option><option value="completion-asc">Menos aspectos completados</option>
+          </select>
+          <button type="button" data-testid="ratings-dir" aria-label={`Dirección: ${dirLabel(sort, dir)}. Tocá para invertir`} onClick={() => setDir(dir === 'asc' ? 'desc' : 'asc')}
+            className="rounded-lg bg-ink-800 px-2 py-1.5 text-xs ring-1 ring-white/10">{dirLabel(sort, dir)}</button>
+          {(sort !== 'recent' || dir !== 'desc' || view !== 'all' || type !== 'all') && (
+            <button type="button" data-testid="ratings-reset" onClick={() => { setSort('recent'); setView('all'); setType('all'); }} className="text-[11px] text-accent underline">Restablecer</button>
+          )}
+        </div>
       </div>
-      {rows.length === 0 && <Empty>No hay títulos en esta vista. Buscá algo y marcalo como visto o puntualo.</Empty>}
+      <DataStatus {...rs} onRetry={rs.retry} />
+      {rs.status === 'ready' && rows.length === 0 && <Empty>No hay títulos en esta vista. Buscá algo y marcalo como visto o puntualo.</Empty>}
       <p className="text-[11px] text-slate-500">El porcentaje indica cuántos de los {DIMENSIONS.length} aspectos puntuaste. Es sólo informativo: no hace falta llegar al 100 %.</p>
       <ul className="space-y-2">{rows.map((r) => <RatingRow key={r.id} r={r} t={tmap.get(r.key)} profileId={profileId} onComplete={() => setEditingKey(r.key)} />)}</ul>
       {editing && (
@@ -139,10 +161,10 @@ function RatingRow({ r, t, profileId, onComplete }: { r: Rating; t?: TitleMeta; 
         <button type="button" onClick={onComplete} data-testid="row-complete" aria-label={c.percent < 100 ? `Completar aspectos faltantes (${c.done} de ${c.total})` : `Editar aspectos (${c.done} de ${c.total})`}
           className="flex items-center gap-1 rounded-lg bg-ink-800 px-1.5 py-1 ring-1 ring-white/10"><CompletionRing {...c} />{c.percent < 100 && <span className="text-[10px] text-accent">＋</span>}</button>
         {r.notInterested
-          ? <button type="button" data-testid="row-undo-dismiss" onClick={() => setNotInterested(profileId, r.key, false)} className="rounded-lg bg-ink-800 px-2 py-1 text-[11px] text-accent ring-1 ring-white/10">Volver a recomendar</button>
+          ? <button type="button" data-testid="row-undo-dismiss" onClick={() => safely(() => setNotInterested(profileId, r.key, false), 'el cambio')} className="rounded-lg bg-ink-800 px-2 py-1 text-[11px] text-accent ring-1 ring-white/10">Volver a recomendar</button>
           : null}
       </div>
-      <button type="button" aria-pressed={r.watched} data-testid="row-watched" onClick={() => setWatched(profileId, r.key, !r.watched)}
+      <button type="button" aria-pressed={r.watched} data-testid="row-watched" onClick={() => safely(() => setWatched(profileId, r.key, !r.watched), 'la marca de vista')}
         className={`shrink-0 rounded-lg px-2 py-1.5 text-[11px] font-semibold ${r.watched ? 'bg-emerald-500/20 text-emerald-300' : 'bg-ink-800 text-slate-400 ring-1 ring-white/10'}`}>
         {r.watched ? '✓ Vista' : 'No vista'}
       </button>

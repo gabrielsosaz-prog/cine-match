@@ -1,0 +1,79 @@
+{
+  "aviso": "Escenarios con datos sintéticos y proveedor simulado: muestran el comportamiento del sistema, no su precisión con usuarios reales.",
+  "Guardado: ms hasta confirmar (sin red)": 2,
+  "Cola de recálculo: 6 valoraciones seguidas → cálculos": 1,
+  "Sólo Terror sin historial": {
+    "candidatos": 12,
+    "sumadosDesdeTMDB": 2,
+    "resultados": 12
+  },
+  "Sólo películas: películas del ranking general que faltan en el filtrado": 0,
+  "Mismo género (CF): viajes en el tiempo vs ópera espacial": {
+    "viajes": 9.59443210175332,
+    "operaEspacial": 2.46592287541303
+  },
+  "Género distinto (romance) con viajes en el tiempo": {
+    "conViajes": 10,
+    "sinViajes": 6.354347826086957
+  },
+  "Actores: ventaja de un título con el protagonista": {
+    "con3Observaciones": 1.032335963197471,
+    "con1Observacion": 0.6628500884593018
+  },
+  "Aspectos: misma nota general, distinta historia": {
+    "sinAspectos": [
+      7.15598670001678,
+      7.15598670001678
+    ],
+    "conAspectos": [
+      7.345777444194098,
+      6.602405423798406
+    ]
+  },
+  "Pesos aprendidos (escenario sintético, 40 notas)": {
+    "pesos": {
+      "theme": 1.7244989926323502,
+      "comments": 0.9,
+      "aspects": 1.4,
+      "actors": 0,
+      "crew": 0.7,
+      "similar": 1.813160668405671,
+      "genre": 0.9,
+      "format": 0.25209768156757095,
+      "rejection": 1,
+      "quality": 0.23823689608370863
+    },
+    "ecm": {
+      "baseline": 2.54862317807208,
+      "prior": 1.2552580282616994,
+      "learned": 0.458599815209664
+    }
+  },
+  "Actores: candidatos por filmografía": {
+    "actores": [
+      {
+        "id": 231,
+        "name": "Actor 231",
+        "added": 7
+      },
+      {
+        "id": 233,
+        "name": "Actor 233",
+        "added": 6
+      },
+      {
+        "id": 234,
+        "name": "Actor 234",
+        "added": 8
+      }
+    ],
+    "sumados": 11,
+    "otrasDelActor": 4
+  },
+  "Similares: tipos/clusters del top 5 para 2 referencias de ciencia ficción": [
+    "Scifi Film 10",
+    "Scifi Film 14",
+    "Scifi Film 13",
+    "Thriller Film 7"
+  ]
+}

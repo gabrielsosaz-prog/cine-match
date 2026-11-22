@@ -3,9 +3,9 @@
  * TMDB_READ_ACCESS_TOKEN y nunca llega al navegador.
  * Lo usan: la función serverless de Vercel (api/tmdb.js) y el servidor de desarrollo de Vite.
  */
-export const ALLOWED_PATH = /^\/(search\/multi|discover\/(movie|tv)|trending\/(movie|tv)\/week|genre\/(movie|tv)\/list|(movie|tv)\/\d+(\/watch\/providers)?|configuration)$/;
+export const ALLOWED_PATH = /^\/(search\/(multi|person)|person\/\d+\/combined_credits|discover\/(movie|tv)|trending\/(movie|tv)\/week|genre\/(movie|tv)\/list|(movie|tv)\/\d+(\/watch\/providers)?|configuration)$/;
 const ALLOWED_PARAMS = new Set(['query', 'language', 'include_adult', 'page', 'append_to_response', 'watch_region', 'with_watch_providers', 'with_watch_monetization_types', 'with_genres', 'sort_by', 'vote_count.gte',
-  'without_genres', 'primary_release_date.gte', 'primary_release_date.lte', 'first_air_date.gte', 'first_air_date.lte', 'with_runtime.gte', 'with_runtime.lte']);
+  'without_genres', 'with_keywords', 'with_cast', 'with_people', 'with_crew', 'with_original_language', 'primary_release_date.gte', 'primary_release_date.lte', 'first_air_date.gte', 'first_air_date.lte', 'with_runtime.gte', 'with_runtime.lte']);
 
 /**
  * @param {string} path ruta de TMDB sin el prefijo /3 (ej. "/search/multi")

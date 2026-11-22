@@ -1,4 +1,59 @@
-# Resultados de pruebas (v2.1)
+# Resultados de pruebas (v3.0)
+
+## Resumen v3.0
+
+- Vitest: **150/150 OK** (39 nuevas en `v3.test.ts`):
+  - guardado confirmado sin esperar el recálculo;
+  - 20 guardados consecutivos;
+  - 5 escrituras simultáneas de campos distintos;
+  - fallo de escritura simulado (no borra nada);
+  - base que no responde (corta por tiempo);
+  - TMDB caído durante el recálculo;
+  - cola única (6 valoraciones seguidas → 1 cálculo);
+  - lectura resiliente con la base cerrada;
+  - años parciales;
+  - «Sólo Terror» sin historial;
+  - «Sólo películas» sin perder ninguna película del ranking general (0 faltantes);
+  - filtros combinados;
+  - filtro por actor con homónimos;
+  - orden A-Z/Z-A estable;
+  - escenarios narrativos;
+  - pesos por validación cruzada;
+  - filmografías de actores y tope en el top 10;
+  - notas pública y personalizada;
+  - Similares;
+  - fichas v3 con guionistas;
+  - exportar/importar;
+  - rutas nuevas del proxy.
+- Playwright, Android Pixel 7 y Galaxy S5 (360 px): **36/36 OK**. Los 6 flujos nuevos:
+  - año escrito dígito por dígito con `inputmode=numeric`;
+  - 10 tarjetas + «Ver más», notas TMDB y «Para vos», diagnóstico por canal, orden por público que persiste al recargar;
+  - guardar con TMDB caído y guardados seguidos, con las valoraciones visibles;
+  - orden A-Z que se conserva al editar, navegar y recargar;
+  - Terror con pocos candidatos y actor con homónimos combinado con tipo;
+  - Similares con 2 referencias, filtros y acciones.
+- Escenarios (`docs/v3-scenarios.json`):
+
+  | Escenario | Resultado |
+  |---|---|
+  | Mismo género: viajes en el tiempo vs ópera espacial | 9,6 vs 2,5 |
+  | Romance con viajes en el tiempo vs sin ellos | 10 vs 6,4 |
+  | Ventaja por protagonista: 3 vs 1 observación | +1,03 vs +0,66 |
+  | Misma nota general, distinta «Trama» | 7,35 vs 6,60 (sin aspectos: iguales) |
+  | Batman frente a superhéroes descartados | Batman no queda eliminada |
+  | Título popular pero ajeno | queda por debajo |
+
+- Evaluación offline sintética:
+
+  | Pesos | NDCG@10 | Recall@10 |
+  |---|---|---|
+  | Previos | 0,757 | 0,92 |
+  | Aprendidos por validación cruzada | 0,784 | 0,90 |
+
+  Las líneas base, popularidad y calidad, quedan en 0,21 y 0,27 de NDCG@10.
+
+**Sintético**: el proveedor simulado y los títulos construidos a mano validan comportamiento, no la precisión con usuarios reales. Los emuladores de Playwright reproducen tamaños y teclado por eventos, pero no son un teclado virtual físico de Android.
+
 
 ## Resumen v2.1
 

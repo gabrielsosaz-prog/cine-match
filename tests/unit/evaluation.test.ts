@@ -5,7 +5,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildProfile } from '../../src/engine/profile';
-import { rank, ALGORITHM_VERSION } from '../../src/engine/recommender';
+import { rank, ALGORITHM_VERSION, hybridEngine } from '../../src/engine/recommender';
 import type { TitleKey } from '../../src/types';
 import { rng } from '../fixtures/fakeTmdb';
 import { simulateHistory, syntheticMetas, USERS } from '../fixtures/synthetic';
@@ -21,7 +21,7 @@ const recall = (ranked: TitleKey[], relevant: Set<TitleKey>, k = 10) => (relevan
 describe('Evaluación offline (sintética)', () => {
   it('el motor supera a las líneas base de popularidad, calidad y azar', async () => {
     const { catalog, metas, byKey } = await syntheticMetas(25, 42);
-    const methods = ['motor', 'popularidad', 'calidad', 'azar'] as const;
+    const methods = ['motor', 'motorPesosAprendidos', 'popularidad', 'calidad', 'azar'] as const;
     const acc = Object.fromEntries(methods.map((m) => [m, { ndcg: 0, recall: 0, items: new Set<TitleKey>() }])) as Record<(typeof methods)[number], { ndcg: number; recall: number; items: Set<TitleKey> }>;
     let runs = 0;
     const perUser: Record<string, { ndcg: number; recall: number }> = {};
@@ -35,7 +35,10 @@ describe('Evaluación offline (sintética)', () => {
         const relevant = new Set(test.filter((k) => scores.get(k)! >= 8));
         const profile = buildProfile(ratings, metas);
         const lists: Record<string, TitleKey[]> = {
+          // «motor»: pesos de canal previos; «motorPesosAprendidos»: pesos re-estimados por validación cruzada con
+          // las 30 notas de entrenamiento (la evaluación es sobre títulos NO usados para aprender)
           motor: rank({ profile, ratings, titles: metas, candidates: test, limit: 10, seed: s }).map((i) => i.key),
+          motorPesosAprendidos: rank({ profile: hybridEngine.buildProfile(ratings, metas), ratings, titles: metas, candidates: test, limit: 10, seed: s }).map((i) => i.key),
           popularidad: [...test].sort((a, b) => byKey.get(b)!.popularity - byKey.get(a)!.popularity),
           calidad: [...test].sort((a, b) => byKey.get(b)!.vote - byKey.get(a)!.vote),
           azar: (() => { const r = rng(s + 9); return [...test].sort(() => r() - 0.5); })(),

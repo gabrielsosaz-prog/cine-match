@@ -97,14 +97,32 @@ export function fakeTmdbHandler(catalog: FakeTitle[], opts: FakeOptions = {}) {
       const q = (u.searchParams.get('query') ?? '').toLowerCase();
       return { status: 200, body: { results: [{ id: 1, media_type: 'person', name: 'Persona' }, ...catalog.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 20).map(listItem)] } };
     }
+    if (path === '/search/person') {
+      const q = (u.searchParams.get('query') ?? '').toLowerCase();
+      // Homónimos a propósito: dos personas «Actor 231» con distinto id y oficio
+      const people = [...new Set(catalog.flatMap((t) => t.cast))].map((id) => ({ id, name: `Actor ${id}`, known_for_department: 'Acting', popularity: 10,
+        known_for: catalog.filter((t) => t.cast.includes(id)).slice(0, 2).map((t) => ({ ...listItem(t), media_type: t.type })) }));
+      people.push({ id: 99231, name: 'Actor 231', known_for_department: 'Directing', popularity: 1, known_for: [] });
+      return { status: 200, body: { results: people.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 20) } };
+    }
+    if ((m = path.match(/^\/person\/(\d+)\/combined_credits$/))) {
+      const id = Number(m[1]);
+      const cast = catalog.filter((t) => t.cast.includes(id)).map((t) => ({ ...listItem(t), media_type: t.type, character: 'Personaje', order: t.cast.indexOf(id), episode_count: t.type === 'tv' ? 8 : undefined }));
+      const crew = catalog.filter((t) => t.director === id).map((t) => ({ ...listItem(t), media_type: t.type, job: 'Director', department: 'Directing' }));
+      return { status: 200, body: { id, cast, crew } };
+    }
     if ((m = path.match(/^\/(trending)\/(movie|tv)\/week$/))) return { status: 200, body: { results: catalog.filter((t) => t.type === m![2]).slice(0, 20).map(listItem) } };
     if ((m = path.match(/^\/discover\/(movie|tv)$/))) {
       const type = m[1];
       const genres = u.searchParams.get('with_genres')?.split('|').map(Number);
       const prov = u.searchParams.get('with_watch_providers')?.split('|').map(Number);
+      const kws = u.searchParams.get('with_keywords')?.split('|').map(Number);
+      const castQ = u.searchParams.get('with_cast')?.split('|').map(Number);
+      const crewQ = u.searchParams.get('with_crew')?.split('|').map(Number);
       const page = Number(u.searchParams.get('page') ?? 1);
       const sort = u.searchParams.get('sort_by') ?? 'popularity.desc';
-      let list = catalog.filter((t) => t.type === type && (!genres || t.genres.some((g) => genres.includes(g))) && (!prov || (t.providers ?? []).some((p) => prov.includes(p.id))));
+      let list = catalog.filter((t) => t.type === type && (!genres || t.genres.some((g) => genres.includes(g))) && (!prov || (t.providers ?? []).some((p) => prov.includes(p.id)))
+        && (!kws || t.keywords.some((k) => kws.includes(k))) && (!castQ || t.cast.some((c) => castQ.includes(c))) && (!crewQ || crewQ.includes(t.director) || crewQ.includes(t.director + 500)));
       list = list.sort((a, b) => sort.startsWith('vote_average') ? b.vote - a.vote : sort.startsWith('vote_count') ? b.votes - a.votes : b.popularity - a.popularity);
       return { status: 200, body: { results: list.slice((page - 1) * 20, page * 20).map(listItem) } };
     }
@@ -131,7 +149,8 @@ export function fakeTmdbHandler(catalog: FakeTitle[], opts: FakeOptions = {}) {
           created_by: t.type === 'tv' ? [{ id: t.director, name: `Creador ${t.director}` }] : undefined,
           vote_average: t.vote, vote_count: t.votes, popularity: t.popularity, original_language: t.lang,
           keywords: t.type === 'movie' ? { keywords: kws } : { results: kws },
-          credits: { cast: t.cast.map((c) => ({ id: c, name: `Actor ${c}`, character: 'Personaje' })), crew: t.type === 'movie' ? [{ id: t.director, name: `Director ${t.director}`, job: 'Director' }] : [] },
+          credits: { cast: t.cast.map((c) => ({ id: c, name: `Actor ${c}`, character: 'Personaje' })), crew: t.type === 'movie' ? [{ id: t.director, name: `Director ${t.director}`, job: 'Director', department: 'Directing' }, { id: t.director + 500, name: `Guionista ${t.director + 500}`, job: 'Screenplay', department: 'Writing' }] : [] },
+          aggregate_credits: t.type === 'tv' ? { cast: t.cast.map((c, i) => ({ id: c, name: `Actor ${c}`, roles: [{ character: 'Personaje' }], order: i, total_episode_count: 8 })), crew: [{ id: t.director + 500, name: `Guionista ${t.director + 500}`, department: 'Writing', jobs: [{ job: 'Writer' }], total_episode_count: 8 }] } : undefined,
           recommendations: { results: related.slice(0, 5) }, similar: { results: related.slice(5) },
           'watch/providers': providersPayload(t),
         },

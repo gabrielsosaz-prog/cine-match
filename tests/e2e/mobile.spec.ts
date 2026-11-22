@@ -366,9 +366,9 @@ test('v2.1: panel de filtros combinables con indicador y limpieza', async ({ pag
     expect(year).toBeGreaterThanOrEqual(2000);
   }
   // Un año imposible deja sin resultados y explica qué filtro restringe
-  await panel.getByTestId('filter-year-min').fill('2090');
+  await panel.getByTestId('filter-year-min').fill('2030');
   await expect(page.getByTestId('filters-empty')).toBeVisible({ timeout: 10000 });
-  await expect(page.getByText(/Sin «Desde 2090» habría/)).toBeVisible();
+  await expect(page.getByText(/Sin «Desde 2030» habría/)).toBeVisible();
   // Se conserva al navegar
   await page.getByRole('link', { name: /Buscar/ }).click();
   await page.goBack();
@@ -393,4 +393,177 @@ test('v2.1: porcentaje de aspectos y acceso a los faltantes', async ({ page }) =
   await page.getByTestId('view-incomplete').click();
   await expect(page.locator('[data-testid="completion"][data-percent="43"]')).toHaveCount(1);
   await noHorizontalScroll(page);
+});
+
+// ═════════════════════════ v3.0 ═════════════════════════
+
+test('v3: año con teclado numérico de Android, dígito por dígito', async ({ page }, info) => {
+  await onboardQuick(page);
+  await page.getByTestId('filters-toggle').click();
+  const input = page.getByTestId('filter-year-min');
+  await expect(input).toHaveAttribute('inputmode', 'numeric');
+  await expect(input).toHaveAttribute('type', 'text');
+  await input.tap();
+  // Como un teclado virtual: un dígito por vez. Antes, cada dígito se borraba al instante.
+  for (const [i, d] of ['2', '0', '1', '0'].entries()) {
+    await page.keyboard.type(d, { delay: 60 });
+    await expect(input).toHaveValue('2010'.slice(0, i + 1));
+  }
+  await expect(page.getByTestId('active-filters')).toContainText('Desde 2010');
+  // Borrar y corregir parcialmente no aplica valores a medias
+  await page.keyboard.press('Backspace');
+  await expect(input).toHaveValue('201');
+  await expect(page.getByTestId('active-filters')).toContainText('Desde 2010');
+  await page.keyboard.type('5');
+  await expect(page.getByTestId('active-filters')).toContainText('Desde 2015');
+  // Valor inválido: se avisa sin aplicar
+  await input.fill('');
+  await page.keyboard.type('1200');
+  await expect(page.getByTestId('filter-year-min-error')).toBeVisible();
+  await noHorizontalScroll(page);
+  await page.screenshot({ path: `test-results/${info.project.name}-v3-anio.png` });
+});
+
+test('v3: 10 recomendaciones al inicio, «Ver más» de a 10 y notas pública y «Para vos» separadas', async ({ page }, info) => {
+  await onboardQuick(page);
+  await expect(page.getByTestId('rec-item')).toHaveCount(10);
+  await expect(page.getByTestId('rows-count')).toContainText('Mostrando 10 de');
+  const first = page.getByTestId('rec-item').first();
+  await expect(first.getByTestId('score-personal')).toBeVisible();
+  await expect(first.getByTestId('score-public')).toContainText('TMDB');
+  await page.getByTestId('show-more').click();
+  await expect(page.getByTestId('rec-item')).toHaveCount(20);
+  // Diagnóstico por canal en la explicación
+  await first.getByTestId('rec-explanation').click();
+  await expect(first.getByTestId('channel-bars')).toBeVisible();
+  // Ordenar por público: la lista sigue completa y se conserva al recargar
+  await page.getByTestId('home-sort').selectOption('public');
+  await expect(page.getByTestId('rec-item')).toHaveCount(10);
+  const pubs = await page.getByTestId('score-public').allInnerTexts();
+  const vals = pubs.map((t) => Number(t.replace(/[^\d,]/g, '').replace(',', '.'))).filter((x) => !Number.isNaN(x) && x > 0);
+  for (let i = 1; i < vals.length; i++) expect(vals[i]).toBeLessThanOrEqual(vals[i - 1]);
+  await page.reload();
+  await expect(page.getByTestId('home-sort')).toHaveValue('public');
+  await noHorizontalScroll(page);
+  await page.screenshot({ path: `test-results/${info.project.name}-v3-inicio.png` });
+});
+
+test('v3: guardar en la ficha confirma sin esperar el recálculo y las valoraciones siguen visibles aunque TMDB falle', async ({ page }) => {
+  await onboardQuick(page);
+  await page.getByRole('link', { name: /Buscar/ }).click();
+  await page.getByTestId('search-input').fill('Drama Film');
+  await page.getByTestId('search-result').filter({ hasText: 'Drama Film' }).first().click();
+  await expect(page.getByTestId('title-scores')).toBeVisible();
+  // TMDB deja de responder justo antes de guardar
+  await page.route('https://api.themoviedb.org/**', (r) => r.fulfill({ status: 500, body: '{}' }));
+  await page.getByTestId('overall').getByRole('button', { name: 'Valoración general (1-10): 8' }).click();
+  await page.getByTestId('save-rating').click();
+  await expect(page.getByTestId('save-status')).toContainText('Guardado', { timeout: 5000 });
+  await expect(page.getByTestId('save-rating')).toBeEnabled(); // nunca queda «procesando»
+  // Guardados consecutivos rápidos
+  for (const n of [6, 7, 9]) {
+    await page.getByTestId('overall').getByRole('button', { name: `Valoración general (1-10): ${n}` }).click();
+    await page.getByTestId('save-rating').click();
+    await expect(page.getByTestId('save-status')).toContainText('Guardado', { timeout: 5000 });
+  }
+  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await expect(page.getByTestId('rating-row').first()).toBeVisible();
+  const rows = await page.getByTestId('rating-row').count();
+  expect(rows).toBeGreaterThanOrEqual(5); // las de la incorporación + esta (puede coincidir con una ya puntuada)
+  await expect(page.getByTestId('rating-row').filter({ hasText: 'Drama Film' }).getByTestId('row-score')).toHaveText('9');
+});
+
+test('v3: el orden A-Z de Valoraciones se conserva al editar un título y al recargar', async ({ page }) => {
+  await onboardQuick(page);
+  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await page.getByTestId('ratings-sort').selectOption('title');
+  await expect(page.getByTestId('ratings-dir')).toHaveText('A→Z');
+  const names = async () => (await page.getByTestId('rating-row').locator('.truncate.font-medium').allInnerTexts()).map((x) => x.trim());
+  const before = await names();
+  expect([...before].sort((a, b) => a.localeCompare(b, 'es'))).toEqual(before);
+  // Editar el segundo título (aspectos) y guardar
+  await page.getByTestId('rating-row').nth(1).getByTestId('row-complete').click();
+  await page.getByTestId('aspects-sheet').getByTestId('dim-story').getByRole('radio', { name: /3 estrellas$/ }).click();
+  await page.getByTestId('aspects-sheet').getByTestId('save-rating').click();
+  await expect(page.getByTestId('aspects-sheet')).toBeHidden();
+  await expect(page.getByTestId('ratings-sort')).toHaveValue('title');
+  expect(await names()).toEqual(before);
+  await page.getByRole('link', { name: /Inicio/ }).click();
+  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await expect(page.getByTestId('ratings-sort')).toHaveValue('title');
+  await page.reload();
+  await expect(page.getByTestId('ratings-sort')).toHaveValue('title');
+  expect(await names()).toEqual(before);
+  await page.getByTestId('ratings-dir').click();
+  await expect(page.getByTestId('ratings-dir')).toHaveText('Z→A');
+  expect(await names()).toEqual([...before].reverse());
+});
+
+test('v3: filtro de un género con pocos candidatos (Terror) y filtro por actor con homónimos', async ({ page }, info) => {
+  await onboardQuick(page);
+  await page.getByTestId('filters-toggle').click();
+  const panel = page.getByTestId('filters-panel');
+  await panel.getByTestId('genre-27').click();
+  await expect(page.getByTestId('rec-item').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId('filters-empty')).toHaveCount(0);
+  await panel.getByTestId('genre-27').click(); // excluir
+  await panel.getByTestId('genre-27').click(); // sin filtrar
+  // Actor: dos personas con el mismo nombre se distinguen por oficio
+  await panel.getByTestId('person-input').fill('Actor 231');
+  await expect(panel.getByTestId('person-hit')).toHaveCount(2);
+  await expect(panel.getByTestId('person-hit').filter({ hasText: 'Dirección' })).toHaveCount(1);
+  await panel.getByTestId('person-hit').filter({ hasText: 'Actuación' }).click();
+  await expect(panel.getByTestId('person-selected')).toHaveText('Con Actor 231');
+  await expect(page.getByTestId('active-filters')).toContainText('Con Actor 231');
+  await page.getByTestId('watched-filter-all').click();
+  await expect(page.getByTestId('rec-item').first()).toBeVisible({ timeout: 20000 });
+  // Combinable con tipo
+  await panel.getByTestId('panel-movie').click();
+  await expect(page.getByTestId('active-filters')).toContainText('Sólo películas');
+  await expect(page.getByTestId('rec-item').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId('rec-item').filter({ hasNotText: 'Película' })).toHaveCount(0);
+  await noHorizontalScroll(page);
+  await page.screenshot({ path: `test-results/${info.project.name}-v3-actor.png`, fullPage: true });
+  await panel.getByTestId('person-clear').click();
+  await expect(page.getByTestId('active-filters')).not.toContainText('Con Actor');
+});
+
+test('v3: Similares con dos referencias, similitud y afinidad separadas, filtros y acciones', async ({ page }, info) => {
+  test.setTimeout(180000);
+  await onboardQuick(page);
+  const t0 = Date.now();
+  await page.getByRole('link', { name: /Similares/ }).click();
+  await expect(page.getByRole('heading', { name: 'Similares' })).toBeVisible();
+  await noHorizontalScroll(page);
+  await page.getByTestId('similar-only-mine').uncheck();
+  await page.getByTestId('similar-search').fill('Scifi Film 1');
+  await page.getByTestId('similar-hit').first().click();
+  await expect(page.getByTestId('similar-ref')).toHaveCount(1);
+  await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 30000 });
+  const first = page.getByTestId('similar-item').first();
+  await expect(first.getByTestId('similarity')).toContainText('%');
+  await expect(first.getByTestId('score-public')).toBeVisible();
+  await expect(page.getByTestId('similar-personalized')).toBeVisible();
+  // Segunda referencia
+  await page.getByTestId('similar-search').fill('Scifi');
+  await page.locator('[data-testid="similar-hit"]:not([disabled])').first().click();
+  await expect(page.getByTestId('similar-ref')).toHaveCount(2);
+  await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 30000 });
+  const refs = await page.getByTestId('similar-ref').allInnerTexts();
+  const results = await page.getByTestId('similar-item').locator('h3').allInnerTexts();
+  for (const r of refs) expect(results).not.toContain(r.replace('✕', '').trim());
+  // Explicación + acción rápida
+  await first.getByTestId('similar-explanation').click();
+  await first.getByTestId('similar-watched').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await first.getByTestId('similar-watched').click();
+  await expect(first.getByTestId('similar-watched')).toHaveAttribute('aria-pressed', 'true');
+  // Filtro: sólo series
+  await page.getByTestId('filters-toggle').click();
+  await page.getByTestId('panel-tv').click();
+  await page.getByTestId('similar-watched-all').click();
+  await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByTestId('similar-item').filter({ hasNotText: 'Serie' })).toHaveCount(0, { timeout: 30000 });
+  console.log(`[${info.project.name}] Similares: ${Date.now() - t0} ms para 3 búsquedas (proveedor simulado)`);
+  await noHorizontalScroll(page);
+  await page.screenshot({ path: `test-results/${info.project.name}-v3-similares.png`, fullPage: true });
 });

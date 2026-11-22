@@ -38,6 +38,19 @@ jobs:
           echo "--- Ficha + disponibilidad en Argentina (The Matrix, id 603)"
           curl -fsS --max-time 30 "$APP/api/tmdb/movie/603?language=es-MX&append_to_response=keywords,credits,watch/providers" -o /tmp/d.json
           python3 -c "import json;d=json.load(open('/tmp/d.json'));ar=d['watch/providers']['results'].get('AR',{});print('Título:',d['title'],'| géneros:',[g['name'] for g in d['genres']],'| keywords:',len(d['keywords']['keywords']));print('AR suscripción:',[p['provider_name'] for p in ar.get('flatrate',[])] or 'sin datos')"
+          echo "--- v3: guionistas en la ficha (Volver al futuro, id 105)"
+          curl -fsS --max-time 30 "$APP/api/tmdb/movie/105?language=es-MX&append_to_response=keywords,credits" -o /tmp/b.json
+          python3 -c "import json;d=json.load(open('/tmp/b.json'));w=[c['name'] for c in d['credits']['crew'] if c.get('department')=='Writing'];print('Guion:',w);print('Reparto:',[c['name'] for c in d['credits']['cast'][:3]]);assert w"
+          echo "--- v3: búsqueda de personas con id único (homónimos) y filmografía"
+          curl -fsS --max-time 30 "$APP/api/tmdb/search/person?query=Michael%20J.%20Fox&language=es-MX" -o /tmp/p.json
+          python3 -c "import json;r=json.load(open('/tmp/p.json'))['results'];print([(x['id'],x['name'],x.get('known_for_department')) for x in r[:3]]);assert any(x['id']==521 for x in r)"
+          curl -fsS --max-time 30 "$APP/api/tmdb/person/521/combined_credits?language=es-MX" -o /tmp/c.json
+          python3 -c "import json;d=json.load(open('/tmp/c.json'));c=sorted(d['cast'],key=lambda x:-x.get('vote_count',0));print(len(c),'créditos; más votados:',[(x.get('title') or x.get('name')) for x in c[:6]]);assert len(c)>10"
+          echo "--- v3: descubrimiento por palabra clave (viaje en el tiempo, 4379) y género Terror en AR"
+          curl -fsS --max-time 30 "$APP/api/tmdb/discover/movie?with_keywords=4379&sort_by=vote_count.desc&language=es-MX" -o /tmp/k.json
+          python3 -c "import json;r=json.load(open('/tmp/k.json'))['results'];print([x['title'] for x in r[:5]]);assert r"
+          curl -fsS --max-time 30 "$APP/api/tmdb/discover/movie?with_genres=27&watch_region=AR&with_watch_providers=8&with_watch_monetization_types=flatrate&sort_by=popularity.desc&language=es-MX" -o /tmp/t.json
+          python3 -c "import json;r=json.load(open('/tmp/t.json'))['results'];print('Terror en Netflix AR:',[x['title'] for x in r[:5]]);assert r"
           echo "--- El token no aparece en las respuestas públicas"
           if grep -l "eyJhbGci" /tmp/*.json; then echo "::error::Se encontró un token en una respuesta"; exit 1; fi
           echo "OK"

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { LIST_LABELS } from '../constants';
-import { migrateRating } from '../db/migrations';
 import { db } from '../db/db';
 import { useApp } from '../hooks/useApp';
+import { useRatings } from '../hooks/useRatings';
 import { friendlyError } from '../providers/errors';
 import { refreshAvailability, searchTitles, type SearchHit } from '../services/catalog';
 import { AvailabilityLine, Empty, ErrorNote, Poster, Spinner, TitleLink, TypeBadge } from '../ui/components';
@@ -33,7 +33,8 @@ export function useSearch(query: string, language: string, country: string) {
 
 export function SearchResults({ hits, country, profileId }: { hits: SearchHit[]; country: string; profileId: string }) {
   const snaps = useLiveQuery(() => db.availability.bulkGet(hits.map((h) => `${h.key}|${country}`)), [hits, country]);
-  const ratings = useLiveQuery(() => db.ratings.bulkGet(hits.map((h) => `${profileId}|${h.key}`)).then((rs) => rs.map((r) => (r ? migrateRating(r) : undefined))), [hits, profileId]);
+  const { byKey } = useRatings(profileId);
+  const ratings = hits.map((h) => byKey.get(h.key));
   return (
     <ul className="space-y-2" aria-label="Resultados">
       {hits.map((h, i) => (

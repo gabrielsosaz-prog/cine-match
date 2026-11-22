@@ -2,12 +2,14 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useApp } from '../hooks/useApp';
 import { refreshAvailability } from '../services/catalog';
-import { AvailabilityLine, Empty, Poster, TitleLink, TypeBadge } from '../ui/components';
-import { useEffect } from 'react';
+import { AvailabilityLine, DataStatus, Empty, Poster, TitleLink, TypeBadge } from '../ui/components';
+import { useEffect, useMemo } from 'react';
+import { useRatings } from '../hooks/useRatings';
 
 export default function Pending() {
   const { profileId, settings } = useApp();
-  const items = useLiveQuery(() => db.ratings.where('[profileId+list]').anyOf([[profileId, 'want'], [profileId, 'watching']]).toArray(), [profileId]) ?? [];
+  const rs = useRatings(profileId);
+  const items = useMemo(() => rs.ratings.filter((r) => r.list === 'want' || r.list === 'watching'), [rs.ratings]);
   const titles = useLiveQuery(() => db.titles.bulkGet(items.map((i) => i.key)), [items]) ?? [];
   const snaps = useLiveQuery(() => db.availability.bulkGet(items.map((i) => `${i.key}|${settings.country}`)), [items, settings.country]) ?? [];
   useEffect(() => { if (items.length) refreshAvailability(items.map((i) => i.key), settings.country, 30).catch(() => undefined); }, [items.length, settings.country]);
@@ -15,7 +17,8 @@ export default function Pending() {
     <div className="space-y-3">
       <h1 className="text-2xl font-bold">Pendientes</h1>
       <p className="text-sm text-slate-400">Lo que marcaste como «Quiero verla» o «Viéndola», con disponibilidad actualizada.</p>
-      {items.length === 0 && <Empty>No tenés títulos pendientes.</Empty>}
+      <DataStatus {...rs} onRetry={rs.retry} />
+      {rs.status === 'ready' && items.length === 0 && <Empty>No tenés títulos pendientes.</Empty>}
       <ul className="space-y-2">
         {items.map((r, i) => (
           <li key={r.id}>

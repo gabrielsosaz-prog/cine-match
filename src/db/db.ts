@@ -45,8 +45,17 @@ export class CineDB extends Dexie {
     this.version(3)
       .stores({ ratings: 'id, profileId, key, updatedAt, [profileId+list]' })
       .upgrade((tx) => tx.table('ratings').toCollection().modify((r: any, ref: { value: unknown }) => { ref.value = migrateRating(r); }));
+    // Otra instancia de la app (p. ej. tras actualizarse la PWA) necesita una versión nueva de la base:
+    // se avisa para recargar en vez de quedar con una conexión cerrada a mitad de un guardado.
+    this.on('versionchange', () => { emitDbEvent('versionchange'); });
+    this.on('blocked', () => { emitDbEvent('blocked'); });
   }
 }
+
+export type DbEvent = 'versionchange' | 'blocked';
+const dbListeners = new Set<(e: DbEvent) => void>();
+export function onDbEvent(fn: (e: DbEvent) => void) { dbListeners.add(fn); return () => { dbListeners.delete(fn); }; }
+function emitDbEvent(e: DbEvent) { for (const fn of dbListeners) fn(e); }
 
 export let db = new CineDB();
 

@@ -133,3 +133,44 @@ export async function discoverCandidates(opts: { type: MediaType; language: stri
   if (fresh.length) await db.titles.bulkPut(fresh);
   return results;
 }
+
+// ───────────── v3.0: personas (actores, dirección) ─────────────
+export type { PersonHit, PersonCredit } from '../providers/tmdb';
+import type { PersonCredit, PersonHit } from '../providers/tmdb';
+
+export async function searchPeople(query: string, language: string): Promise<PersonHit[]> {
+  const client = await getClient();
+  return client.searchPerson(query, language);
+}
+
+/** Créditos que no son actuaciones de ficción: talk shows, noticieros, galas, apariciones como sí mismo. */
+const NON_FICTION_GENRES = new Set([10767, 10763, 99]);
+const isSelf = (c: PersonCredit) => /\b(self|himself|herself|themselves|host|narrator \(voice\)|archive footage)\b/i.test(c.character ?? '');
+
+const creditCache = new Map<string, { at: number; credits: PersonCredit[] }>();
+const CREDIT_TTL_MS = 7 * 24 * 3600 * 1000;
+
+/**
+ * Filmografía de una persona por id único (desambigua homónimos). Guarda metadata básica de cada título para
+ * poder ordenarlos y mostrarlos. Se cachea 7 días en memoria y en el dispositivo.
+ */
+export async function personFilmography(personId: number, language: string, opts: { role?: 'cast' | 'crew' | 'any'; fiction?: boolean } = {}): Promise<PersonCredit[]> {
+  const ck = `${personId}|${language}`;
+  let credits = creditCache.get(ck);
+  if (!credits) {
+    try { const raw = localStorage.getItem(`cine-match:credits:${ck}`); if (raw) { const v = JSON.parse(raw); if (Date.now() - v.at < CREDIT_TTL_MS) credits = v; } } catch { /* sin almacenamiento */ }
+  }
+  if (!credits || Date.now() - credits.at > CREDIT_TTL_MS) {
+    const client = await getClient();
+    credits = { at: Date.now(), credits: await client.personCredits(personId, language) };
+    creditCache.set(ck, credits);
+    try { localStorage.setItem(`cine-match:credits:${ck}`, JSON.stringify(credits)); } catch { /* cuota llena: queda en memoria */ }
+    const names = await genreNames(language);
+    const uniq = [...new Map(credits.credits.map((c) => [c.key, c])).values()];
+    const have = await db.titles.bulkGet(uniq.map((c) => c.key));
+    const fresh = uniq.filter((_, i) => !have[i]).map((r) => metaFromSearch(r, names));
+    if (fresh.length) await db.titles.bulkPut(fresh);
+  }
+  const role = opts.role ?? 'any';
+  return credits.credits.filter((c) => (role === 'any' || c.kind === role) && (!opts.fiction || (!isSelf(c) && !c.genreIds.some((g) => NON_FICTION_GENRES.has(g)))));
+}

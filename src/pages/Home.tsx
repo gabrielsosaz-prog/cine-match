@@ -3,14 +3,16 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DIMENSIONS, PLATFORMS } from '../constants';
 import { db } from '../db/db';
-import { migrateRating } from '../db/migrations';
+import { useRatings } from '../hooks/useRatings';
 import { useApp } from '../hooks/useApp';
 import { useRecommendations } from '../hooks/useRecs';
 import { rankWithFilters } from '../services/recommendations';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
 import { activeFilters, filterLabel, loadFilters, saveFilters, type RankFilters, type WatchedFilter } from '../services/filters';
 import type { AvailabilitySnapshot, MediaType, Named, PlatformId, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
-import { AvailabilityLine, Chip, Empty, ErrorNote, Poster, ScoreBadge, Spinner, TitleLink, TypeBadge, PlatformPill } from '../ui/components';
+import { AvailabilityLine, ChannelBars, Chip, Empty, ErrorNote, Poster, publicScore, ScorePair, Spinner, TitleLink, TypeBadge, PlatformPill } from '../ui/components';
+import { safely } from '../services/notices';
+import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import FilterPanel from '../ui/FilterPanel';
 import RatingEditor, { readDraft } from '../ui/RatingEditor';
 import { num, relTime } from '../ui/format';
@@ -33,7 +35,7 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
   const dims = Object.entries(shownItem.dimensionEstimates ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
   const nAspects = rating ? Object.keys(rating.dimensions).length : 0;
   const hasDraft = Boolean(readDraft(profileId, item.key));
-  const quick = (fn: () => Promise<unknown>) => { onTouch(item.key); onSave(fn()); };
+  const quick = (fn: () => Promise<unknown>, what = 'el cambio') => { onTouch(item.key); onSave(safely(fn, what)); };
   return (
     <li className={`rounded-2xl bg-ink-900 p-3 ring-1 ${editing ? 'ring-accent/60' : 'ring-white/5'} ${dismissed ? 'opacity-70' : ''}`} data-testid="rec-item" data-key={item.key} data-dismissed={dismissed}>
       <div className="flex gap-3">
@@ -41,14 +43,15 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
             <span className="text-sm font-bold text-slate-500">#{item.rank}</span>
-            <TitleLink k={item.key} className="min-w-0 flex-1"><h3 className="truncate font-semibold leading-tight">{meta.title}</h3></TitleLink>
-            {rating?.overall !== undefined ? <ScoreBadge score={rating.overall} label="tu nota" /> : <ScoreBadge score={shownItem.score} />}
+            <TitleLink k={item.key} className="min-w-0 flex-1"><h3 className="line-clamp-2 font-semibold leading-tight">{meta.title}</h3></TitleLink>
           </div>
+          <div className="mt-1"><ScorePair item={shownItem} meta={meta} userScore={rating?.overall} compact /></div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
             <TypeBadge type={meta.type} />{meta.year && <span>{meta.year}</span>}
             <span className={`rounded px-1.5 py-0.5 text-[10px] ${shownItem.confidenceLabel === 'alta' ? 'bg-emerald-500/15 text-emerald-300' : shownItem.confidenceLabel === 'media' ? 'bg-sky-500/15 text-sky-300' : 'bg-slate-500/15 text-slate-300'}`}>confianza {shownItem.confidenceLabel}</span>
             {item.exploration && <span className="rounded bg-fuchsia-500/15 px-1.5 py-0.5 text-[10px] text-fuchsia-300">exploración</span>}
-            {rating?.overall !== undefined && <span className="text-[10px]">estimada {num(shownItem.score)}</span>}
+            {rating?.overall !== undefined && <span className="text-[10px]" data-testid="estimate-separate">estimación para vos {num(shownItem.score)} (aparte de tu nota)</span>}
+            {shownItem.lowEvidence && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200" data-testid="low-evidence">provisional: pocos datos</span>}
             {hasDraft && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300">borrador</span>}
           </div>
           <div className="mt-1.5"><AvailabilityLine snap={snap} compact /></div>
@@ -56,16 +59,22 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             {open ? shownItem.explanation.map((l, i) => <p key={i} className="mb-0.5">• {l}</p>) : <span className="line-clamp-2">{shownItem.explanation[0]}</span>}
             {open && dims.length > 0 && <p className="mt-1 text-[11px] text-slate-400">Estimado para vos: {dims.map(([d, v]) => `${DIMENSIONS.find((x) => x.id === d)!.short} ${num(v)}★`).join(' · ')}</p>}
           </button>
+          {open && (
+            <div className="mt-2 rounded-lg bg-ink-950/60 p-2">
+              {shownItem.lowEvidence && <p className="mb-1 text-[11px] text-amber-200">Este título se sumó con una búsqueda en TMDB para tus filtros y tu historial casi no tiene información sobre algo parecido: la estimación es de baja confianza y se apoya en datos públicos.</p>}
+              <ChannelBars channels={shownItem.channels} base={shownItem.base} score={shownItem.score} />
+            </div>
+          )}
         </div>
       </div>
       {dismissed ? (
         <div className="mt-2 flex items-center gap-2 rounded-lg bg-red-500/10 p-2 text-xs text-red-200" data-testid="dismissed-note">
           <span className="flex-1">Descartada: no se va a recomendar. Sale de la lista al actualizar el ranking.</span>
-          <button type="button" data-testid="undo-not-interested" className="font-semibold underline" onClick={() => quick(() => setNotInterested(profileId, item.key, false))}>Deshacer</button>
+          <button type="button" data-testid="undo-not-interested" className="font-semibold underline" onClick={() => quick(() => setNotInterested(profileId, item.key, false), 'el cambio')}>Deshacer</button>
         </div>
       ) : (
         <div className="mt-2 grid grid-cols-4 gap-1.5" role="group" aria-label={`Acciones rápidas para ${meta.title}`}>
-          <button type="button" data-testid="quick-watched" aria-pressed={watched} onClick={() => quick(() => setWatched(profileId, item.key, !watched))}
+          <button type="button" data-testid="quick-watched" aria-pressed={watched} onClick={() => quick(() => setWatched(profileId, item.key, !watched), 'la marca de vista')}
             className={`rounded-lg px-1 py-1.5 text-[11px] font-semibold leading-tight ${watched ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40' : 'bg-ink-800 text-slate-300 ring-1 ring-white/10'}`}>
             {watched ? '✓ Vista' : '○ Vista'}
           </button>
@@ -77,7 +86,7 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             className="rounded-lg bg-ink-800 px-1 py-1.5 text-[11px] font-semibold leading-tight text-slate-300 ring-1 ring-white/10">
             Aspectos{nAspects ? ` ${nAspects}/${DIMENSIONS.length}` : ''}
           </button>
-          <button type="button" data-testid="quick-not-interested" onClick={() => { onEdit(undefined); quick(() => setNotInterested(profileId, item.key, true)); }}
+          <button type="button" data-testid="quick-not-interested" onClick={() => { onEdit(undefined); quick(() => setNotInterested(profileId, item.key, true), '«No me interesa»'); }}
             className="rounded-lg bg-ink-800 px-1 py-1.5 text-[11px] font-semibold leading-tight text-slate-300 ring-1 ring-white/10">
             ✕ No me interesa
           </button>
@@ -88,7 +97,7 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
           <div className="flex gap-1">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
               <button key={n} type="button" aria-label={`Nota general ${n}`}
-                onClick={() => { quick(() => rateAndLearn(profileId, item.key, { overall: n })); onEdit({ key: item.key, mode: 'score', savedScore: n }); }}
+                onClick={() => { quick(() => rateAndLearn(profileId, item.key, { overall: n }), 'la nota'); onEdit({ key: item.key, mode: 'score', savedScore: n }); }}
                 className={`h-9 flex-1 rounded-md text-sm font-semibold ${rating?.overall === n ? 'bg-accent text-ink-950' : 'bg-ink-800 text-slate-300'}`}>{n}</button>
             ))}
           </div>
@@ -100,7 +109,7 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             </div>
           ) : (
             <p className="mt-1 text-[11px] text-slate-500">Tocá una nota para guardarla. No cambia la marca de vista ni el orden hasta que actualices el ranking.
-              {rating?.overall !== undefined && <> <button className="underline" onClick={() => quick(() => rateAndLearn(profileId, item.key, { overall: null }))}>Quitar nota</button></>}</p>
+              {rating?.overall !== undefined && <> <button className="underline" onClick={() => quick(() => rateAndLearn(profileId, item.key, { overall: null }), 'el cambio')}>Quitar nota</button></>}</p>
           )}
         </div>
       )}
@@ -113,11 +122,35 @@ export function filterByWatched<T extends { key: TitleKey }>(rows: T[], ratings:
   return rows.filter((r) => sticky.has(r.key) || (filter === 'watched') === Boolean(ratings.get(r.key)?.watched));
 }
 
+export type HomeSort = 'affinity' | 'public' | 'year' | 'title';
+const HOME_SORTS: [HomeSort, string][] = [['affinity', 'Para vos'], ['public', 'Público (TMDB)'], ['year', 'Año'], ['title', 'Título']];
+export const PAGE_SIZE = 10;
+
+/** Orden de la lista visible. «Para vos» respeta el ranking (afinidad + diversidad); los demás reordenan la misma lista. */
+export function sortRows<T extends { key: TitleKey; item: RecommendationItem; meta?: TitleMeta }>(rows: T[], sort: HomeSort, dir: 'asc' | 'desc'): T[] {
+  if (sort === 'affinity') return dir === 'desc' ? rows : [...rows].reverse();
+  const val = (r: T): number | string | undefined => sort === 'public' ? publicScore(r.meta) : sort === 'year' ? r.meta?.year : r.meta?.title;
+  const sign = dir === 'desc' ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const x = val(a), y = val(b);
+    // Sin dato (p. ej. sin votos suficientes en TMDB) va siempre al final
+    if (x === undefined && y === undefined) return a.item.rank - b.item.rank;
+    if (x === undefined) return 1;
+    if (y === undefined) return -1;
+    const c = typeof x === 'string' ? x.localeCompare(y as string, 'es') : x - (y as number);
+    return sign * c || a.item.rank - b.item.rank;
+  });
+}
+
 export default function Home() {
   const { profileId, settings } = useApp();
+  const [sort, setSortRaw] = usePersistentState<HomeSort>(`cine-match:home-sort:${profileId}`, 'affinity', oneOf(HOME_SORTS.map(([v]) => v)));
+  const [dir, setDir] = usePersistentState<'asc' | 'desc'>(`cine-match:home-dir:${profileId}`, 'desc', oneOf(['asc', 'desc'] as const));
+  const setSort = (v: HomeSort) => { setSortRaw(v); setDir(v === 'title' ? 'asc' : 'desc'); setPage(1); };
+  const [page, setPage] = useState(1);
   const { run: latest, busy, error, refresh } = useRecommendations(profileId);
   const [filters, setFiltersState] = useState<RankFilters>(() => loadFilters(profileId));
-  const setFilters = (f: RankFilters) => { setFiltersState(f); saveFilters(profileId, f); setTouched(new Set()); };
+  const setFilters = (f: RankFilters) => { setFiltersState(f); saveFilters(profileId, f); setTouched(new Set()); setPage(1); };
   // Orden visible: sólo cambia al abrir, al tocar «Actualizar ranking» o al cambiar filtros. El modelo se recalcula solo.
   const [shown, setShown] = useState<RecommendationRun>();
   const [applyNext, setApplyNext] = useState(false);
@@ -148,7 +181,7 @@ export default function Home() {
     if (!shown || !advanced) { setFiltered(undefined); return; }
     let alive = true;
     setFilterBusy(true);
-    rankWithFilters(profileId, shown, filters).then((r) => { if (alive) setFiltered(r); }).finally(() => { if (alive) setFilterBusy(false); });
+    rankWithFilters(profileId, shown, filters).then((r) => { if (alive) setFiltered(r); }).catch((e) => { if (alive) setFiltered({ items: [], candidates: 0, diagnostics: [], discovered: 0, warning: e instanceof Error ? e.message : String(e) }); }).finally(() => { if (alive) setFilterBusy(false); });
     return () => { alive = false; };
   }, [shown?.id, filtersKey, applyTick, advanced]);
 
@@ -164,8 +197,8 @@ export default function Home() {
     for (const t of eligibleMetas ?? []) for (const g of t?.genres ?? []) if (!/^Género \d+$/.test(g.name)) m.set(g.id, g);
     return [...m.values()];
   }, [eligibleMetas]);
-  const ratingList = useLiveQuery(() => db.ratings.where('profileId').equals(profileId).toArray(), [profileId]);
-  const ratings = useMemo(() => new Map((ratingList ?? []).map((r) => { const m = migrateRating(r); return [m.key, m] as [TitleKey, Rating]; })), [ratingList]);
+  const rs = useRatings(profileId);
+  const ratings = rs.byKey;
   const liveItems = useMemo(() => new Map((latest?.items ?? []).map((i) => [i.key, i])), [latest?.id]);
   const pendingCount = [...ratings.values()].filter((r) => r.list === 'want' || r.list === 'watching').length;
   const events = useLiveQuery(() => db.availabilityEvents.where('country').equals(settings.country).reverse().sortBy('detectedAt').then((e) => e.slice(0, 6)), [settings.country]);
@@ -175,9 +208,11 @@ export default function Home() {
     if (!titles) return [];
     const base = items.map((item, i) => ({ key: item.key, item, meta: titles[i], snap: snaps?.[i] })).filter((r) => r.meta);
     const visible = advanced ? base : filterByWatched(base, ratings, filters.watched, touched);
-    return visible.map((r, i) => ({ ...r, item: { ...r.item, rank: i + 1 } }));
-  }, [items, titles, snaps, filters.watched, ratings, touched, advanced]);
-  const featured = !advanced && filters.watched === 'unwatched' ? rows.filter((r) => !touched.has(r.key) && (r.meta?.backdropPath || r.meta?.posterPath)).slice(0, 3) : [];
+    return sortRows(visible.map((r, i) => ({ ...r, item: { ...r.item, rank: i + 1 } })), sort, dir);
+  }, [items, titles, snaps, filters.watched, ratings, touched, advanced, sort, dir]);
+  // Paginación: 10 al principio y de a 10 con «Ver más» (nunca cientos de tarjetas a la vez)
+  const pageRows = rows.slice(0, page * PAGE_SIZE);
+  const featured = !advanced && filters.watched === 'unwatched' && sort === 'affinity' && dir === 'desc' ? rows.filter((r) => !touched.has(r.key) && (r.meta?.backdropPath || r.meta?.posterPath)).slice(0, 3) : [];
   const trackSave = (p: Promise<unknown>) => {
     setSaving((n) => n + 1);
     p.catch(() => undefined).finally(() => setSaving((n) => n - 1));
@@ -234,7 +269,16 @@ export default function Home() {
         <Chip active={quickType === 'tv'} onClick={() => setFilters({ ...filters, types: ['tv'] })} testId="filter-tv">Series</Chip>
         <Link to="/pendientes" className="ml-auto shrink-0 rounded-full bg-ink-800 px-3 py-1.5 text-sm text-slate-300 ring-1 ring-white/10">Pendientes ({pendingCount})</Link>
       </div>
-      <FilterPanel value={filters} onChange={setFilters} genres={genres} userPlatforms={settings.platforms} onSearchMore={advanced ? onSearchMore : undefined} searching={busy} />
+      <FilterPanel value={filters} onChange={setFilters} genres={genres} userPlatforms={settings.platforms} onSearchMore={advanced ? onSearchMore : undefined} searching={busy} language={settings.language} />
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-slate-400" htmlFor="home-sort">Ordenar por</label>
+        <select id="home-sort" value={sort} onChange={(e) => setSort(e.target.value as HomeSort)} data-testid="home-sort" className="rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10">
+          {HOME_SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <button type="button" data-testid="home-dir" onClick={() => { setDir(dir === 'asc' ? 'desc' : 'asc'); setPage(1); }} className="rounded-lg bg-ink-800 px-2 py-1.5 text-xs ring-1 ring-white/10"
+          aria-label="Invertir el orden">{sort === 'title' ? (dir === 'asc' ? 'A→Z' : 'Z→A') : dir === 'desc' ? '↓ Mayor' : '↑ Menor'}</button>
+        {(sort !== 'affinity' || dir !== 'desc') && <button type="button" data-testid="home-sort-reset" onClick={() => setSort('affinity')} className="text-[11px] text-accent underline">Restablecer</button>}
+      </div>
       {advanced && (
         <div className="flex flex-wrap gap-1.5" data-testid="active-filters">
           {activeFilters(filters).map((id) => <span key={id} className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] text-accent">{filterLabel(id, filters, genreName, platformName)}</span>)}
@@ -245,7 +289,14 @@ export default function Home() {
       {shown?.warning && <ErrorNote>{shown.warning}</ErrorNote>}
       {notice && !pending && <p role="status" data-testid="rank-notice" className="rounded-xl bg-emerald-500/10 p-2.5 text-xs text-emerald-200" onClick={() => setNotice(undefined)}>{notice}</p>}
       {busy && !shown && <Spinner label="Buscando títulos en tus plataformas…" />}
-      {advanced && filterBusy && !filtered && <Spinner label="Aplicando filtros…" />}
+      {advanced && filterBusy && !filtered && <Spinner label="Aplicando filtros (si hay pocos títulos, se busca en TMDB)…" />}
+      {advanced && filtered?.warning && <ErrorNote>{filtered.warning}</ErrorNote>}
+      {advanced && filtered && filtered.discovered > 0 && (
+        <p role="status" data-testid="discovered-note" className="rounded-xl bg-sky-500/10 p-2 text-xs text-sky-100">
+          Había pocos títulos para estos filtros en tu ranking: se sumaron {filtered.discovered} buscados en TMDB con los mismos filtros y tus plataformas. Los marcados «provisional» tienen estimación de baja confianza.
+        </p>
+      )}
+      {advanced && filtered?.outsidePlatforms ? <p className="text-[11px] text-slate-500" data-testid="person-outside">{filtered.outsidePlatforms} títulos de {filters.person?.name} no figuran en tus plataformas en {settings.country} y no se muestran.</p> : null}
 
       {featured.length > 0 && (
         <section aria-label="Destacadas" className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4">
@@ -254,7 +305,7 @@ export default function Home() {
               <Poster path={meta!.backdropPath ?? meta!.posterPath} size="w780" title={meta!.title} className="aspect-video w-full" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
               <div className="absolute bottom-0 p-3">
-                <div className="text-xs font-semibold text-accent">#{item.rank} · {num(item.score)} estimada</div>
+                <div className="text-xs font-semibold text-accent">#{item.rank} · Para vos {num(item.score)}{publicScore(meta) !== undefined ? ` · TMDB ${num(publicScore(meta))}` : ''}</div>
                 <div className="text-lg font-bold leading-tight">{meta!.title}</div>
               </div>
             </TitleLink>
@@ -281,13 +332,19 @@ export default function Home() {
         )
       )}
       <ol className="space-y-3" aria-label="Ranking personalizado">
-        {rows.map((r) => (
+        {pageRows.map((r) => (
           <RecCard key={r.key} item={r.item} live={liveItems.get(r.key)} meta={r.meta!} snap={r.snap} rating={ratings.get(r.key)} profileId={profileId}
             editing={editing?.key === r.key ? editing : undefined}
             onEdit={setEditing} onSave={trackSave}
             onTouch={(k) => setTouched((s) => (s.has(k) ? s : new Set(s).add(k)))} />
         ))}
       </ol>
+      {rows.length > pageRows.length && (
+        <button type="button" data-testid="show-more" onClick={() => setPage(page + 1)} className="w-full rounded-xl bg-ink-800 py-2.5 text-sm font-semibold ring-1 ring-white/10">
+          Ver más ({Math.min(PAGE_SIZE, rows.length - pageRows.length)} de {rows.length - pageRows.length} restantes)
+        </button>
+      )}
+      {rows.length > 0 && <p className="text-center text-[11px] text-slate-500" data-testid="rows-count">Mostrando {pageRows.length} de {rows.length}</p>}
 
       {editing?.mode === 'aspects' && editingMeta && (
         <div className="fixed inset-0 z-30 flex items-end bg-black/60" role="dialog" aria-modal="true" aria-label={`Valorar ${editingMeta.title}`} data-testid="aspects-sheet"
@@ -318,7 +375,7 @@ export default function Home() {
           ))}
         </section>
       )}
-      <p className="pt-2 text-center text-[10px] text-slate-500">La nota estimada es una afinidad calculada (1-10), no una probabilidad. Datos: TMDB · Disponibilidad: JustWatch.</p>
+      <p className="pt-2 text-center text-[10px] text-slate-500">«Para vos» es una estimación personalizada (1-10) de cuánto lo disfrutarías; no es una probabilidad ni tu nota. «TMDB» es el promedio de votos del público en TMDB. Disponibilidad: JustWatch.</p>
     </div>
   );
 }

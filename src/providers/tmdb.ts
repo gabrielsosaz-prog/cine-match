@@ -50,6 +50,12 @@ export interface SearchResult {
   originalLanguage?: string;
 }
 
+/** Tiempo máximo de una consulta a TMDB */
+export const REQUEST_TIMEOUT_MS = 15000;
+
+export interface PersonHit { id: number; name: string; department?: string; profilePath?: string | null; popularity?: number; knownFor: string[] }
+export interface PersonCredit extends SearchResult { kind: 'cast' | 'crew'; character?: string; job?: string; order?: number; episodes?: number }
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function platformOf(providerId: number, providerName: string): PlatformId | null {
@@ -99,12 +105,21 @@ export class TmdbClient {
     return this.slot(async () => {
       for (let attempt = 0; attempt < 3; attempt++) {
         let res: Response;
+        // Tiempo máximo por consulta: una conexión colgada (frecuente en redes móviles) no puede bloquear
+        // la cola de consultas ni dejar la app «procesando» para siempre.
+        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
+        const timer = setTimeout(() => ctrl?.abort(), REQUEST_TIMEOUT_MS);
         try {
-          res = await this.fetchImpl(url.toString(), { headers });
+          res = await Promise.race([
+            this.fetchImpl(url.toString(), { headers, signal: ctrl?.signal }),
+            new Promise<never>((_, rej) => setTimeout(() => rej(new Error('tiempo de espera agotado')), REQUEST_TIMEOUT_MS + 50)),
+          ]);
         } catch (e) {
+          clearTimeout(timer);
           if (attempt < 1) { await sleep(400); continue; }
           throw new ProviderError('network', `Fallo de red: ${(e as Error).message}`);
         }
+        clearTimeout(timer);
         if (res.ok) {
           try { return (await res.json()) as T; } catch { throw new ProviderError('bad_response', 'JSON inválido'); }
         }
@@ -174,6 +189,33 @@ export class TmdbClient {
     return { meta, availability: mapProviders(meta.key, d['watch/providers'], country), related };
   }
 
+  /** v3.0: búsqueda de personas (actores, directores). Se distinguen por id único de TMDB, no por nombre. */
+  async searchPerson(query: string, language: string): Promise<PersonHit[]> {
+    const q = query.trim();
+    if (!q) return [];
+    const data = await this.get<any>('/search/person', { query: q, language, include_adult: false, page: 1 });
+    const results: any[] = Array.isArray(data?.results) ? data.results : [];
+    return results.filter((r) => typeof r?.id === 'number' && r.name).map((r) => ({
+      id: r.id, name: r.name, department: r.known_for_department || undefined, profilePath: r.profile_path ?? null, popularity: r.popularity,
+      knownFor: (Array.isArray(r.known_for) ? r.known_for : []).filter((k: any) => k?.media_type === 'movie' || k?.media_type === 'tv')
+        .slice(0, 3).map((k: any) => `${k.title ?? k.name}${(k.release_date ?? k.first_air_date ?? '').slice(0, 4) ? ` (${(k.release_date ?? k.first_air_date).slice(0, 4)})` : ''}`),
+    }));
+  }
+
+  /** v3.0: filmografía completa (películas y series) de una persona por su id único. */
+  async personCredits(personId: number, language: string): Promise<PersonCredit[]> {
+    const data = await this.get<any>(`/person/${personId}/combined_credits`, { language });
+    const out: PersonCredit[] = [];
+    for (const [list, kind] of [[data?.cast, 'cast'], [data?.crew, 'crew']] as const) {
+      if (!Array.isArray(list)) continue;
+      for (const c of list) {
+        if ((c?.media_type !== 'movie' && c?.media_type !== 'tv') || typeof c.id !== 'number') continue;
+        out.push({ ...mapListItem(c, c.media_type), kind, character: c.character, job: c.job, order: typeof c.order === 'number' ? c.order : undefined, episodes: typeof c.episode_count === 'number' ? c.episode_count : undefined });
+      }
+    }
+    return out;
+  }
+
   /** Sólo disponibilidad (para refrescos periódicos baratos). */
   async availability(type: MediaType, id: number, country: string): Promise<AvailabilitySnapshot> {
     const d = await this.get<any>(`/${type}/${id}/watch/providers`);
@@ -213,7 +255,7 @@ export function metaFromSearch(r: SearchResult, genreNames: Map<number, string>)
 }
 
 /** Versión del mapeo de fichas: las guardadas con una versión menor se vuelven a pedir. */
-export const META_VERSION = 2;
+export const META_VERSION = 3;
 
 export function mapDetails(d: any, type: MediaType, language: string): TitleMeta {
   const missing: string[] = [];
@@ -238,6 +280,20 @@ export function mapDetails(d: any, type: MediaType, language: string): TitleMeta
   } else {
     directors = (d.created_by ?? []).map((c: any) => ({ id: c.id, name: c.name, role: 'Creación' }));
   }
+  // Guion y autoría: créditos de TMDB del departamento «Writing» (series: aggregate_credits con varios trabajos)
+  const crewRaw: any[] = type === 'tv' && Array.isArray(d.aggregate_credits?.crew) ? d.aggregate_credits.crew : Array.isArray(d.credits?.crew) ? d.credits.crew : [];
+  const WRITING = /^(Screenplay|Writer|Story|Novel|Author|Characters|Teleplay|Head Writer|Original Story|Book)$/i;
+  const seenW = new Set<number>();
+  const writers: Person[] = [];
+  for (const c of crewRaw) {
+    if (typeof c?.id !== 'number' || seenW.has(c.id)) continue;
+    const jobs: string[] = Array.isArray(c.jobs) ? c.jobs.map((j: any) => j?.job).filter(Boolean) : c.job ? [c.job] : [];
+    const job = jobs.find((j) => WRITING.test(j));
+    if (c.department !== 'Writing' && !job) continue;
+    seenW.add(c.id);
+    writers.push({ id: c.id, name: c.name, role: job ?? 'Guion', episodes: typeof c.total_episode_count === 'number' ? c.total_episode_count : undefined });
+  }
+  writers.sort((a, b) => (b.episodes ?? 0) - (a.episodes ?? 0));
   const runtime = type === 'movie' ? d.runtime || undefined : (Array.isArray(d.episode_run_time) && d.episode_run_time[0]) || d.last_episode_to_air?.runtime || undefined;
   const overview: string | undefined = d.overview || undefined;
   if (!overview) missing.push('sinopsis');
@@ -260,7 +316,7 @@ export function mapDetails(d: any, type: MediaType, language: string): TitleMeta
     year: yearOf(releaseDate), releaseDate: releaseDate || undefined,
     overview, overviewLang: overview ? language.slice(0, 2) : undefined,
     posterPath: d.poster_path ?? null, backdropPath: d.backdrop_path ?? null,
-    genres, keywords, cast, directors, runtime,
+    genres, keywords, cast, directors, writers: writers.slice(0, 6), runtime,
     seasons: type === 'tv' && Array.isArray(d.seasons)
       ? d.seasons.filter((s: any) => s.season_number > 0).map((s: any) => ({ number: s.season_number, name: s.name, episodes: s.episode_count, airDate: s.air_date || undefined }))
       : undefined,

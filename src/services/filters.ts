@@ -18,12 +18,14 @@ export interface RankFilters {
   runtimeMin?: number; // minutos (en series: duración de episodio)
   runtimeMax?: number;
   minScore?: number; // afinidad estimada mínima (1-10)
+  /** v3.0: persona elegida por id único de TMDB (actor, actriz, dirección) */
+  person?: { id: number; name: string; department?: string };
 }
 
 /** «Recomendaciones generales» */
 export const DEFAULT_FILTERS: RankFilters = { types: [], includeGenres: [], excludeGenres: [], platforms: [], watched: 'unwatched' };
 
-type FilterId = 'types' | 'includeGenres' | 'excludeGenres' | 'yearMin' | 'yearMax' | 'platforms' | 'runtime' | 'minScore';
+type FilterId = 'types' | 'includeGenres' | 'excludeGenres' | 'yearMin' | 'yearMax' | 'platforms' | 'runtime' | 'minScore' | 'person';
 
 /** Filtros que cambian el conjunto de candidatos (el de vistos se maneja aparte, como en v2.0). */
 export function activeFilters(f: RankFilters): FilterId[] {
@@ -36,6 +38,7 @@ export function activeFilters(f: RankFilters): FilterId[] {
   if (f.platforms.length) out.push('platforms');
   if (f.runtimeMin || f.runtimeMax) out.push('runtime');
   if (f.minScore) out.push('minScore');
+  if (f.person) out.push('person');
   return out;
 }
 
@@ -52,6 +55,7 @@ const without = (f: RankFilters, id: FilterId): RankFilters => {
   if (id === 'platforms') g.platforms = [];
   if (id === 'runtime') { g.runtimeMin = undefined; g.runtimeMax = undefined; }
   if (id === 'minScore') g.minScore = undefined;
+  if (id === 'person') g.person = undefined;
   return g;
 };
 
@@ -64,7 +68,8 @@ export function filterLabel(id: FilterId, f: RankFilters, genreName: (id: number
     case 'yearMax': return `Hasta ${f.yearMax}`;
     case 'platforms': return f.platforms.map(platformName).join(' o ');
     case 'runtime': return f.runtimeMin && f.runtimeMax ? `${f.runtimeMin}-${f.runtimeMax} min` : f.runtimeMin ? `Más de ${f.runtimeMin} min` : `Hasta ${f.runtimeMax} min`;
-    case 'minScore': return `Afinidad ≥ ${f.minScore}`;
+    case 'minScore': return `Para vos ≥ ${f.minScore}`;
+    case 'person': return `Con ${f.person?.name}`;
   }
 }
 

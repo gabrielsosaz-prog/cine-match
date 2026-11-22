@@ -36,8 +36,8 @@ export function AvailabilityLine({ snap, compact }: { snap?: AvailabilitySnapsho
   return <div className="text-[11px] text-amber-300">⚠ Disponibilidad no confirmada{compact ? '' : `: ${st.reason}`}</div>;
 }
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-2xl bg-ink-900 p-4 ring-1 ring-white/5 ${className}`}>{children}</div>;
+export function Card({ children, className = '', 'data-testid': testId }: { children: ReactNode; className?: string; 'data-testid'?: string }) {
+  return <div data-testid={testId} className={`rounded-2xl bg-ink-900 p-4 ring-1 ring-white/5 ${className}`}>{children}</div>;
 }
 
 export function Chip({ active, onClick, children, testId }: { active?: boolean; onClick?: () => void; children: ReactNode; testId?: string }) {
@@ -140,4 +140,98 @@ export function Spinner({ label = 'Cargando…' }: { label?: string }) {
 
 export function ErrorNote({ children }: { children: ReactNode }) {
   return <div role="alert" className="rounded-xl bg-red-500/10 p-3 text-sm text-red-200 ring-1 ring-red-500/30">{children}</div>;
+}
+
+/**
+ * Estado de la lectura de tus datos locales. Distingue «cargando», «tardando» y «error» de «vacío»
+ * para que una lectura demorada nunca se vea como si se hubieran perdido las valoraciones.
+ */
+export function DataStatus({ status, slow, stale, error, onRetry }: { status: 'loading' | 'ready' | 'error'; slow?: boolean; stale?: boolean; error?: string; onRetry: () => void }) {
+  if (status === 'loading' && !slow) return <Spinner label="Leyendo tus datos guardados…" />;
+  if (status === 'loading' || status === 'error') {
+    return (
+      <div role="alert" data-testid="data-status" className="rounded-xl bg-amber-500/10 p-3 text-sm text-amber-100">
+        {status === 'error' ? 'No se pudo leer la base local en este momento.' : 'La base local está tardando en responder.'} Tus valoraciones siguen guardadas en el dispositivo.
+        <button type="button" onClick={onRetry} data-testid="data-retry" className="ml-1 font-semibold underline">Reintentar</button>
+        {error && <span className="mt-1 block text-[11px] text-amber-200/70">Detalle: {error}</span>}
+      </div>
+    );
+  }
+  if (stale) return <p role="status" data-testid="data-stale" className="rounded-lg bg-amber-500/10 p-2 text-[11px] text-amber-200">Mostrando los últimos datos confirmados mientras se reconecta la base local. <button type="button" className="underline" onClick={onRetry}>Reintentar</button></p>;
+  return null;
+}
+
+/**
+ * v3.0 — Dos notas comparables en la misma escala 1-10:
+ *  · «Público»: promedio de votos de TMDB (fuente identificada). Nunca se inventa: sin votos suficientes, «s/d».
+ *  · «Para vos»: estimación personalizada de cuánto lo disfrutarías (1-10). No es tu nota, ni la confianza del
+ *    modelo, ni una probabilidad. Con poca evidencia se marca «provisional» o «info insuficiente».
+ * Si ya lo puntuaste, se muestra «Tu nota» y la estimación queda aparte.
+ */
+export function publicScore(meta?: { voteAverage?: number; voteCount?: number }): number | undefined {
+  return meta?.voteAverage && (meta.voteCount ?? 0) >= 20 ? Math.round(meta.voteAverage * 10) / 10 : undefined;
+}
+export type PersonalState = { kind: 'ok' | 'provisional' | 'insufficient'; value?: number };
+export function personalState(item?: { score: number; confidence: number; provisional?: boolean; lowEvidence?: boolean }): PersonalState {
+  if (!item) return { kind: 'insufficient' };
+  if (item.confidence < 0.12) return { kind: 'insufficient', value: item.score };
+  if (item.provisional || item.lowEvidence) return { kind: 'provisional', value: item.score };
+  return { kind: 'ok', value: item.score };
+}
+
+export function ScorePair({ item, meta, userScore, compact }: {
+  item?: { score: number; confidence: number; provisional?: boolean; lowEvidence?: boolean }; meta?: { voteAverage?: number; voteCount?: number }; userScore?: number; compact?: boolean;
+}) {
+  const pub = publicScore(meta);
+  const ps = personalState(item);
+  const box = 'flex min-w-[3.6rem] flex-col items-center rounded-xl px-1.5 py-1';
+  return (
+    <div className="flex shrink-0 gap-1" data-testid="score-pair">
+      {userScore !== undefined ? (
+        <div className={`${box} bg-emerald-500/15 text-emerald-300`} data-testid="score-user" title="Tu nota (la que diste)">
+          <span className="text-lg font-bold leading-none">{num(userScore, userScore % 1 ? 1 : 0)}</span>
+          <span className="text-[9px] uppercase tracking-wide">tu nota</span>
+        </div>
+      ) : (
+        <div className={`${box} bg-accent-soft text-accent`} data-testid="score-personal" data-state={ps.kind}
+          title="Para vos: estimación personalizada de cuánto lo disfrutarías (1-10). No es una probabilidad.">
+          <span className="text-lg font-bold leading-none">{ps.kind === 'insufficient' ? '—' : num(ps.value!)}</span>
+          <span className="text-[9px] uppercase leading-tight tracking-wide">{ps.kind === 'insufficient' ? 'info insuf.' : 'para vos'}</span>
+          {ps.kind === 'provisional' && !compact && <span className="text-[8px] leading-none text-accent/80">provisional</span>}
+        </div>
+      )}
+      <div className={`${box} bg-sky-500/10 text-sky-200`} data-testid="score-public" title="Público: promedio de votos de TMDB (0-10)">
+        <span className="text-lg font-bold leading-none">{pub !== undefined ? num(pub) : 's/d'}</span>
+        <span className="text-[9px] uppercase tracking-wide">TMDB</span>
+      </div>
+    </div>
+  );
+}
+
+const CH_LABELS: Record<string, string> = {
+  theme: 'Temáticas', comments: '«Otros»', aspects: 'Aspectos', actors: 'Actores', crew: 'Dirección y guion',
+  similar: 'Parecido a tu historial', genre: 'Géneros', format: 'Formato y época', rejection: 'Descartes', quality: 'Público (auxiliar)',
+};
+
+/** Diagnóstico: cuánto aportó cada canal a la estimación «Para vos» (en puntos sobre tu media). */
+export function ChannelBars({ channels, base, score }: { channels?: { id: string; contribution: number; weight: number }[]; base?: number; score: number }) {
+  if (!channels?.length) return <p className="text-[11px] text-slate-500">Sin detalle por canal para esta estimación (se calculó con una versión anterior del motor).</p>;
+  const rows = [...channels].sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+  const max = Math.max(0.5, ...rows.map((r) => Math.abs(r.contribution)));
+  return (
+    <div className="space-y-1" data-testid="channel-bars">
+      <p className="text-[11px] text-slate-400">Cómo se llegó a {num(score)}: tu media{base !== undefined ? ` (${num(base)})` : ''} más el aporte de cada canal.</p>
+      {rows.map((r) => (
+        <div key={r.id} className="flex items-center gap-2 text-[11px]" data-testid={`channel-${r.id}`}>
+          <span className="w-28 shrink-0 truncate text-slate-300">{CH_LABELS[r.id] ?? r.id}</span>
+          <div className="relative h-2 flex-1 rounded bg-ink-800">
+            <div className={`absolute top-0 h-2 rounded ${r.contribution >= 0 ? 'left-1/2 bg-emerald-400/80' : 'right-1/2 bg-red-400/80'}`} style={{ width: `${(Math.abs(r.contribution) / max) * 50}%` }} />
+            <div className="absolute left-1/2 top-0 h-2 w-px bg-white/30" />
+          </div>
+          <span className={`w-10 shrink-0 text-right tabular-nums ${r.contribution >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{r.contribution >= 0 ? '+' : '−'}{num(Math.abs(r.contribution), 2)}</span>
+        </div>
+      ))}
+      <p className="text-[10px] text-slate-500">Diagnóstico del modelo con tus datos: muestra cómo se combinan las señales, no mide la precisión real de la predicción.</p>
+    </div>
+  );
 }

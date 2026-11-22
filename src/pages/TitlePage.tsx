@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useApp } from '../hooks/useApp';
@@ -9,10 +9,13 @@ import { similarTo } from '../engine/recommender';
 import { availabilityState } from '../services/availability';
 import type { MediaType, TitleKey, TitleMeta } from '../types';
 import { titleKey } from '../types';
-import { AvailabilityLine, Card, ErrorNote, Poster, Spinner, TitleLink, TypeBadge } from '../ui/components';
+import { AvailabilityLine, Card, ChannelBars, ErrorNote, personalState, Poster, publicScore, ScorePair, Spinner, TitleLink, TypeBadge } from '../ui/components';
+import { predictFor } from '../services/recommendations';
+import type { RecommendationItem } from '../types';
+import { num } from '../ui/format';
 import { dateTime } from '../ui/format';
 import RatingEditor from '../ui/RatingEditor';
-import { migrateRating } from '../db/migrations';
+import { useRatings } from '../hooks/useRatings';
 
 export default function TitlePage() {
   const { type, id } = useParams();
@@ -26,7 +29,16 @@ export default function TitlePage() {
   }, [key, settings.language, settings.country]);
   const meta = useLiveQuery(() => db.titles.get(key), [key]);
   const snap = useLiveQuery(() => db.availability.get(`${key}|${settings.country}`), [key, settings.country]);
-  const rating = useLiveQuery(() => db.ratings.get(`${profileId}|${key}`).then((r) => (r ? migrateRating(r) : undefined)), [profileId, key]);
+  const rs = useRatings(profileId);
+  const rating = rs.byKey.get(key);
+  // «Para vos»: estimación con el modelo actual. Si ya lo puntuaste, se estima SIN tu nota (no es un eco de ella)
+  const [pred, setPred] = useState<RecommendationItem | null>();
+  useEffect(() => {
+    let alive = true;
+    if (!meta) return;
+    predictFor(profileId, [key], { holdOut: true }).then((m) => { if (alive) setPred(m.get(key) ?? null); }).catch(() => { if (alive) setPred(null); });
+    return () => { alive = false; };
+  }, [key, meta?.fetchedAt, rating?.updatedAt, rs.ratings.length]);
   const related = useLiveQuery(async () => {
     if (!meta?.related?.length) return [];
     const rel = (await db.titles.bulkGet(meta.related)).filter((m): m is TitleMeta => Boolean(m));
@@ -50,10 +62,33 @@ export default function TitlePage() {
             <span>{meta.year ?? 'Año sin datos'}</span>
             {meta.runtime && <span>· {meta.runtime} min{meta.type === 'tv' ? '/ep.' : ''}</span>}
             {meta.numberOfSeasons && <span>· {meta.numberOfSeasons} {meta.numberOfSeasons === 1 ? 'temporada' : 'temporadas'}</span>}
-            {meta.voteAverage ? <span>· TMDB {meta.voteAverage.toFixed(1)}</span> : null}
           </div>
         </div>
       </div>
+      <Card className="space-y-2" data-testid="title-scores">
+        <div className="flex items-center gap-3">
+          <ScorePair item={pred ?? undefined} meta={meta} />
+          {rating?.overall !== undefined && (
+            <div className="flex flex-col items-center rounded-xl bg-emerald-500/15 px-2 py-1 text-emerald-300" data-testid="title-user-score">
+              <span className="text-lg font-bold leading-none">{num(rating.overall, rating.overall % 1 ? 1 : 0)}</span><span className="text-[9px] uppercase tracking-wide">tu nota</span>
+            </div>
+          )}
+          <div className="min-w-0 text-[11px] text-slate-400">
+            {pred === undefined ? 'Calculando «Para vos»…'
+              : !pred ? 'Sin estimación disponible.'
+              : personalState(pred).kind === 'insufficient' ? 'Info insuficiente para estimar: puntuá más títulos.'
+              : <>Para vos: estimación {personalState(pred).kind === 'provisional' ? 'provisional ' : ''}de cuánto lo disfrutarías. Confianza {pred.confidenceLabel}.{rating?.overall !== undefined ? ' Calculada sin tu nota, para compararla.' : ''}</>}
+            {publicScore(meta) !== undefined ? <span className="block">TMDB: {num(publicScore(meta))} con {meta.voteCount?.toLocaleString('es-AR')} votos.</span> : <span className="block">TMDB: sin votos suficientes.</span>}
+          </div>
+        </div>
+        {pred && (
+          <details data-testid="title-diagnostic">
+            <summary className="cursor-pointer text-xs text-accent">¿Por qué esta estimación?</summary>
+            <ul className="mt-1 space-y-0.5 text-xs text-slate-300">{pred.explanation.map((l, i) => <li key={i}>• {l}</li>)}</ul>
+            <div className="mt-2"><ChannelBars channels={pred.channels} base={pred.base} score={pred.score} /></div>
+          </details>
+        )}
+      </Card>
       {error && <ErrorNote>{error}</ErrorNote>}
       <div className="flex flex-wrap gap-1.5">{meta.genres.map((g) => <span key={g.id} className="rounded-full bg-ink-800 px-2.5 py-1 text-xs">{g.name}</span>)}</div>
       <p className="text-sm leading-relaxed text-slate-300">{meta.overview ?? <span className="italic text-slate-500">Sinopsis no disponible.</span>}{meta.overviewLang === 'en' && <span className="block text-[11px] text-slate-500">(Sinopsis en inglés: no hay traducción al español en TMDB.)</span>}</p>
@@ -76,6 +111,7 @@ export default function TitlePage() {
       {(meta.directors.length > 0 || meta.cast.length > 0) && (
         <Card className="space-y-1 text-sm">
           {meta.directors.length > 0 && <p><span className="text-slate-400">{meta.type === 'movie' ? 'Dirección' : 'Creación'}:</span> {meta.directors.map((d) => d.name).join(', ')}</p>}
+          {(meta.writers?.length ?? 0) > 0 && <p><span className="text-slate-400">Guion:</span> {meta.writers!.slice(0, 4).map((d) => d.name).join(', ')}</p>}
           {meta.cast.length > 0 && <p><span className="text-slate-400">Reparto:</span> {meta.cast.slice(0, 6).map((c) => c.name).join(', ')}</p>}
         </Card>
       )}
@@ -88,7 +124,7 @@ export default function TitlePage() {
 
       {related && related.length > 0 && (
         <section>
-          <h2 className="mb-2 font-semibold">Títulos similares</h2>
+          <div className="mb-2 flex items-center justify-between"><h2 className="font-semibold">Títulos similares</h2><Link to={`/similares?ref=${encodeURIComponent(key)}`} className="text-xs text-accent underline" data-testid="open-similar">Buscar similares a fondo</Link></div>
           <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
             {related.map((r) => (
               <TitleLink key={r.key} k={r.key} className="w-24 shrink-0">
