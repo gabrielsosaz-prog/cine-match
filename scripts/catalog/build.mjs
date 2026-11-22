@@ -44,9 +44,10 @@ await pages('movie', `watch_region=AR&with_watch_providers=${PROVIDERS}&sort_by=
 await pages('tv', `watch_region=AR&with_watch_providers=${PROVIDERS}&sort_by=popularity.desc&vote_count.gte=10&language=en-US`, 150, 'plataformas');
 await pages('movie', 'sort_by=vote_count.desc&language=en-US', 60, 'global');
 await pages('tv', 'sort_by=vote_count.desc&language=en-US', 40, 'global');
-for (const k of ['tv:111803', 'tv:325755', 'tv:336240', 'tv:227371', 'tv:253376', 'tv:241372', 'tv:229962', 'tv:131142', 'tv:1413']) if (!keys.has(k)) keys.set(k, 'caso');
+const CASES = ['tv:111803', 'tv:325755', 'tv:336240', 'tv:227371', 'tv:253376', 'tv:241372', 'tv:229962', 'tv:131142', 'tv:1413'];
+for (const k of CASES) if (!keys.has(k)) keys.set(k, 'caso');
 let list = [...keys.keys()];
-if (LIMIT) list = [...list.filter((k) => keys.get(k) === 'caso'), ...list.slice(0, LIMIT)];
+if (LIMIT) list = [...new Set([...CASES, ...list.slice(0, LIMIT)])];
 console.log('Títulos seleccionados:', list.length);
 
 // 2) Fichas TMDB
