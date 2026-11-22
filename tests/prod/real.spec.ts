@@ -7,7 +7,19 @@ import { expect, test, type Page } from '@playwright/test';
 const log = (...a: unknown[]) => console.log('[prod]', ...a);
 const BTTF = [105, 165, 196]; // Volver al futuro I, II y III (ids de TMDB)
 
+async function dump(page: Page, what: string) {
+  const txt = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 1500);
+  log(`FALLO en ${what}. URL ${page.url()}. Pantalla: ${txt}`);
+}
+async function step<T>(page: Page, what: string, fn: () => Promise<T>): Promise<T> {
+  const t0 = Date.now();
+  try { const r = await fn(); log(`✓ ${what} (${Date.now() - t0} ms)`); return r; } catch (e) { await dump(page, what); throw e; }
+}
+
 async function rate(page: Page, id: number, overall: number, acting?: number) {
+  return step(page, `valorar ${id}`, () => rateInner(page, id, overall, acting));
+}
+async function rateInner(page: Page, id: number, overall: number, acting?: number) {
   await page.goto(`/#/t/movie/${id}`);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.getByTestId('overall').getByRole('button', { name: `Valoración general (1-10): ${overall}`, exact: true }).click();
@@ -23,18 +35,22 @@ async function rate(page: Page, id: number, overall: number, acting?: number) {
 }
 
 test('producción: guardado, actores, filtros, notas y Similares con TMDB real', async ({ page }, info) => {
+  test.setTimeout(600000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') log('consola:', m.text().slice(0, 300)); });
   await page.goto('/');
   const v = await (await page.request.get('/version.json')).json();
-  log(info.project.name, 'versión', v);
+  log(info.project.name, 'versión', JSON.stringify(v));
   expect(v.version).toBe('3.0.0');
   // Incorporación mínima: plataformas por defecto y saltear
   await expect(page.getByText('Paso 1 de 3')).toBeVisible();
   for (const p of ['netflix', 'prime', 'disney', 'max']) { const c = page.getByTestId(`ob-${p}`); if ((await c.getAttribute('aria-pressed')) === 'false') await c.click(); }
   await page.getByTestId('ob-next').click();
-  await page.getByTestId('ob-finish').click();
-  await expect(page.getByRole('heading', { name: 'Para vos' })).toBeVisible();
+  await step(page, 'incorporación sin valoraciones → inicio', async () => {
+    await page.getByTestId('ob-finish').click();
+    await expect(page.getByRole('heading', { name: 'Para vos' })).toBeVisible({ timeout: 240000 });
+  });
 
   // 1) Guardado: trilogía con Actuaciones 5★ + otros títulos; tiempos de confirmación
   const times: number[] = [];
