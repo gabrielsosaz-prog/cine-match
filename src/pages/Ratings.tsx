@@ -102,7 +102,7 @@ export default function Ratings() {
       {editing && (
         <div className="fixed inset-0 z-30 flex items-end bg-black/60" role="dialog" aria-modal="true" aria-label="Completar aspectos" data-testid="aspects-sheet"
           onClick={(e) => { if (e.target === e.currentTarget) setEditingKey(undefined); }}>
-          <div className="safe-bottom mx-auto max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-ink-900 p-4 ring-1 ring-white/10">
+          <div className="safe-bottom mx-auto max-h-[88vh] w-full max-w-xl scroll-pb-24 scroll-pt-4 overflow-y-auto rounded-t-3xl bg-ink-900 p-4 ring-1 ring-white/10">
             <div className="mb-2 font-semibold">{editingMeta?.title ?? editing.key}</div>
             <p className="mb-2 text-[11px] text-slate-400">Resaltamos los aspectos que faltan. Completá sólo los que quieras.</p>
             <RatingEditor profileId={profileId} k={editing.key} existing={editing} isTv={editingMeta?.type === 'tv'} title={editingMeta} openAspects highlightMissing

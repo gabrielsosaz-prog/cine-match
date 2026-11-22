@@ -292,7 +292,7 @@ export default function Home() {
       {editing?.mode === 'aspects' && editingMeta && (
         <div className="fixed inset-0 z-30 flex items-end bg-black/60" role="dialog" aria-modal="true" aria-label={`Valorar ${editingMeta.title}`} data-testid="aspects-sheet"
           onClick={(e) => { if (e.target === e.currentTarget) setEditing(undefined); }}>
-          <div className="safe-bottom mx-auto max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-ink-900 p-4 ring-1 ring-white/10">
+          <div className="safe-bottom mx-auto max-h-[88vh] w-full max-w-xl scroll-pb-24 scroll-pt-4 overflow-y-auto rounded-t-3xl bg-ink-900 p-4 ring-1 ring-white/10">
             <div className="mb-3 flex items-center gap-3">
               <Poster path={editingMeta.posterPath} title={editingMeta.title} className="h-14 w-10" />
               <div className="min-w-0"><div className="truncate font-semibold">{editingMeta.title}</div><div className="text-xs text-slate-400">Nota general, aspectos y comentario</div></div>
