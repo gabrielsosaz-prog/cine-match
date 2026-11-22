@@ -6,8 +6,14 @@ import { conceptsOfTitle } from './comments';
 import { rejectionPenalty, type RejectionResult } from './rejections';
 import { SPOILER_PATTERN } from './keywordsEs';
 import { textCosine, textIdf, textVector, tokens } from './text';
+import { narrativeFromMeta, pairSimilarity, type Narrative, type NarrativeIndex } from './narrative';
 
-export const ALGORITHM_VERSION = 'hybrid-channels-3.0.0';
+export const ALGORITHM_VERSION = 'hybrid-narrative-3.1.0';
+
+/** Índice narrativo por defecto (lo fija la app al cargar el catálogo; en pruebas puede no existir). */
+let defaultNarrative: NarrativeIndex | undefined;
+export const setDefaultNarrative = (idx: NarrativeIndex | undefined) => { defaultNarrative = idx; };
+export const getDefaultNarrative = () => defaultNarrative;
 
 /** Interfaz modular: cualquier motor que la implemente puede reemplazar al actual. */
 export interface RecommenderEngine {
@@ -29,6 +35,8 @@ export interface RankInput {
   includeWatched?: boolean;
   /** Candidatos que entraron por una búsqueda extra (filtros) y tienen poca evidencia propia */
   lowEvidence?: Set<TitleKey>;
+  /** v3.1: índice narrativo (vectores semánticos y rasgos). Sin él, el canal narrativo queda en 0 (desconocido). */
+  narrative?: NarrativeIndex | null;
 }
 
 /**
@@ -43,7 +51,8 @@ export const CHANNELS: { id: ChannelId; label: string; prior: number; max: numbe
   { id: 'aspects', label: 'Aspectos que puntuaste', prior: 1.4, max: 3, learn: true },
   { id: 'actors', label: 'Actores', prior: 0.8, max: 2, learn: true },
   { id: 'crew', label: 'Dirección y guion', prior: 0.7, max: 2, learn: true },
-  { id: 'similar', label: 'Parecido con títulos que puntuaste', prior: 1.3, max: 3, learn: true },
+  { id: 'narrative', label: 'Parecido narrativo con lo que puntuaste (argumento y rasgos)', prior: 1.2, max: 3, learn: true },
+  { id: 'similar', label: 'Parecido con títulos que puntuaste (etiquetas)', prior: 0.9, max: 3, learn: true },
   { id: 'genre', label: 'Géneros (acotado)', prior: 0.6, max: 0.9, learn: true },
   { id: 'format', label: 'Formato, época e idioma', prior: 0.4, max: 0.8, learn: true },
   { id: 'rejection', label: 'Descartes («No me interesa»)', prior: 1, max: 1, learn: false },
@@ -95,6 +104,7 @@ interface Scored {
   channels: ChannelContribution[];
   contributions: { f: string; c: number }[];
   neighbors: { key: TitleKey; sim: number; dev: number }[];
+  narrNeighbors: { key: TitleKey; sim: number; dev: number }[];
   quality: number;
   novelty: number;
   aspects: { d: DimensionId; dev: number; evidence: number; weighted: number }[];
@@ -115,7 +125,10 @@ function mulberry32(a: number) {
 
 export function scoreCandidates(input: RankInput): Scored[] {
   const { profile, titles } = input;
-  const W = profile.channelWeights?.weights ?? priorWeights();
+  const W0 = profile.channelWeights?.weights ?? priorWeights();
+  const nidxAvail = input.narrative === null ? undefined : input.narrative ?? defaultNarrative;
+  // Sin índice narrativo, el parecido por etiquetas vuelve a cargar con el peso que tenía en v3.0 (1,3)
+  const W = nidxAvail ? W0 : { ...W0, similar: profile.channelWeights?.learned ? W0.similar : 1.3 };
   const rated = profile.signals.filter((s) => titles.has(s.key));
   const corpusKeys = [...new Set([...rated.map((s) => s.key), ...input.candidates])].filter((k) => titles.has(k));
   const raw = new Map(corpusKeys.map((k) => [k, rawFeatures(titles.get(k)!)]));
@@ -126,6 +139,11 @@ export function scoreCandidates(input: RankInput): Scored[] {
   const tIdf = textIdf([...toks.values()]);
   const tvecs = new Map([...toks].map(([k, ts]) => [k, textVector(ts, tIdf)]));
   const ratedVecs = rated.map((s) => ({ s, vec: vecs.get(s.key)!, tv: tvecs.get(s.key)! }));
+  // v3.1: representación narrativa (catálogo precalculado; si un título no está, sólo rasgos de sus palabras clave)
+  const nidx = input.narrative === null ? undefined : input.narrative ?? defaultNarrative;
+  const narrOf = new Map<TitleKey, Narrative>();
+  const getNarr = (k: TitleKey) => { let n = narrOf.get(k); if (!n) { const m = titles.get(k)!; n = nidx ? nidx.narrativeOf(k, m)! : narrativeFromMeta(m); narrOf.set(k, n); } return n; };
+  const ratedNarr = nidx ? rated.map((s) => ({ s, n: getNarr(s.key) })) : [];
 
   const out: Scored[] = [];
   for (const key of input.candidates) {
@@ -162,6 +180,16 @@ export function scoreCandidates(input: RankInput): Scored[] {
     let kn = 0, kd = 0.6;
     for (const n of neigh) { kn += n.sim * n.w * n.dev; kd += n.sim * n.w; }
     const knn = kn / kd;
+    // J) Parecido narrativo (v3.1): kNN sobre la similitud narrativa (semántica calibrada + rasgos + temáticas raras)
+    let narrNum = 0, narrDen = 0.6, narrEvid = 0;
+    const narrNeighbors: { key: TitleKey; sim: number; dev: number }[] = [];
+    if (nidx && ratedNarr.length) {
+      const cn = getNarr(key);
+      const sims = ratedNarr.filter((r) => r.s.key !== key).map((r) => ({ key: r.s.key, sim: pairSimilarity(r.n, cn, nidx).score, dev: Math.max(-LEARNING.maxDeviation, Math.min(LEARNING.maxDeviation, r.s.value - profile.mean)), w: r.s.weight }))
+        .filter((x) => x.sim > 0.2).sort((a, b) => b.sim - a.sim).slice(0, PARAMS.knnK);
+      for (const x of sims) { narrNum += x.sim * x.w * x.dev; narrDen += x.sim * x.w; narrEvid += x.sim; narrNeighbors.push({ key: x.key, sim: x.sim, dev: x.dev }); }
+    }
+    const narrative = narrNum / narrDen;
     // B) Aspectos: qué tan bien te resultan, aspecto por aspecto, los rasgos de este título,
     //    ponderado por cuánto pesa cada aspecto en tus notas generales (0 si nunca lo puntuaste).
     const aspects: Scored['aspects'] = [];
@@ -213,11 +241,11 @@ export function scoreCandidates(input: RankInput): Scored[] {
     const quality = bayesQuality(t);
     const rawCh: Record<ChannelId, number> = {
       theme: theme.v, comments: commentChannel, aspects: aspectChannel, actors: actorChannel, crew: crew.v,
-      similar: knn, genre: genre.v, format: format.v, rejection: rejection.penalty, quality: quality - 6.6,
+      narrative, similar: knn, genre: genre.v, format: format.v, rejection: rejection.penalty, quality: quality - 6.6,
     };
     const evidence: Record<ChannelId, number> = {
       theme: theme.ev, comments: concepts.length, aspects: aspectEvid, actors: actorEvid, crew: crew.ev,
-      similar: neigh.reduce((a, n) => a + n.sim, 0), genre: genre.ev, format: format.ev, rejection: profile.rejections.count, quality: t.voteCount ?? 0,
+      narrative: narrEvid, similar: neigh.reduce((a, n) => a + n.sim, 0), genre: genre.ev, format: format.ev, rejection: profile.rejections.count, quality: t.voteCount ?? 0,
     };
     const channels: ChannelContribution[] = CHANNELS.map((c) => {
       let contribution = W[c.id] * rawCh[c.id];
@@ -225,9 +253,9 @@ export function scoreCandidates(input: RankInput): Scored[] {
       return { id: c.id, value: rawCh[c.id], weight: W[c.id], contribution, evidence: evidence[c.id] };
     });
     const pred = Math.max(1, Math.min(10, profile.mean + channels.reduce((a, c) => a + c.contribution, 0)));
-    const simMass = evidence.similar;
+    const simMass = evidence.similar + evidence.narrative;
     const confidence = (1 - Math.exp(-(evid + 3 * simMass + 0.5 * Math.min(actorEvid, 4)) / 8)) * (1 - Math.exp(-profile.ratedCount / 6));
-    out.push({ key, pred, confidence, vec, raw: rawCh, channels, contributions: contributions.sort((a, b) => Math.abs(b.c) - Math.abs(a.c)), neighbors: neigh.map(({ key, sim, dev }) => ({ key, sim, dev })), quality, novelty: 1 - Math.min(1, evid / 6), aspects, dimensionEstimates, actors, concepts, rejection });
+    out.push({ key, pred, confidence, vec, raw: rawCh, channels, contributions: contributions.sort((a, b) => Math.abs(b.c) - Math.abs(a.c)), neighbors: neigh.map(({ key, sim, dev }) => ({ key, sim, dev })), narrNeighbors, quality, novelty: 1 - Math.min(1, evid / 6), aspects, dimensionEstimates, actors, concepts, rejection });
   }
   return out;
 }
@@ -347,7 +375,12 @@ export function explain(s: Scored, input: RankInput, info: ReturnType<typeof des
     const f = people[0].f;
     lines.push(`${family(f) === 'd' ? (titles.get(s.key)?.type === 'tv' ? 'De' : 'Dirigida por') : 'Con guion de'} ${featureLabel(f, info)}, presente en títulos que valoraste bien.`);
   }
-  const good = s.neighbors.filter((n) => n.dev > 0.5 && n.sim > 0.2).slice(0, 3);
+  const narrGood = s.narrNeighbors.filter((n) => n.dev > 0.5 && n.sim >= 0.35).slice(0, 3);
+  if (narrGood.length) {
+    const names = narrGood.map((n) => { const r = ratingByKey.get(n.key); const t = titles.get(n.key)?.title ?? 'un título'; return r?.overall !== undefined ? `${t} (${fmt(r.overall)})` : t; });
+    lines.push(`Narrativamente parecida a ${list(names)}, que puntuaste por encima de tu media (argumento y rasgos narrativos, análisis semántico).`);
+  }
+  const good = s.neighbors.filter((n) => n.dev > 0.5 && n.sim > 0.2 && !narrGood.some((g) => g.key === n.key)).slice(0, 3);
   if (good.length) {
     const names = good.map((n) => {
       const r = ratingByKey.get(n.key);

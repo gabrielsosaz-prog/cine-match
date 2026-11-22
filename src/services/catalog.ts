@@ -174,3 +174,46 @@ export async function personFilmography(personId: number, language: string, opts
   const role = opts.role ?? 'any';
   return credits.credits.filter((c) => (role === 'any' || c.kind === role) && (!opts.fiction || (!isSelf(c) && !c.genreIds.some((g) => NON_FICTION_GENRES.has(g)))));
 }
+
+// ───────────── v3.1: búsqueda unificada y personas ─────────────
+import type { PersonInfo } from '../providers/tmdb';
+export type { PersonInfo };
+const deaccent = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+/** Variantes razonables de escritura: sin tildes, espacios normalizados, sin puntos de iniciales. */
+export function queryVariants(q: string): string[] {
+  const base = q.trim().replace(/\s+/g, ' ');
+  return [...new Set([base, deaccent(base), base.replace(/\./g, '').replace(/\s+/g, ' '), deaccent(base).replace(/(.)\1+/g, '$1')])].filter((x) => x.length >= 2);
+}
+
+export interface UnifiedSearch { titles: SearchHit[]; people: PersonHit[]; peopleFirst: boolean; usedQuery: string }
+
+/**
+ * Búsqueda unificada: películas, series y personas (actuación, dirección, guion) con una llamada a TMDB.
+ * Si no hay resultados, prueba variantes de escritura. Las personas se distinguen por id único (homónimos).
+ * Las personas se muestran primero sólo si TMDB las considera el resultado más relevante.
+ */
+export async function searchAll(query: string, language: string): Promise<UnifiedSearch> {
+  const client = await getClient();
+  const names = await genreNames(language);
+  for (const q of queryVariants(query)) {
+    const r = await client.searchMultiAll(q, language);
+    if (!r.titles.length && !r.people.length) continue;
+    const existing = await db.titles.bulkGet(r.titles.map((x) => x.key));
+    const toPut = r.titles.filter((_, i) => !existing[i]).map((x) => metaFromSearch(x, names));
+    if (toPut.length) await db.titles.bulkPut(toPut);
+    const titles = r.titles.map((x) => ({ ...x, genres: x.genreIds.map((id) => ({ id, name: names.get(id) ?? `Género ${id}` })) }));
+    return { titles, people: r.people, peopleFirst: r.firstKind === 'person', usedQuery: q };
+  }
+  return { titles: [], people: [], peopleFirst: false, usedQuery: query };
+}
+
+const personCache = new Map<string, PersonInfo>();
+export async function getPerson(id: number, language: string): Promise<PersonInfo> {
+  const ck = `${id}|${language}`;
+  const c = personCache.get(ck);
+  if (c) return c;
+  const client = await getClient();
+  const p = await client.personDetails(id, language);
+  personCache.set(ck, p);
+  return p;
+}

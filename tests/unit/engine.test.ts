@@ -70,7 +70,7 @@ describe('Generación del ranking', () => {
       expect(it.confidence).toBeGreaterThanOrEqual(0); expect(it.confidence).toBeLessThanOrEqual(1);
       expect(it.explanation.length).toBeGreaterThan(0);
     });
-    expect(ALGORITHM_VERSION).toMatch(/^hybrid-channels-3/);
+    expect(ALGORITHM_VERSION).toMatch(/^hybrid-(channels|narrative)-3/);
     expect(hybridEngine.version).toBe(ALGORITHM_VERSION);
   });
   it('excluye vistas, pendientes y rechazadas', () => {

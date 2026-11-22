@@ -44,6 +44,8 @@ export interface TitleMeta {
   status?: string;
   originalLanguage?: string;
   originCountry?: string[];
+  /** Películas: países de producción (pueden ser varios en coproducciones). v3.1 */
+  productionCountries?: string[];
   voteAverage?: number;
   voteCount?: number;
   popularity?: number;
@@ -97,7 +99,7 @@ export interface AvailabilityEvent {
   source: string;
 }
 
-export type PlatformId = 'netflix' | 'prime' | 'disney' | 'max';
+export type PlatformId = 'netflix' | 'prime' | 'disney' | 'max' | 'paramount';
 
 /** Seguimiento opcional, independiente de la marca de visto, la puntuación y «No me interesa». */
 export type ListStatus = 'want' | 'watching' | 'abandoned';
@@ -209,7 +211,7 @@ export interface RecommendationItem {
   lowEvidence?: boolean;
 }
 
-export type ChannelId = 'theme' | 'comments' | 'aspects' | 'actors' | 'crew' | 'similar' | 'genre' | 'format' | 'rejection' | 'quality';
+export type ChannelId = 'theme' | 'comments' | 'aspects' | 'actors' | 'crew' | 'narrative' | 'similar' | 'genre' | 'format' | 'rejection' | 'quality';
 export interface ChannelContribution { id: ChannelId; value: number; weight: number; contribution: number; evidence: number }
 
 export interface RecommendationRun {

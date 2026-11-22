@@ -6,11 +6,13 @@ import { db } from '../db/db';
 import { useRatings } from '../hooks/useRatings';
 import { useApp } from '../hooks/useApp';
 import { useRecommendations } from '../hooks/useRecs';
-import { rankWithFilters } from '../services/recommendations';
+import { useScrollRestore } from '../hooks/useScrollRestore';
+import { hintsFromFilters, rankWithFilters } from '../services/recommendations';
+import { TrailerButton } from '../ui/Trailer';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
 import { activeFilters, filterLabel, loadFilters, saveFilters, type RankFilters, type WatchedFilter } from '../services/filters';
 import type { AvailabilitySnapshot, MediaType, Named, PlatformId, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
-import { AvailabilityLine, ChannelBars, Chip, Empty, ErrorNote, Poster, publicScore, ScorePair, Spinner, TitleLink, TypeBadge, PlatformPill } from '../ui/components';
+import { AvailabilityLine, ChannelBars, Chip, Empty, ErrorNote, Poster, personalState, publicScore, ScorePair, Spinner, TitleLink, TypeBadge, PlatformPill } from '../ui/components';
 import { safely } from '../services/notices';
 import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import FilterPanel from '../ui/FilterPanel';
@@ -26,12 +28,15 @@ interface CardProps {
   editing?: Editing; onEdit: (e?: Editing) => void; onSave: (p: Promise<unknown>) => void; onTouch: (k: TitleKey) => void;
 }
 
-function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, onSave, onTouch }: CardProps) {
+function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, onSave, onTouch, strictScore }: CardProps & { strictScore?: boolean }) {
   const [open, setOpen] = useState(false);
   const watched = rating?.watched ?? false;
   const dismissed = Boolean(rating?.notInterested);
   const quickOpen = editing?.mode === 'score';
-  const shownItem = live ?? item; // estimación recalculada; el orden visible sólo cambia con «Actualizar ranking»
+  // Estimación recalculada; el orden visible sólo cambia con «Actualizar ranking». Con orden estricto «Para vos» se muestra
+  // el mismo valor con que se ordenó (si cambió, se indica la nueva estimación aparte).
+  const shownItem = strictScore ? item : live ?? item;
+  const newer = strictScore && live && Math.abs(live.score - item.score) >= 0.05 ? live.score : undefined;
   const dims = Object.entries(shownItem.dimensionEstimates ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
   const nAspects = rating ? Object.keys(rating.dimensions).length : 0;
   const hasDraft = Boolean(readDraft(profileId, item.key));
@@ -46,6 +51,7 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             <TitleLink k={item.key} className="min-w-0 flex-1"><h3 className="line-clamp-2 font-semibold leading-tight">{meta.title}</h3></TitleLink>
           </div>
           <div className="mt-1"><ScorePair item={shownItem} meta={meta} userScore={rating?.overall} compact /></div>
+          {newer !== undefined && <p className="text-[10px] text-slate-500" data-testid="newer-estimate">Nueva estimación: {num(newer)} (se reordena al tocar «Actualizar ranking»)</p>}
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
             <TypeBadge type={meta.type} />{meta.year && <span>{meta.year}</span>}
             <span className={`rounded px-1.5 py-0.5 text-[10px] ${shownItem.confidenceLabel === 'alta' ? 'bg-emerald-500/15 text-emerald-300' : shownItem.confidenceLabel === 'media' ? 'bg-sky-500/15 text-sky-300' : 'bg-slate-500/15 text-slate-300'}`}>confianza {shownItem.confidenceLabel}</span>
@@ -63,6 +69,7 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             <div className="mt-2 rounded-lg bg-ink-950/60 p-2">
               {shownItem.lowEvidence && <p className="mb-1 text-[11px] text-amber-200">Este título se sumó con una búsqueda en TMDB para tus filtros y tu historial casi no tiene información sobre algo parecido: la estimación es de baja confianza y se apoya en datos públicos.</p>}
               <ChannelBars channels={shownItem.channels} base={shownItem.base} score={shownItem.score} />
+              <div className="mt-2 flex flex-wrap items-center gap-2"><TrailerButton k={item.key} originalLanguage={meta.originalLanguage} compact /></div>
             </div>
           )}
         </div>
@@ -122,14 +129,20 @@ export function filterByWatched<T extends { key: TitleKey }>(rows: T[], ratings:
   return rows.filter((r) => sticky.has(r.key) || (filter === 'watched') === Boolean(ratings.get(r.key)?.watched));
 }
 
-export type HomeSort = 'affinity' | 'public' | 'year' | 'title';
-const HOME_SORTS: [HomeSort, string][] = [['affinity', 'Para vos'], ['public', 'Público (TMDB)'], ['year', 'Año'], ['title', 'Título']];
+export type HomeSort = 'recommended' | 'affinity' | 'public' | 'year' | 'title';
+const HOME_SORTS: [HomeSort, string][] = [['recommended', 'Recomendado'], ['affinity', 'Para vos (estricto)'], ['public', 'Público (TMDB)'], ['year', 'Año'], ['title', 'Título']];
 export const PAGE_SIZE = 10;
 
-/** Orden de la lista visible. «Para vos» respeta el ranking (afinidad + diversidad); los demás reordenan la misma lista. */
+/**
+ * Orden de la lista visible (v3.1). Se ordena la lista COMPLETA antes de paginar, así «Ver más» nunca rompe el orden.
+ * - «Recomendado»: el orden del motor (afinidad + variedad + exploración).
+ * - «Para vos (estricto)»: por la puntuación personalizada mostrada, sin diversificación posterior. Se compara el valor
+ *   interno; como el redondeo a un decimal es monótono, los valores mostrados quedan siempre en orden no creciente.
+ * - Los demás: por el dato elegido; los títulos sin dato van al final; empates por el orden del motor.
+ */
 export function sortRows<T extends { key: TitleKey; item: RecommendationItem; meta?: TitleMeta }>(rows: T[], sort: HomeSort, dir: 'asc' | 'desc'): T[] {
-  if (sort === 'affinity') return dir === 'desc' ? rows : [...rows].reverse();
-  const val = (r: T): number | string | undefined => sort === 'public' ? publicScore(r.meta) : sort === 'year' ? r.meta?.year : r.meta?.title;
+  if (sort === 'recommended') return dir === 'desc' ? rows : [...rows].reverse();
+  const val = (r: T): number | string | undefined => sort === 'affinity' ? (personalState(r.item).kind === 'insufficient' ? undefined : r.item.score) : sort === 'public' ? publicScore(r.meta) : sort === 'year' ? r.meta?.year : r.meta?.title;
   const sign = dir === 'desc' ? -1 : 1;
   return [...rows].sort((a, b) => {
     const x = val(a), y = val(b);
@@ -144,10 +157,11 @@ export function sortRows<T extends { key: TitleKey; item: RecommendationItem; me
 
 export default function Home() {
   const { profileId, settings } = useApp();
-  const [sort, setSortRaw] = usePersistentState<HomeSort>(`cine-match:home-sort:${profileId}`, 'affinity', oneOf(HOME_SORTS.map(([v]) => v)));
+  const [sort, setSortRaw] = usePersistentState<HomeSort>(`cine-match:home-sort:${profileId}`, 'recommended', oneOf(HOME_SORTS.map(([v]) => v)));
   const [dir, setDir] = usePersistentState<'asc' | 'desc'>(`cine-match:home-dir:${profileId}`, 'desc', oneOf(['asc', 'desc'] as const));
+  const [listReady, setListReady] = useState(false);
+  const { page, setPage } = useScrollRestore('home', listReady);
   const setSort = (v: HomeSort) => { setSortRaw(v); setDir(v === 'title' ? 'asc' : 'desc'); setPage(1); };
-  const [page, setPage] = useState(1);
   const { run: latest, busy, error, refresh } = useRecommendations(profileId);
   const [filters, setFiltersState] = useState<RankFilters>(() => loadFilters(profileId));
   const setFilters = (f: RankFilters) => { setFiltersState(f); saveFilters(profileId, f); setTouched(new Set()); setPage(1); };
@@ -215,7 +229,8 @@ export default function Home() {
   }, [items, titles, snaps, filters.watched, ratings, touched, advanced, sort, dir]);
   // Paginación: 10 al principio y de a 10 con «Ver más» (nunca cientos de tarjetas a la vez)
   const pageRows = rows.slice(0, page * PAGE_SIZE);
-  const featured = !advanced && filters.watched === 'unwatched' && sort === 'affinity' && dir === 'desc' ? rows.filter((r) => !touched.has(r.key) && (r.meta?.backdropPath || r.meta?.posterPath)).slice(0, 3) : [];
+  useEffect(() => { if (rows.length && titles && snaps) setListReady(true); }, [rows.length, Boolean(titles), Boolean(snaps)]);
+  const featured = !advanced && filters.watched === 'unwatched' && sort === 'recommended' && dir === 'desc' ? rows.filter((r) => !touched.has(r.key) && (r.meta?.backdropPath || r.meta?.posterPath)).slice(0, 3) : [];
   const trackSave = (p: Promise<unknown>) => {
     setSaving((n) => n + 1);
     p.catch(() => undefined).finally(() => setSaving((n) => n - 1));
@@ -229,7 +244,7 @@ export default function Home() {
   };
   const onSearchMore = async () => {
     setApplyNext(true);
-    await refresh({ trigger: 'filtros', discover: { types: filters.types, genres: filters.includeGenres, excludeGenres: filters.excludeGenres, yearMin: filters.yearMin, yearMax: filters.yearMax, platforms: filters.platforms, runtimeMin: filters.runtimeMin, runtimeMax: filters.runtimeMax } });
+    await refresh({ trigger: 'filtros', discover: hintsFromFilters(filters) });
   };
   const editingMeta = editing?.mode === 'aspects' ? rows.find((r) => r.key === editing.key)?.meta : undefined;
   const genreName = (id: number) => genres.find((g) => g.id === id)?.name ?? `género ${id}`;
@@ -266,21 +281,21 @@ export default function Home() {
         <Chip active={quickPlatform === 'all' && !filters.platforms.length} onClick={() => setFilters({ ...filters, platforms: [] })}>Todas</Chip>
         {PLATFORMS.filter((p) => settings.platforms.includes(p.id)).map((p) => <Chip key={p.id} testId={`filter-${p.id}`} active={quickPlatform === p.id} onClick={() => setFilters({ ...filters, platforms: quickPlatform === p.id ? [] : [p.id] })}>{p.label}</Chip>)}
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Chip active={quickType === 'all'} onClick={() => setFilters({ ...filters, types: [] })}>Todo</Chip>
         <Chip active={quickType === 'movie'} onClick={() => setFilters({ ...filters, types: ['movie'] })} testId="filter-movie">Películas</Chip>
         <Chip active={quickType === 'tv'} onClick={() => setFilters({ ...filters, types: ['tv'] })} testId="filter-tv">Series</Chip>
         <Link to="/pendientes" className="ml-auto shrink-0 rounded-full bg-ink-800 px-3 py-1.5 text-sm text-slate-300 ring-1 ring-white/10">Pendientes ({pendingCount})</Link>
       </div>
       <FilterPanel value={filters} onChange={setFilters} genres={genres} userPlatforms={settings.platforms} onSearchMore={advanced ? onSearchMore : undefined} searching={busy} language={settings.language} />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <label className="text-xs text-slate-400" htmlFor="home-sort">Ordenar por</label>
-        <select id="home-sort" value={sort} onChange={(e) => setSort(e.target.value as HomeSort)} data-testid="home-sort" className="rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10">
+        <select id="home-sort" value={sort} onChange={(e) => setSort(e.target.value as HomeSort)} data-testid="home-sort" className="min-w-0 max-w-[55vw] rounded-lg bg-ink-800 p-1.5 text-sm ring-1 ring-white/10">
           {HOME_SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <button type="button" data-testid="home-dir" onClick={() => { setDir(dir === 'asc' ? 'desc' : 'asc'); setPage(1); }} className="rounded-lg bg-ink-800 px-2 py-1.5 text-xs ring-1 ring-white/10"
           aria-label="Invertir el orden">{sort === 'title' ? (dir === 'asc' ? 'A→Z' : 'Z→A') : dir === 'desc' ? '↓ Mayor' : '↑ Menor'}</button>
-        {(sort !== 'affinity' || dir !== 'desc') && <button type="button" data-testid="home-sort-reset" onClick={() => setSort('affinity')} className="text-[11px] text-accent underline">Restablecer</button>}
+        {(sort !== 'recommended' || dir !== 'desc') && <button type="button" data-testid="home-sort-reset" onClick={() => setSort('recommended')} className="text-[11px] text-accent underline">Restablecer</button>}
       </div>
       {advanced && (
         <div className="flex flex-wrap gap-1.5" data-testid="active-filters">
@@ -336,7 +351,7 @@ export default function Home() {
       )}
       <ol className="space-y-3" aria-label="Ranking personalizado">
         {pageRows.map((r) => (
-          <RecCard key={r.key} item={r.item} live={liveItems.get(r.key)} meta={r.meta!} snap={r.snap} rating={ratings.get(r.key)} profileId={profileId}
+          <RecCard key={r.key} strictScore={sort === 'affinity'} item={r.item} live={liveItems.get(r.key)} meta={r.meta!} snap={r.snap} rating={ratings.get(r.key)} profileId={profileId}
             editing={editing?.key === r.key ? editing : undefined}
             onEdit={setEditing} onSave={trackSave}
             onTouch={(k) => setTouched((s) => (s.has(k) ? s : new Set(s).add(k)))} />

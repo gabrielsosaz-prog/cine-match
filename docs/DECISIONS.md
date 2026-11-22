@@ -23,3 +23,8 @@
 - **v3.0: similitud de sinopsis léxica.** Local y gratuita; se declara que no es semántica. Embeddings: postergados (costo/peso).
 - **v3.0: sin FilmAffinity.** No tiene API pública; sólo se muestra la nota de TMDB.
 - **v3.0: actores con tope.** Sus filmografías entran como candidatos, pero nunca más de 2 títulos del mismo actor en el top 10.
+- **v3.1: vectores semánticos precalculados, no en el teléfono ni en un servicio pago.** Un modelo de embeddings abierto (`bge-small-en-v1.5`) corre en GitHub Actions sobre textos públicos (TMDB + Wikipedia). Alternativas descartadas: API de LLM/embeddings (requiere credenciales y pago, y no se activa sin autorización), modelo en el dispositivo (descarga de ~35 MB y CPU en Android), análisis sólo léxico (no es comprensión semántica).
+- **v3.1: sin representación generada por un LLM.** Los rasgos salen de palabras clave de TMDB y de inferencia semántica con prototipos (marcada «inferido»). Un LLM daría premisas y conflictos más ricos, pero requiere un servicio externo autorizado.
+- **v3.1: similitud absoluta.** v3.0 dividía por el mejor candidato, así el primero siempre era 100 %. Ahora 100 % es sólo identidad y la rareza (IDF) se calcula sobre todo el catálogo, no sobre los candidatos.
+- **v3.1: «Recomendado» y «Para vos (estricto)» separados.** El orden del motor incluye diversidad y exploración; quien elige ordenar por «Para vos» recibe un orden global estricto por el valor mostrado.
+- **v3.1: el catálogo no se precachea.** Se descarga al usarlo y queda en caché por versión; si falla, la app sigue con rasgos y palabras clave y lo dice.

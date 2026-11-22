@@ -1,6 +1,6 @@
 {
-  "algorithmVersion": "hybrid-channels-3.0.0",
-  "generatedAt": "2026-11-22T14:09:17.044Z",
+  "algorithmVersion": "hybrid-narrative-3.1.0",
+  "generatedAt": "2026-11-22T19:13:45.187Z",
   "dataset": "sintético: 200 títulos, 4 perfiles × 5 semillas, 30 valoraciones de entrenamiento c/u",
   "aviso": "Datos sintéticos: no demuestran precisión con usuarios reales.",
   "resumen": {
@@ -10,9 +10,9 @@
       "cobertura": 0.525
     },
     "motorPesosAprendidos": {
-      "NDCG@10": 0.784,
-      "Recall@10": 0.9,
-      "cobertura": 0.52
+      "NDCG@10": 0.781,
+      "Recall@10": 0.885,
+      "cobertura": 0.525
     },
     "popularidad": {
       "NDCG@10": 0.207,

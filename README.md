@@ -61,6 +61,24 @@ Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se 
 - **Filtros avanzados** combinables (tipo, géneros incluidos/excluidos, años, plataformas, vistos, duración, afinidad mínima), con indicador, «Limpiar filtros» y «Restablecer generales». Se aplican al conjunto de candidatos antes de ordenar; si no hay resultados se indica qué filtro restringe y se puede buscar más en TMDB con esos filtros.
 - **Porcentaje de aspectos completados** (aspectos / 7 × 100) en Valoraciones, con filtros, orden y acceso directo a los faltantes.
 
+### Novedades v3.1 (`hybrid-narrative-3.1.0`)
+
+**Similares con análisis narrativo real**
+- **Catálogo narrativo** precalculado (≈ 6.500 películas y series populares o muy votadas): sinopsis de TMDB en inglés + sección de argumento/premisa de **Wikipedia en inglés** (CC BY-SA) → **vectores semánticos reales** con el modelo abierto `bge-small-en-v1.5` (384 dimensiones, int8). Se calcula **fuera del teléfono**, en GitHub Actions, con textos públicos; la app sólo descarga el resultado (~1 MB comprimido + 2,5 MB de vectores, en caché, sin bloquear el arranque ni el guardado). **No se envía ningún dato personal a terceros** y no hay servicios pagos. El texto de Wikipedia no se distribuye.
+- **Rasgos narrativos** con procedencia y confianza (taxonomía de ~45 rasgos: premisa, conflicto, temas, relaciones, poder, secretos, motivaciones, tono, ritmo, complejidad, tipo de misterio, humor, intensidad, estructura, ambientación): «palabras clave de TMDB» (exactas) o «inferido del argumento» (similitud semántica con descripciones prototipo, sólo si supera un umbral estadístico). Si no hay datos, el rasgo queda **desconocido**, no se inventa.
+- **Similitud absoluta**, no relativa al mejor: argumento (45 %), rasgos (25 %), temáticas específicas ponderadas por rareza en todo el catálogo (18 %), creación/guion (7 %), género (5 %). Lugares, épocas y etiquetas genéricas («basada en un libro», «antología», «thriller») casi no pesan y se muestran como «no justifican el parecido». **100 % = el mismo título**; el resto llega como máximo a 99 %. La **confianza** (alta/media/baja) es aparte y mide cuánta evidencia hay, no la probabilidad de acierto.
+- **1 a 5 referencias**, modos **«En común»** (predeterminado: parecido a todas, núcleo compartido) y **«Combinar»** (mezcla rasgos de distintas referencias), **importancia por referencia** (Menos/Normal/Más; iguales por defecto). Una referencia con muy pocos datos pesa menos en «En común». Se muestran lo que comparten, lo propio de cada una, las diferencias y el parecido con cada referencia.
+- Recuperación en dos etapas (todo el catálogo + relacionados y descubrimiento de TMDB → reordenamiento fino), con variedad por saga sin romper el orden estricto «Similitud».
+- El canal «Similitud» de «Para vos» usa los mismos vectores (canal «Narrativa»).
+
+**Otras mejoras**
+- **Orden estricto «Para vos»** en Inicio, también después de «Ver más» (el orden «Recomendado» conserva la variedad del motor y es el predeterminado). Se muestra el mismo valor con que se ordenó; los títulos con «info insuficiente» van al final.
+- **Volver sin perder el lugar**: al volver con «Atrás» (incluido el botón Atrás de Android) se recuperan posición, cantidad cargada, filtros, orden, búsqueda y referencias de Similares. Al entrar desde el menú o hacer una búsqueda nueva se empieza arriba.
+- **Ver tráiler** con el reproductor oficial (YouTube sin cookies / Vimeo) dentro de la app: prioridad audio en español → subtítulos en español (sólo si TMDB lo indica) → idioma original → otro video oficial. Se cierra con ✕, tocando fuera, Escape o Atrás.
+- **Filtros por país** (incluir/excluir, buscador por nombre): país de origen ∪ países de producción de TMDB (no idioma ni nacionalidad del reparto). Coproducciones: incluir = alcanza con uno; excluir = se excluye si figura alguno. Sin datos de país: no pasa un filtro de inclusión y sí uno de exclusión.
+- **Paramount+** (TMDB 531, verificado en Argentina) en Ajustes, filtros y disponibilidad; no se confunde con canales de Paramount.
+- **Búsqueda unificada**: títulos y personas (actuación, dirección, guion) con foto, profesión y **filmografía** filtrable (rol, tipo, género, año, mis plataformas) y ordenable (Para vos, Público, recientes). Tolera tildes y variantes; un texto que es un título no se toma como persona.
+
 ### Novedades v3.0
 
 **Correcciones críticas**

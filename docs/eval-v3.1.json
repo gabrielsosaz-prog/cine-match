@@ -1,0 +1,671 @@
+{
+  "catalog": "2026-11-22",
+  "model": "Xenova/bge-small-en-v1.5",
+  "titles": 6558,
+  "embedded": 6551,
+  "overviewsForV30": 6558,
+  "triples": [
+    {
+      "id": "mismo-genero-1",
+      "kind": "Mismo género, historias muy diferentes",
+      "v30": {
+        "posRank": 12,
+        "posBeatsNeg": true,
+        "pos": 0.0806060593285078,
+        "neg": 0.001484103575294472,
+        "top": [
+          "Milagro en la Celda 7 - El Equivoco 15",
+          "El gran Gatsby 15",
+          "Milagro en la Celda 7 13",
+          "Fuga en Dannemora 12",
+          "Prison Break 10"
+        ]
+      },
+      "v31": {
+        "posRank": 6,
+        "posBeatsNeg": true,
+        "pos": 39,
+        "neg": 15,
+        "confidence": "media",
+        "top": [
+          "Érase una vez en América 44",
+          "La hora 25 44",
+          "Imperdonable 41",
+          "Prison Playbook 40",
+          "Memorias de un Asesino 40"
+        ]
+      },
+      "ms": {
+        "v30": 581,
+        "v31": 149
+      }
+    },
+    {
+      "id": "mismo-genero-2",
+      "kind": "Mismo género, historias muy diferentes",
+      "v30": {
+        "posRank": 17,
+        "posBeatsNeg": true,
+        "pos": 0.08568125195081365,
+        "neg": 0.02099664333438984,
+        "top": [
+          "Poseídos 15",
+          "Insomnia 13",
+          "El club de la pelea 13",
+          "Batman 12",
+          "Más Allá del Mal 12"
+        ]
+      },
+      "v31": {
+        "posRank": 354,
+        "posBeatsNeg": false,
+        "pos": 34,
+        "neg": 46,
+        "confidence": "alta",
+        "top": [
+          "Insomnia 57",
+          "En la mente del asesino 55",
+          "La paradoja del asesino 53",
+          "Las cintas de Poughkeepsie 53",
+          "Memorias de un Asesino 53"
+        ]
+      },
+      "ms": {
+        "v30": 617,
+        "v31": 161
+      }
+    },
+    {
+      "id": "distinto-genero-1",
+      "kind": "Distinto género, conflictos parecidos",
+      "v30": {
+        "posRank": 3950,
+        "posBeatsNeg": false,
+        "pos": 0.0006432680744693197,
+        "neg": 0.07611656579612787,
+        "top": [
+          "Memorias de un Asesino 12",
+          "A Todos Los Chicos Para Siempre 12",
+          "Guasón 11",
+          "Tatsuki Fujimoto 17-26 11",
+          "Trust 10"
+        ]
+      },
+      "v31": {
+        "posRank": 2298,
+        "posBeatsNeg": false,
+        "pos": 21,
+        "neg": 35,
+        "confidence": "alta",
+        "top": [
+          "Vincenzo 51",
+          "Un amor posible 49",
+          "Burning 49",
+          "¡Huye! 49",
+          "Jugada Maestra 49"
+        ]
+      },
+      "ms": {
+        "v30": 447,
+        "v31": 121
+      }
+    },
+    {
+      "id": "distinto-genero-2",
+      "kind": "Distinto género, conflictos parecidos",
+      "v30": {
+        "posRank": 109,
+        "posBeatsNeg": false,
+        "pos": 0.05262750113030432,
+        "neg": 0.12005762888713474,
+        "top": [
+          "Glass Onion: Un misterio de Knives Out 23",
+          "Wake Up Dead Man: Un misterio de Knives Out 19",
+          "Mira como corren 15",
+          "La residencia 14",
+          "Looper: Asesinos del futuro 13"
+        ]
+      },
+      "v31": {
+        "posRank": 2887,
+        "posBeatsNeg": false,
+        "pos": 17,
+        "neg": 36,
+        "confidence": "media",
+        "top": [
+          "Wake Up Dead Man: Un misterio de Knives Out 63",
+          "El club del crimen de los jueves 60",
+          "La casa torcida 58",
+          "Maligno 56",
+          "El halcón maltés 56"
+        ]
+      },
+      "ms": {
+        "v30": 584,
+        "v31": 95
+      }
+    },
+    {
+      "id": "lugar-1",
+      "kind": "Misma localización, narrativas diferentes",
+      "v30": {
+        "posRank": 10,
+        "posBeatsNeg": true,
+        "pos": 0.09192155939932224,
+        "neg": 0.040195880190841554,
+        "top": [
+          "El Padrino II 34",
+          "El Padrino III 29",
+          "El irlandés 16",
+          "Inferno 12",
+          "복수가 돌아왔다 11"
+        ]
+      },
+      "v31": {
+        "posRank": 5,
+        "posBeatsNeg": true,
+        "pos": 48,
+        "neg": 27,
+        "confidence": "media",
+        "top": [
+          "El Padrino II 62",
+          "El Padrino III 59",
+          "El Perfecto Asesino 58",
+          "Los Santos De La Mafia 52",
+          "Buenos Muchachos 48"
+        ]
+      },
+      "ms": {
+        "v30": 475,
+        "v31": 126
+      }
+    },
+    {
+      "id": "lugar-2",
+      "skipped": "fuera del catálogo"
+    },
+    {
+      "id": "adaptacion-1",
+      "kind": "Adaptaciones literarias sin similitud narrativa",
+      "v30": {
+        "posRank": 7,
+        "posBeatsNeg": true,
+        "pos": 0.09150287975030526,
+        "neg": 0.006080052448152214,
+        "top": [
+          "Orgullo y prejuicio 28",
+          "Orgullo, Prejuicio y Zombies 24",
+          "La reina Charlotte: Una historia de Bridgerton 14",
+          "Emma. 13",
+          "El misterio de los excavadores 11"
+        ]
+      },
+      "v31": {
+        "posRank": 47,
+        "posBeatsNeg": true,
+        "pos": 35,
+        "neg": 12,
+        "confidence": "media",
+        "top": [
+          "Sensatez y sentimientos 57",
+          "Orgullo, Prejuicio y Zombies 56",
+          "Orgullo y prejuicio 55",
+          "Emma. 54",
+          "El amante de Lady Chatterley (Lady Chatterley’s Lover) 46"
+        ]
+      },
+      "ms": {
+        "v30": 562,
+        "v31": 94
+      }
+    },
+    {
+      "id": "adaptacion-2",
+      "kind": "Adaptaciones literarias sin similitud narrativa",
+      "v30": {
+        "posRank": 1353,
+        "posBeatsNeg": true,
+        "pos": 0.004654110310501072,
+        "neg": 0.004600076821564524,
+        "top": [
+          "Te veo 11",
+          "Búsqueda frenética 11",
+          "The Leftovers 11",
+          "Misterios sin resolver 10",
+          "La chica del tren 9"
+        ]
+      },
+      "v31": {
+        "posRank": 4090,
+        "posBeatsNeg": true,
+        "pos": 7,
+        "neg": 3,
+        "confidence": "media",
+        "top": [
+          "La chica del tren 62",
+          "Buscando... 57",
+          "Un crimen de pasión 51",
+          "El Sexto Sentido 51",
+          "Un pequeño favor 50"
+        ]
+      },
+      "ms": {
+        "v30": 436,
+        "v31": 77
+      }
+    },
+    {
+      "id": "lexico-1",
+      "kind": "Coincidencias léxicas engañosas",
+      "v30": {
+        "posRank": 22,
+        "posBeatsNeg": true,
+        "pos": 0.09075552730949009,
+        "neg": 0,
+        "top": [
+          "Life: Vida inteligente 24",
+          "Mission Force One 18",
+          "El astronauta 17",
+          "2001: Odisea del Espacio 16",
+          "Si las estrellas hablaran 16"
+        ]
+      },
+      "v31": {
+        "posRank": 10,
+        "posBeatsNeg": true,
+        "pos": 54,
+        "neg": 8,
+        "confidence": "media",
+        "top": [
+          "La Astronauta 59",
+          "Armageddon 58",
+          "Interestelar 56",
+          "Misión a Marte 55",
+          "La Paradoja Cloverfield 55"
+        ]
+      },
+      "ms": {
+        "v30": 504,
+        "v31": 102
+      }
+    },
+    {
+      "id": "lexico-2",
+      "kind": "Coincidencias léxicas engañosas",
+      "v30": {
+        "posRank": 127,
+        "posBeatsNeg": true,
+        "pos": 0.04884568301282865,
+        "neg": 0.011985318909623422,
+        "top": [
+          "Ladrón 16",
+          "Ladrones Con Clase 13",
+          "Jackie Brown 13",
+          "Colisión 12",
+          "Los sospechosos de siempre 12"
+        ]
+      },
+      "v31": {
+        "posRank": 6,
+        "posBeatsNeg": true,
+        "pos": 49,
+        "neg": 32,
+        "confidence": "media",
+        "top": [
+          "Pacto siniestro 52",
+          "Ladrón 51",
+          "Los sospechosos de siempre 49",
+          "Caminos del crimen 49",
+          "La Estafa Maestra 49"
+        ]
+      },
+      "ms": {
+        "v30": 626,
+        "v31": 104
+      }
+    },
+    {
+      "id": "lexico-3",
+      "kind": "Coincidencias léxicas engañosas",
+      "v30": {
+        "posRank": 179,
+        "posBeatsNeg": false,
+        "pos": 0.038810876387747106,
+        "neg": 0.05366582155562075,
+        "top": [
+          "Alien: Covenant 20",
+          "Dark Matter 20",
+          "Alien vs. Depredador 18",
+          "Viaje a las estrellas: La nueva generación 18",
+          "El Planeta De Los Simios 17"
+        ]
+      },
+      "v31": {
+        "posRank": 2221,
+        "posBeatsNeg": false,
+        "pos": 22,
+        "neg": 56,
+        "confidence": "baja",
+        "top": [
+          "Alien³ 72",
+          "Alien: Covenant 72",
+          "Alien: La resurrección 69",
+          "Prometeo 69",
+          "Alien vs. Depredador 69"
+        ]
+      },
+      "ms": {
+        "v30": 443,
+        "v31": 50
+      }
+    },
+    {
+      "id": "tono-1",
+      "kind": "Títulos con características contradictorias (tono)",
+      "v30": {
+        "posRank": 145,
+        "posBeatsNeg": false,
+        "pos": 0.03659668800212687,
+        "neg": 0.050440851470373735,
+        "top": [
+          "Fargo 23",
+          "En el juego del asesino 13",
+          "Animaniacs 11",
+          "Educando a Arizona 11",
+          "Abigail 11"
+        ]
+      },
+      "v31": {
+        "posRank": 35,
+        "posBeatsNeg": true,
+        "pos": 42,
+        "neg": 35,
+        "confidence": "alta",
+        "top": [
+          "El Transportador 2 51",
+          "La última parada de Arizona 51",
+          "Educando a Arizona 48",
+          "Quiero matar a mi jefe 2 48",
+          "Amistad Toxica 48"
+        ]
+      },
+      "ms": {
+        "v30": 411,
+        "v31": 108
+      }
+    },
+    {
+      "id": "multi-comun-1",
+      "kind": "Varias referencias con coincidencias temáticas",
+      "v30": {
+        "posRank": 6,
+        "posBeatsNeg": true,
+        "pos": 0.13125129809944042,
+        "neg": 0.11660060359916735,
+        "top": [
+          "Wake Up Dead Man: Un misterio de Knives Out 23",
+          "Mira como corren 18",
+          "La residencia 17",
+          "La casa torcida 15",
+          "Looper: Asesinos del futuro 13"
+        ]
+      },
+      "v31": {
+        "posRank": 3,
+        "posBeatsNeg": true,
+        "pos": 66,
+        "neg": 54,
+        "confidence": "alta",
+        "top": [
+          "La casa torcida 67",
+          "Wake Up Dead Man: Un misterio de Knives Out 66",
+          "Asesinato en el Expreso de Oriente 66",
+          "Cacería en Venecia 63",
+          "Scream 6 62"
+        ]
+      },
+      "ms": {
+        "v30": 455,
+        "v31": 117
+      }
+    },
+    {
+      "id": "multi-tonos-1",
+      "kind": "Varias referencias con tonos diferentes",
+      "v30": {
+        "posRank": 828,
+        "posBeatsNeg": false,
+        "pos": 0.011566364450044431,
+        "neg": 0.013369121845298143,
+        "top": [
+          "El Camino: Una película de Breaking Bad 35",
+          "Better Call Saul 26",
+          "La Oficina 22",
+          "El Chapo 14",
+          "Narcos 13"
+        ]
+      },
+      "v31": {
+        "posRank": 8,
+        "posBeatsNeg": true,
+        "pos": 26,
+        "neg": 4,
+        "confidence": "media",
+        "top": [
+          "Better Call Saul 36",
+          "El Camino: Una película de Breaking Bad 30",
+          "La Oficina 30",
+          "Superstore 29",
+          "La sustancia 27"
+        ]
+      },
+      "ms": {
+        "v30": 488,
+        "v31": 114
+      }
+    },
+    {
+      "id": "multi-comun-2",
+      "kind": "Varias referencias con coincidencias temáticas",
+      "v30": {
+        "posRank": 1031,
+        "posBeatsNeg": true,
+        "pos": 0.008636914148129839,
+        "neg": 0,
+        "top": [
+          "Chef's Table 13",
+          "The Chef Show 12",
+          "El Oso 11",
+          "Anthony Bourdain: Lo desconocido 10",
+          "Pesadilla en la cocina EE.UU 10"
+        ]
+      },
+      "v31": {
+        "posRank": 2184,
+        "posBeatsNeg": true,
+        "pos": 27,
+        "neg": 6,
+        "confidence": "alta",
+        "top": [
+          "¡Huye! 71",
+          "Lo que hay dentro 69",
+          "Beau tiene miedo 67",
+          "Jugada Maestra 65",
+          "Los Roses 64"
+        ]
+      },
+      "ms": {
+        "v30": 572,
+        "v31": 141
+      }
+    },
+    {
+      "id": "secuela-1",
+      "kind": "Secuelas frente a obras independientes",
+      "v30": {
+        "posRank": 49,
+        "posBeatsNeg": false,
+        "pos": 0.08175709766977222,
+        "neg": 0.10535984061947293,
+        "top": [
+          "Batman inicia 35",
+          "Batman: El caballero de la noche asciende 32",
+          "Batman 19",
+          "Batman 18",
+          "Batman regresa 18"
+        ]
+      },
+      "v31": {
+        "posRank": 3271,
+        "posBeatsNeg": false,
+        "pos": 7,
+        "neg": 48,
+        "confidence": "media",
+        "top": [
+          "Batman: El caballero de la noche asciende 78",
+          "Batman inicia 76",
+          "Batman 72",
+          "Batman 71",
+          "Batman & Robin 67"
+        ]
+      },
+      "ms": {
+        "v30": 415,
+        "v31": 69
+      }
+    }
+  ],
+  "sequel": [
+    {
+      "id": "saga-hp",
+      "v30SameSagaTop10": 7,
+      "v31SameSagaTop10Raw": 7
+    },
+    {
+      "id": "saga-bttf",
+      "v30SameSagaTop10": 2,
+      "v31SameSagaTop10Raw": 2
+    }
+  ],
+  "diagnostic": {
+    "profileCore": [
+      "secrets [2]",
+      "secretos y mentiras que salen a la luz [2]"
+    ],
+    "contrasts": [
+      "conflicto de clases: ricos frente a quienes los sirven",
+      "sátira de los ricos y su hipocresía",
+      "misterio de «quién lo hizo» con varios sospechosos",
+      "grupo cerrado en un lugar aislado donde crece la sospecha",
+      "humor negro y mordaz",
+      "secretos y mentiras que salen a la luz"
+    ],
+    "common": {
+      "top15": [
+        "¡Madre! 36% (13/30/23)",
+        "Hasta que la camiseta se seque 30% (9/17/26)",
+        "El Complejo De Apartamentos 29% (4/19/16)",
+        "Recién casados 27% (7/12/22)",
+        "La Empleada 27% (8/13/21)",
+        "Enamorándome de mi ex 25% (3/15/22)",
+        "La apariencia de las cosas 24% (0/18/24)",
+        "Los Voyeristas 24% (0/14/18)",
+        "Se7en: Los Siete Pecados Capitales 24% (6/12/15)",
+        "Ni en tu casa ni en la mía 24% (14/4/14)",
+        "El velo 23% (5/14/13)",
+        "Aniversario 23% (4/11/15)",
+        "Light Shop: Entre la vida y la muerte 23% (11/11/13)",
+        "Asesinato en primera persona 23% (3/25/14)",
+        "Tony 23% (8/15/11)"
+      ],
+      "reported": [
+        "Perfil falso: puesto 3458 · 6%",
+        "American Horror Story: puesto 1327 · 10%",
+        "La novia: puesto 200 · 16%",
+        "56 días: puesto 3358 · 6%",
+        "El cuerpo en llamas: puesto 426 · 14%",
+        "Love Story: puesto 3156 · 6%"
+      ]
+    },
+    "combine": {
+      "top15": [
+        "¡Madre! 22% (13/30/23)",
+        "Dirty Linen 16% (4/17/26)",
+        "Hasta que la camiseta se seque 16% (9/17/26)",
+        "La apariencia de las cosas 16% (0/18/24)",
+        "Nueve perfectos desconocidos 15% (27/2/10)",
+        "Asesinato en primera persona 15% (3/25/14)",
+        "La huésped 14% (1/18/21)",
+        "Enamorándome de mi ex 14% (3/15/22)",
+        "No Confies En Nadie 14% (2/23/13)",
+        "Deseo 14% (10/2/24)",
+        "Beauty in Black 13% (2/5/26)",
+        "Recién casados 13% (7/12/22)",
+        "Vigilante 13% (4/14/21)",
+        "La Empleada 13% (8/13/21)",
+        "Revelaciones 13% (2/18/18)"
+      ],
+      "reported": [
+        "Perfil falso: puesto 1232 · 3%",
+        "American Horror Story: puesto 400 · 5%",
+        "La novia: puesto 401 · 5%",
+        "56 días: puesto 1717 · 2%",
+        "El cuerpo en llamas: puesto 515 · 5%",
+        "Love Story: puesto 1150 · 3%"
+      ]
+    },
+    "v30": {
+      "top15": [
+        "El Arma del Engaño 100% (relativo al mejor, como mostraba v3.0)",
+        "El Gatopardo 85% (relativo al mejor, como mostraba v3.0)",
+        "El Complejo De Apartamentos 80% (relativo al mejor, como mostraba v3.0)",
+        "El descanso 68% (relativo al mejor, como mostraba v3.0)",
+        "La Playa 65% (relativo al mejor, como mostraba v3.0)",
+        "Cinema Paradiso 64% (relativo al mejor, como mostraba v3.0)",
+        "¿Cómo Sobrevivir A Mi Ex? 63% (relativo al mejor, como mostraba v3.0)",
+        "La residencia 58% (relativo al mejor, como mostraba v3.0)",
+        "Dark 57% (relativo al mejor, como mostraba v3.0)",
+        "LEGO Pixar: Animaventuras 55% (relativo al mejor, como mostraba v3.0)",
+        "007: El hombre del revólver de oro 54% (relativo al mejor, como mostraba v3.0)",
+        "Asesinato para principiantes 54% (relativo al mejor, como mostraba v3.0)",
+        "Kill Blue 53% (relativo al mejor, como mostraba v3.0)",
+        "Gente que conocemos en vacaciones 52% (relativo al mejor, como mostraba v3.0)",
+        "La Langosta 52% (relativo al mejor, como mostraba v3.0)"
+      ],
+      "reported": [
+        "Perfil falso: puesto 55 · 36%",
+        "American Horror Story: puesto 65 · 34%",
+        "La novia: puesto 389 · 16%",
+        "56 días: puesto 97 · 30%",
+        "El cuerpo en llamas: puesto 173 · 25%",
+        "Love Story: puesto 95 · 31%"
+      ]
+    }
+  },
+  "perf": {},
+  "summary": {
+    "cases": 15,
+    "pairwiseAccuracy": {
+      "v30": 0.6,
+      "v31": 0.6666666666666666
+    },
+    "mrrPositive": {
+      "v30": 0.043349651799779516,
+      "v31": 0.07643862865684904
+    },
+    "accuracyByConfidenceV31": {
+      "media": {
+        "n": 9,
+        "ok": 7
+      },
+      "alta": {
+        "n": 5,
+        "ok": 3
+      },
+      "baja": {
+        "n": 1,
+        "ok": 0
+      }
+    }
+  }
+}

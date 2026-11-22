@@ -5,6 +5,8 @@
 html { scroll-padding-bottom: 6rem; scroll-padding-top: 1rem; }
 html, body { background: #0b0d12; color: #e5e7eb; -webkit-tap-highlight-color: transparent; }
 body { overscroll-behavior-y: contain; }
+/* Ningún contenido debe ensanchar la página en móviles (evita el zoom involuntario que desplaza la barra inferior) */
+html, body { overflow-x: clip; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

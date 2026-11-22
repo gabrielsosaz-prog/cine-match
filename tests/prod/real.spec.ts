@@ -44,7 +44,7 @@ test('producción: guardado, actores, filtros, notas y Similares con TMDB real',
   await page.goto('/');
   const v = await (await page.request.get('/version.json')).json();
   log(info.project.name, 'versión', JSON.stringify(v));
-  expect(v.version).toBe('3.0.0');
+  expect(v.version).toBe('3.1.0');
   // Incorporación mínima: plataformas por defecto y saltear
   await expect(page.getByText('Paso 1 de 3')).toBeVisible();
   for (const p of ['netflix', 'prime', 'disney', 'max']) { const c = page.getByTestId(`ob-${p}`); if ((await c.getAttribute('aria-pressed')) === 'false') await c.click(); }

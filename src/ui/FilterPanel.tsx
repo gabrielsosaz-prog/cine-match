@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { allCountries, countryName } from '../services/filters';
+import { useEffect, useMemo, useState } from 'react';
 import { PLATFORMS } from '../constants';
 import { DEFAULT_FILTERS, activeCount, type RankFilters } from '../services/filters';
 import { searchPeople, type PersonHit } from '../services/catalog';
@@ -85,6 +86,7 @@ export default function FilterPanel({ value, onChange, genres, userPlatforms, on
             </div>
           </section>
           <PersonPicker value={f.person} language={language} onChange={(person) => onChange({ ...f, person })} />
+          <CountryPicker include={f.includeCountries ?? []} exclude={f.excludeCountries ?? []} onChange={(includeCountries, excludeCountries) => onChange({ ...f, includeCountries, excludeCountries })} />
           {!hideScore && <section>
             <h3 className="mb-1 text-xs font-semibold text-slate-400">«Para vos» mínimo</h3>
             <div className="flex gap-1.5">
@@ -190,6 +192,44 @@ export function PersonPicker({ value, onChange, language }: { value?: RankFilter
           </ul>
         </>
       )}
+    </section>
+  );
+}
+
+/**
+ * País de origen o producción (v3.1). Buscar por nombre; tocar «Incluir» o «Excluir».
+ * Regla: incluir = al menos uno de sus países está en la lista; excluir = se quita si cualquiera de sus países está
+ * (coproducciones incluidas). Sin país informado por TMDB: no pasa un «incluir» y no se quita por un «excluir».
+ */
+export function CountryPicker({ include, exclude, onChange }: { include: string[]; exclude: string[]; onChange: (inc: string[], exc: string[]) => void }) {
+  const [q, setQ] = useState('');
+  const all = useMemo(() => allCountries(), []);
+  const norm = (x: string) => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const hits = q.trim().length >= 2 ? all.filter((c) => norm(c.name).includes(norm(q.trim())) || c.code === q.trim().toUpperCase()).slice(0, 6) : [];
+  const chip = (code: string, kind: 'inc' | 'exc') => (
+    <span key={`${kind}${code}`} className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${kind === 'inc' ? 'bg-emerald-500/15 text-emerald-200' : 'bg-rose-500/15 text-rose-200'}`} data-testid={`country-${kind}`}>
+      {kind === 'inc' ? '' : 'sin '}{countryName(code)}
+      <button type="button" aria-label={`Quitar ${countryName(code)}`} onClick={() => onChange(include.filter((c) => !(kind === 'inc' && c === code)), exclude.filter((c) => !(kind === 'exc' && c === code)))}>✕</button>
+    </span>
+  );
+  return (
+    <section data-testid="country-filter">
+      <h3 className="mb-1 text-xs font-semibold text-slate-400">País de origen o producción</h3>
+      {(include.length > 0 || exclude.length > 0) && <div className="mb-1 flex flex-wrap gap-1">{include.map((c) => chip(c, 'inc'))}{exclude.map((c) => chip(c, 'exc'))}</div>}
+      <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar país (p. ej. México)" aria-label="Buscar país" data-testid="country-input"
+        className="w-full rounded-lg bg-ink-800 px-3 py-2 text-sm ring-1 ring-white/10" />
+      {hits.length > 0 && (
+        <ul className="mt-1 space-y-1">
+          {hits.map((c) => (
+            <li key={c.code} className="flex items-center gap-2 text-sm" data-testid="country-hit" data-code={c.code}>
+              <span className="flex-1">{c.name}</span>
+              <button type="button" data-testid="country-include" onClick={() => { onChange([...new Set([...include, c.code])], exclude.filter((x) => x !== c.code)); setQ(''); }} className="rounded bg-emerald-500/15 px-2 py-1 text-xs text-emerald-200">Incluir</button>
+              <button type="button" data-testid="country-exclude" onClick={() => { onChange(include.filter((x) => x !== c.code), [...new Set([...exclude, c.code])]); setQ(''); }} className="rounded bg-rose-500/15 px-2 py-1 text-xs text-rose-200">Excluir</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-1 text-[10px] text-slate-500">Se usan los países de origen y de producción de TMDB (no el idioma ni la nacionalidad del reparto). Excluir quita también las coproducciones; si TMDB no informa el país, el título se mantiene.</p>
     </section>
   );
 }

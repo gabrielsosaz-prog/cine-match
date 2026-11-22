@@ -44,9 +44,10 @@ await pages('movie', `watch_region=AR&with_watch_providers=${PROVIDERS}&sort_by=
 await pages('tv', `watch_region=AR&with_watch_providers=${PROVIDERS}&sort_by=popularity.desc&vote_count.gte=10&language=en-US`, 150, 'plataformas');
 await pages('movie', 'sort_by=vote_count.desc&language=en-US', 60, 'global');
 await pages('tv', 'sort_by=vote_count.desc&language=en-US', 40, 'global');
-for (const k of ['tv:111803', 'tv:325755', 'tv:336240', 'tv:227371', 'tv:253376', 'tv:241372', 'tv:229962', 'tv:131142', 'tv:1413']) if (!keys.has(k)) keys.set(k, 'caso');
+const CASES = ['tv:111803', 'tv:325755', 'tv:336240', 'tv:227371', 'tv:253376', 'tv:241372', 'tv:229962', 'tv:131142', 'tv:1413'];
+for (const k of CASES) if (!keys.has(k)) keys.set(k, 'caso');
 let list = [...keys.keys()];
-if (LIMIT) list = [...list.filter((k) => keys.get(k) === 'caso'), ...list.slice(0, LIMIT)];
+if (LIMIT) list = [...new Set([...CASES, ...list.slice(0, LIMIT)])];
 console.log('Títulos seleccionados:', list.length);
 
 // 2) Fichas TMDB
@@ -203,6 +204,8 @@ writeFileSync(join(OUT, 'catalog-meta.json'), JSON.stringify(meta));
 const buf = new Int8Array(meta.embedded * DIM);
 order.slice(0, meta.embedded).forEach((t, i) => { const v = vecs.get(t.key); for (let j = 0; j < DIM; j++) buf[i * DIM + j] = Math.max(-127, Math.min(127, Math.round(v[j] * 127))); });
 writeFileSync(join(OUT, 'catalog-emb.bin'), Buffer.from(buf.buffer));
+// Sólo para la evaluación comparativa con v3.0 (que usaba la sinopsis en español); no se publica en la app
+writeFileSync(join(OUT, 'eval-texts.json'), JSON.stringify(Object.fromEntries(order.map((t) => [t.key, t.overviewEs]))));
 
 // 8) Informe y casos diagnósticos
 const idx = new Map(order.map((t, i) => [t.key, i]));

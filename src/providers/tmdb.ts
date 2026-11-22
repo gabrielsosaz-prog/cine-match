@@ -54,6 +54,15 @@ export interface SearchResult {
 export const REQUEST_TIMEOUT_MS = 15000;
 
 export interface PersonHit { id: number; name: string; department?: string; profilePath?: string | null; popularity?: number; knownFor: string[] }
+export interface PersonInfo { id: number; name: string; department?: string; profilePath?: string | null; birthday?: string; placeOfBirth?: string; alsoKnownAs: string[] }
+export interface VideoInfo { key: string; site: 'YouTube' | 'Vimeo'; name: string; type: string; official: boolean; language?: string; region?: string; publishedAt?: string; size?: number }
+export function mapPersonHit(r: any): PersonHit {
+  return {
+    id: r.id, name: r.name, department: r.known_for_department || undefined, profilePath: r.profile_path ?? null, popularity: r.popularity,
+    knownFor: (Array.isArray(r.known_for) ? r.known_for : []).filter((k: any) => k?.media_type === 'movie' || k?.media_type === 'tv')
+      .slice(0, 3).map((k: any) => `${k.title ?? k.name}${(k.release_date ?? k.first_air_date ?? '').slice(0, 4) ? ` (${(k.release_date ?? k.first_air_date).slice(0, 4)})` : ''}`),
+  };
+}
 export interface PersonCredit extends SearchResult { kind: 'cast' | 'crew'; character?: string; job?: string; order?: number; episodes?: number }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -189,17 +198,45 @@ export class TmdbClient {
     return { meta, availability: mapProviders(meta.key, d['watch/providers'], country), related };
   }
 
+  /**
+   * v3.1: búsqueda unificada (títulos y personas) en una sola llamada. Las personas se devuelven aparte:
+   * no se asume que cualquier texto es un nombre.
+   */
+  async searchMultiAll(query: string, language: string): Promise<{ titles: SearchResult[]; people: PersonHit[]; firstKind?: 'title' | 'person' }> {
+    const q = query.trim();
+    if (!q) return { titles: [], people: [] };
+    const data = await this.get<any>('/search/multi', { query: q, language, include_adult: false, page: 1 });
+    const results: any[] = Array.isArray(data?.results) ? data.results : [];
+    const titles = results.filter((r) => r && (r.media_type === 'movie' || r.media_type === 'tv') && typeof r.id === 'number').map((r) => mapListItem(r, r.media_type));
+    const people = results.filter((r) => r?.media_type === 'person' && typeof r.id === 'number' && r.name).map(mapPersonHit);
+    const first = results.find((r) => r && ['movie', 'tv', 'person'].includes(r.media_type));
+    return { titles, people, firstKind: first ? (first.media_type === 'person' ? 'person' : 'title') : undefined };
+  }
+
+  /** v3.1: datos de una persona (nombre, foto, profesión). */
+  async personDetails(personId: number, language: string): Promise<PersonInfo> {
+    const d = await this.get<any>(`/person/${personId}`, { language });
+    if (!d || typeof d.id !== 'number') throw new ProviderError('bad_response', 'Persona sin id');
+    return { id: d.id, name: d.name, department: d.known_for_department || undefined, profilePath: d.profile_path ?? null, birthday: d.birthday || undefined, placeOfBirth: d.place_of_birth || undefined, alsoKnownAs: Array.isArray(d.also_known_as) ? d.also_known_as.slice(0, 5) : [] };
+  }
+
+  /** v3.1: vídeos oficiales (tráileres) de TMDB. Sólo enlaces a reproductores oficiales (YouTube/Vimeo). */
+  async videos(type: MediaType, id: number, originalLanguage?: string): Promise<VideoInfo[]> {
+    const langs = [...new Set(['es', 'en', originalLanguage, 'null'].filter(Boolean))].join(',');
+    const d = await this.get<any>(`/${type}/${id}/videos`, { language: 'es-MX', include_video_language: langs });
+    const list: any[] = Array.isArray(d?.results) ? d.results : [];
+    return list.filter((v) => v && typeof v.key === 'string' && (v.site === 'YouTube' || v.site === 'Vimeo')).map((v) => ({
+      key: v.key, site: v.site, name: v.name ?? '', type: v.type ?? '', official: Boolean(v.official), language: v.iso_639_1 ?? undefined, region: v.iso_3166_1 ?? undefined, publishedAt: v.published_at ?? undefined, size: v.size,
+    }));
+  }
+
   /** v3.0: búsqueda de personas (actores, directores). Se distinguen por id único de TMDB, no por nombre. */
   async searchPerson(query: string, language: string): Promise<PersonHit[]> {
     const q = query.trim();
     if (!q) return [];
     const data = await this.get<any>('/search/person', { query: q, language, include_adult: false, page: 1 });
     const results: any[] = Array.isArray(data?.results) ? data.results : [];
-    return results.filter((r) => typeof r?.id === 'number' && r.name).map((r) => ({
-      id: r.id, name: r.name, department: r.known_for_department || undefined, profilePath: r.profile_path ?? null, popularity: r.popularity,
-      knownFor: (Array.isArray(r.known_for) ? r.known_for : []).filter((k: any) => k?.media_type === 'movie' || k?.media_type === 'tv')
-        .slice(0, 3).map((k: any) => `${k.title ?? k.name}${(k.release_date ?? k.first_air_date ?? '').slice(0, 4) ? ` (${(k.release_date ?? k.first_air_date).slice(0, 4)})` : ''}`),
-    }));
+    return results.filter((r) => typeof r?.id === 'number' && r.name).map(mapPersonHit);
   }
 
   /** v3.0: filmografía completa (películas y series) de una persona por su id único. */
@@ -323,7 +360,8 @@ export function mapDetails(d: any, type: MediaType, language: string): TitleMeta
     numberOfSeasons: type === 'tv' ? d.number_of_seasons : undefined,
     status: d.status,
     originalLanguage: d.original_language,
-    originCountry: d.origin_country ?? (Array.isArray(d.production_countries) ? d.production_countries.map((c: any) => c.iso_3166_1) : undefined),
+    originCountry: Array.isArray(d.origin_country) && d.origin_country.length ? d.origin_country : (Array.isArray(d.production_countries) ? d.production_countries.map((c: any) => c.iso_3166_1) : undefined),
+    productionCountries: Array.isArray(d.production_countries) ? d.production_countries.map((c: any) => c.iso_3166_1).filter(Boolean) : undefined,
     voteAverage: d.vote_average, voteCount: d.vote_count, popularity: d.popularity,
     collection: d.belongs_to_collection?.id ? { id: d.belongs_to_collection.id, name: d.belongs_to_collection.name } : undefined,
     totalEpisodes: type === 'tv' && typeof d.number_of_episodes === 'number' ? d.number_of_episodes : undefined,

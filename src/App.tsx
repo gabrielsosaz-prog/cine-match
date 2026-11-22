@@ -10,6 +10,8 @@ import Onboarding from './pages/Onboarding';
 import Setup from './pages/Setup';
 import Pending from './pages/Pending';
 import Similar from './pages/Similar';
+import Person from './pages/Person';
+import { ScrollToTopOnPush } from './hooks/useScrollRestore';
 import ErrorBoundary from './ui/ErrorBoundary';
 import Notices from './ui/Notices';
 
@@ -32,6 +34,7 @@ export default function App() {
   const showNav = !['/bienvenida', '/configurar'].includes(loc.pathname);
   return (
     <div className="mx-auto min-h-screen max-w-xl">
+      <ScrollToTopOnPush />
       <main className={`px-4 pt-4 ${showNav ? 'pb-24' : 'pb-8'}`}>
         <ErrorBoundary resetKey={loc.pathname}>
         <Routes>
@@ -41,6 +44,7 @@ export default function App() {
           <Route path="/valoraciones" element={<Ratings />} />
           <Route path="/pendientes" element={<Pending />} />
           <Route path="/similares" element={<Similar />} />
+          <Route path="/persona/:id" element={<Person />} />
           <Route path="/gustos" element={<Taste />} />
           <Route path="/ajustes" element={<Settings />} />
           <Route path="/bienvenida" element={<Onboarding />} />
