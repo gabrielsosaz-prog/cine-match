@@ -51,6 +51,21 @@ jobs:
           python3 -c "import json;r=json.load(open('/tmp/k.json'))['results'];print([x['title'] for x in r[:5]]);assert r"
           curl -fsS --max-time 30 "$APP/api/tmdb/discover/movie?with_genres=27&watch_region=AR&with_watch_providers=8&with_watch_monetization_types=flatrate&sort_by=popularity.desc&language=es-MX" -o /tmp/t.json
           python3 -c "import json;r=json.load(open('/tmp/t.json'))['results'];print('Terror en Netflix AR:',[x['title'] for x in r[:5]]);assert r"
+          echo "--- v3.1: Paramount+ (id 531) en la lista oficial de plataformas de Argentina"
+          curl -fsS --max-time 30 "$APP/api/tmdb/watch/providers/movie?watch_region=AR&language=es-MX" -o /tmp/wp.json
+          python3 -c "import json;r=json.load(open('/tmp/wp.json'))['results'];m=[(x['provider_id'],x['provider_name']) for x in r if 'paramount' in x['provider_name'].lower()];print(m);assert any(i==531 for i,_ in m)"
+          echo "--- v3.1: videos oficiales (tráiler) de Volver al futuro"
+          curl -fsS --max-time 30 "$APP/api/tmdb/movie/105/videos?language=es-MX&include_video_language=es,en,null" -o /tmp/vd.json
+          python3 -c "import json;r=json.load(open('/tmp/vd.json'))['results'];print([(x['site'],x['type'],x['iso_639_1'],x.get('official'),x['name'][:40]) for x in r[:6]]);assert r"
+          echo "--- v3.1: descubrir por país de origen (Argentina) y ficha de persona (Ricardo Darín, buscado por nombre)"
+          curl -fsS --max-time 30 "$APP/api/tmdb/discover/movie?with_origin_country=AR&sort_by=vote_count.desc&language=es-MX" -o /tmp/oc.json
+          python3 -c "import json;r=json.load(open('/tmp/oc.json'))['results'];print([x['title'] for x in r[:5]]);assert r"
+          curl -fsS --max-time 30 "$APP/api/tmdb/search/person?query=Ricardo%20Darin&language=es-MX" -o /tmp/ps.json
+          PID=$(python3 -c "import json;print(json.load(open('/tmp/ps.json'))['results'][0]['id'])")
+          curl -fsS --max-time 30 "$APP/api/tmdb/person/$PID?language=es-MX" -o /tmp/pe.json
+          python3 -c "import json;d=json.load(open('/tmp/pe.json'));print(d['name'],d.get('known_for_department'),d.get('place_of_birth'))"
+          echo "--- v3.1: catálogo narrativo publicado"
+          curl -fsS --max-time 30 "$APP/catalog/manifest.json" | tee /tmp/man.json; echo
           echo "--- El token no aparece en las respuestas públicas"
           if grep -l "eyJhbGci" /tmp/*.json; then echo "::error::Se encontró un token en una respuesta"; exit 1; fi
           echo "OK"
