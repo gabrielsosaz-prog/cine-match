@@ -21,11 +21,13 @@ async function rate(page: Page, id: number, overall: number, acting?: number) {
 }
 async function rateInner(page: Page, id: number, overall: number, acting?: number) {
   await page.goto(`/#/t/movie/${id}`);
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await page.getByTestId('overall').getByRole('button', { name: `Valoración general (1-10): ${overall}`, exact: true }).click();
+  await page.waitForFunction((i) => location.hash.endsWith(`/movie/${i}`), id);
+  await expect(page.getByTestId('title-scores')).toBeVisible({ timeout: 60000 });
+  log(`ficha ${id}:`, await page.getByRole('heading', { level: 1 }).innerText());
+  await page.getByTestId('overall').getByRole('button', { name: `Valoración general (1-10): ${overall}`, exact: true }).click({ timeout: 30000 });
   if (acting) {
     await page.getByTestId('toggle-aspects').click();
-    await page.getByTestId('dim-acting').getByRole('radio', { name: new RegExp(`${acting} estrellas$`) }).click();
+    await page.getByTestId('dim-acting').getByRole('radio', { name: new RegExp(`${acting} estrellas$`) }).click({ timeout: 30000 });
   }
   const t0 = Date.now();
   await page.getByTestId('save-rating').click();

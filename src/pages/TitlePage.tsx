@@ -106,7 +106,7 @@ export default function TitlePage() {
         </p>
       </Card>
 
-      <Card><h2 className="mb-3 font-semibold">Tu valoración</h2><RatingEditor profileId={profileId} k={key} existing={rating} isTv={meta.type === 'tv'} title={meta} /></Card>
+      <Card><h2 className="mb-3 font-semibold">Tu valoración</h2><RatingEditor key={key} profileId={profileId} k={key} existing={rating} isTv={meta.type === 'tv'} title={meta} /></Card>
 
       {(meta.directors.length > 0 || meta.cast.length > 0) && (
         <Card className="space-y-1 text-sm">
