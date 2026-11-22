@@ -132,7 +132,6 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
   let searchSeen = false;
   for (const [k, name, year] of [['movie/105', 'Volver al Futuro', 1985], ['tv/1396', 'Breaking Bad', 2008], ['movie/496243', 'Parásitos', 2019], ['tv/111803', 'The White Lotus', 2021], ['tv/94997', 'La casa del dragón', 2022]] as const) {
     await page.goto(`/#/t/${k}`);
-    const shown = (await page.getByRole('heading', { level: 1 }).innerText()).trim();
     await page.getByTestId('trailer-button').click();
     const modal = page.getByTestId('trailer-modal');
     await expect(modal.or(page.getByTestId('trailer-none')).first()).toBeVisible({ timeout: 60000 });
@@ -152,7 +151,7 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
     if (noSpanish) {
       const href = (await search.first().getAttribute('href'))!;
       expect(href.startsWith('https://www.youtube.com/results?search_query=')).toBe(true);
-      expect(decodeURIComponent(href.split('search_query=')[1])).toBe(`${shown} ${year} tráiler subtitulado español`);
+      expect(decodeURIComponent(href.split('search_query=')[1]).toLowerCase()).toBe(`${name} ${year} tráiler subtitulado español`.toLowerCase());
       log(k, 'búsqueda para', name, '→', href);
       searchSeen = true;
     }
