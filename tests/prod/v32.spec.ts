@@ -41,7 +41,7 @@ async function pickCast(page: Page, q: string, id: number, how: 'include' | 'exc
   await hit.getByTestId(`person-${how}`).click();
 }
 const castTitles = async (page: Page) => {
-  await expect(page.getByTestId('cast-summary').or(page.getByTestId('cast-empty'))).toBeVisible({ timeout: 180000 });
+  await expect(page.getByTestId('cast-summary').or(page.getByTestId('cast-empty')).first()).toBeVisible({ timeout: 180000 });
   return page.getByTestId('cast-result').locator('h3').allInnerTexts();
 };
 
@@ -133,7 +133,7 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
     await page.goto(`/#/t/${k}`);
     await page.getByTestId('trailer-button').click();
     const modal = page.getByTestId('trailer-modal');
-    await expect(modal.or(page.getByTestId('trailer-none'))).toBeVisible({ timeout: 60000 });
+    await expect(modal.or(page.getByTestId('trailer-none')).first()).toBeVisible({ timeout: 60000 });
     if (!(await modal.isVisible())) { log(k, 'sin tráiler informado por TMDB'); continue; }
     const versions = await page.getByTestId('trailer-version').evaluateAll((els) => els.map((e) => e.textContent?.replace(/\s+/g, ' ').trim()));
     const search = page.getByTestId('trailer-youtube-search');
@@ -159,7 +159,7 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
   await page.getByTestId('country-hit').filter({ hasText: 'México' }).getByTestId('country-exclude').click();
   await expect(page.getByTestId('active-filters')).toContainText('Actores incluidos: Ben Affleck');
   await expect(page.getByTestId('active-filters')).toContainText('Países excluidos: México');
-  await expect(page.getByTestId('rec-item').first().or(page.getByTestId('filters-empty')).or(page.getByTestId('people-none'))).toBeVisible({ timeout: 180000 });
+  await expect(page.getByTestId('rec-item').first().or(page.getByTestId('filters-empty')).or(page.getByTestId('people-none')).first()).toBeVisible({ timeout: 180000 });
   log('Inicio con Ben Affleck sin México:', await page.getByTestId('rec-item').locator('h3').allInnerTexts(), (await page.getByTestId('person-outside').count()) ? await page.getByTestId('person-outside').innerText() : '');
   await page.reload();
   await expect(page.getByTestId('active-filters')).toContainText('Actores incluidos: Ben Affleck', { timeout: 60000 });
