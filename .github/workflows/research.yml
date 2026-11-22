@@ -1,0 +1,39 @@
+name: Investigación con TMDB real (manual)
+# Ejecuta un script de investigación de scripts/ contra la app publicada (el token queda en el servidor)
+# y deja la salida en el registro. Opcionalmente publica archivos generados en la rama indicada.
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: Script a ejecutar (ruta en el repo)
+        required: true
+      publish_branch:
+        description: Rama donde publicar data/out (vacío = no publicar)
+        required: false
+        default: ''
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Ejecutar
+        env:
+          APP: https://cine-match-pied-tau.vercel.app
+        run: mkdir -p data/out && node ${{ github.event.inputs.script }}
+      - name: Publicar resultados
+        if: github.event.inputs.publish_branch != ''
+        env:
+          BR: ${{ github.event.inputs.publish_branch }}
+        run: |
+          cp -r data/out /tmp/out
+          git config user.name "cine-match-bot"; git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan "$BR-tmp"; git rm -rfq . ; rm -rf ./*
+          cp -r /tmp/out/. .
+          git add -A; git commit -qm "Datos generados por $GITHUB_WORKFLOW ($GITHUB_RUN_ID)"
+          git push -f origin "HEAD:$BR"
