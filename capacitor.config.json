@@ -1,0 +1,6 @@
+{
+  "appId": "ar.cinematch.app",
+  "appName": "Cine Match AI",
+  "webDir": "dist",
+  "android": { "allowMixedContent": false }
+}

@@ -155,3 +155,17 @@ vite.config.ts.timestamp-*
 .nx/cache
 .nx/workspace-data
 .nx/migrate-runs
+
+# Cine Match AI
+node_modules
+dist
+test-results
+playwright-report
+.vercel
+# Credenciales: nunca se suben
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.dev.vars
