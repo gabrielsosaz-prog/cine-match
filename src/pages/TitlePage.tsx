@@ -1,3 +1,5 @@
+import { TrailerButton } from '../ui/Trailer';
+import { countriesOf, countryName } from '../services/filters';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -63,8 +65,10 @@ export default function TitlePage() {
             {meta.runtime && <span>· {meta.runtime} min{meta.type === 'tv' ? '/ep.' : ''}</span>}
             {meta.numberOfSeasons && <span>· {meta.numberOfSeasons} {meta.numberOfSeasons === 1 ? 'temporada' : 'temporadas'}</span>}
           </div>
+          {countriesOf(meta).length > 0 && <div className="mt-0.5 text-[11px] text-slate-500" data-testid="title-countries">{meta.type === 'tv' ? 'País de origen' : 'Países de origen y producción'}: {countriesOf(meta).map(countryName).join(', ')}</div>}
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-2"><TrailerButton k={meta.key} originalLanguage={meta.originalLanguage} country={settings.country} /></div>
       <Card className="space-y-2" data-testid="title-scores">
         <div className="flex items-center gap-3">
           <ScorePair item={pred ?? undefined} meta={meta} />

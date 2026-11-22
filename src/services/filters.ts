@@ -20,12 +20,24 @@ export interface RankFilters {
   minScore?: number; // afinidad estimada mínima (1-10)
   /** v3.0: persona elegida por id único de TMDB (actor, actriz, dirección) */
   person?: { id: number; name: string; department?: string };
+  /**
+   * v3.1: país de origen o de producción (códigos ISO 3166-1). No es el idioma original ni la nacionalidad del reparto.
+   * Regla: «incluir» exige que al menos uno de los países del título esté en la lista (sin país conocido no pasa);
+   * «excluir» quita el título si CUALQUIERA de sus países está en la lista (también coproducciones); sin país
+   * conocido, el título se mantiene y se informa.
+   */
+  includeCountries?: string[];
+  excludeCountries?: string[];
 }
+
+/** Países de un título: origen (series y películas) + producción (películas). */
+export const countriesOf = (t: TitleMeta): string[] => [...new Set([...(t.originCountry ?? []), ...(t.productionCountries ?? [])])];
 
 /** «Recomendaciones generales» */
 export const DEFAULT_FILTERS: RankFilters = { types: [], includeGenres: [], excludeGenres: [], platforms: [], watched: 'unwatched' };
 
-type FilterId = 'types' | 'includeGenres' | 'excludeGenres' | 'yearMin' | 'yearMax' | 'platforms' | 'runtime' | 'minScore' | 'person';
+type FilterId = 'types' | 'includeGenres' | 'excludeGenres' | 'yearMin' | 'yearMax' | 'platforms' | 'runtime' | 'minScore' | 'person' | 'includeCountries' | 'excludeCountries';
+export type { FilterId };
 
 /** Filtros que cambian el conjunto de candidatos (el de vistos se maneja aparte, como en v2.0). */
 export function activeFilters(f: RankFilters): FilterId[] {
@@ -39,6 +51,8 @@ export function activeFilters(f: RankFilters): FilterId[] {
   if (f.runtimeMin || f.runtimeMax) out.push('runtime');
   if (f.minScore) out.push('minScore');
   if (f.person) out.push('person');
+  if (f.includeCountries?.length) out.push('includeCountries');
+  if (f.excludeCountries?.length) out.push('excludeCountries');
   return out;
 }
 
@@ -56,6 +70,8 @@ const without = (f: RankFilters, id: FilterId): RankFilters => {
   if (id === 'runtime') { g.runtimeMin = undefined; g.runtimeMax = undefined; }
   if (id === 'minScore') g.minScore = undefined;
   if (id === 'person') g.person = undefined;
+  if (id === 'includeCountries') g.includeCountries = [];
+  if (id === 'excludeCountries') g.excludeCountries = [];
   return g;
 };
 
@@ -70,6 +86,8 @@ export function filterLabel(id: FilterId, f: RankFilters, genreName: (id: number
     case 'runtime': return f.runtimeMin && f.runtimeMax ? `${f.runtimeMin}-${f.runtimeMax} min` : f.runtimeMin ? `Más de ${f.runtimeMin} min` : `Hasta ${f.runtimeMax} min`;
     case 'minScore': return `Para vos ≥ ${f.minScore}`;
     case 'person': return `Con ${f.person?.name}`;
+    case 'includeCountries': return `De ${f.includeCountries!.map(countryName).join(' o ')}`;
+    case 'excludeCountries': return `Sin producciones de ${f.excludeCountries!.map(countryName).join(', ')}`;
   }
 }
 
@@ -87,7 +105,28 @@ export function matchesContent(c: Candidate, f: RankFilters): boolean {
   // Duración: sólo se filtra cuando hay datos; un título sin duración conocida no se descarta por eso
   if (t.runtime && f.runtimeMin && t.runtime < f.runtimeMin) return false;
   if (t.runtime && f.runtimeMax && t.runtime > f.runtimeMax) return false;
+  if (f.includeCountries?.length || f.excludeCountries?.length) {
+    const cs = countriesOf(t);
+    if (f.includeCountries?.length && !cs.some((c) => f.includeCountries!.includes(c))) return false;
+    if (f.excludeCountries?.length && cs.some((c) => f.excludeCountries!.includes(c))) return false;
+  }
   return true;
+}
+
+let regionNames: Intl.DisplayNames | undefined;
+/** Nombre del país en español (Intl), con el código si el entorno no lo conoce. */
+export function countryName(code: string): string {
+  try { regionNames ??= new Intl.DisplayNames(['es'], { type: 'region' }); return regionNames.of(code) ?? code; } catch { return code; }
+}
+/** Todos los países ISO conocidos por el navegador, con nombre en español, para el buscador del filtro. */
+export function allCountries(): { code: string; name: string }[] {
+  const out: { code: string; name: string }[] = [];
+  for (let a = 65; a <= 90; a++) for (let b = 65; b <= 90; b++) {
+    const code = String.fromCharCode(a, b);
+    const n = countryName(code);
+    if (n && n !== code && !/^[A-Z]{2}$/.test(n)) out.push({ code, name: n });
+  }
+  return out.sort((x, y) => x.name.localeCompare(y.name, 'es'));
 }
 
 export function matchesWatched(c: Candidate, f: RankFilters): boolean {

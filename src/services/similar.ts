@@ -1,90 +1,135 @@
 import { PLATFORMS } from '../constants';
 import { db } from '../db/db';
 import { getSettings, listRatings } from '../db/repo';
-import { computeIdf, cosine, describeFeatures, family, featureLabel, rawFeatures, SIMILARITY_WEIGHT, type FeatureVec } from '../engine/features';
-import { textCosine, textIdf, textVector, tokens } from '../engine/text';
+import {
+  buildRefProfile, confidenceLabel, narrativeFromMeta, scoreMulti, similarityPercent, weakKind,
+  type CoreFeature, type MultiScore, type Narrative, type NarrativeIndex, type RefIn, type SimilarMode,
+} from '../engine/narrative';
+import { SPOILER_PATTERN, keywordLabel } from '../engine/keywordsEs';
 import { friendlyError } from '../providers/errors';
 import type { RecommendationItem, TitleKey, TitleMeta } from '../types';
 import { matchesPlatforms } from './availability';
-import { discoverCandidates, ensureFullTitles, getTitle } from './catalog';
+import { discoverCandidates, ensureFullTitles, genreNames, getTitle } from './catalog';
 import { matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
-import { getEngine, latestRun, predictFor } from './recommendations';
+import { loadNarrativeIndex, metaFromCatalog, narrativeCatalogError } from './narrativeCatalog';
+import { latestRun, predictFor } from './recommendations';
 
 /**
- * Sección «Similares» (v3.0): títulos parecidos a 1-5 títulos de referencia.
+ * Sección «Similares» (v3.1): títulos parecidos a 1-5 referencias, por coincidencias NARRATIVAS relevantes.
  *
- * No se limita al endpoint «similar» de TMDB. Se arma un PERFIL TEMPORAL de similitud con lo que comparten las
- * referencias (temáticas/palabras clave, dirección, guion, reparto, subgéneros, formato y la sinopsis, de forma
- * léxica) y se buscan candidatos en varias fuentes: relacionados de TMDB, descubrimiento por palabras clave,
- * por reparto y por dirección/guion, y tu propio conjunto de candidatos.
+ * Etapa 1 (recuperación amplia): todo el catálogo narrativo precalculado (miles de títulos con vector semántico y
+ * rasgos), más relacionados de TMDB, descubrimiento por las palabras clave más distintivas (no las genéricas),
+ * por creadores/guionistas y tu conjunto de candidatos.
+ * Etapa 2 (reordenamiento): similitud narrativa con cada referencia (engine/narrative), agregada según el modo
+ * («En común» o «Combinar») y la importancia de cada referencia; filtros, disponibilidad y afinidad personal.
  *
- * Similitud ≠ afinidad: la similitud mide cuánto se parece a las referencias; «Para vos» estima cuánto te gustaría.
- * No se asume que te gustó todo lo que comparten: si puntuaste una referencia, pesa según tu nota; y los rasgos
- * con afinidad negativa en tu historial se atenúan. Sin historial suficiente, el resultado no es personalizado y se avisa.
+ * Similitud ≠ afinidad ≠ calidad pública: se calculan y muestran por separado. La popularidad no entra en la similitud.
  */
 export const MAX_REFS = 5;
-const GENERIC = new Set(['t', 'era', 'lang', 'seas']);
+export type RefWeight = 0.5 | 1 | 2;
 
-export interface SharedFeature { f: string; label: string; family: string; refs: TitleKey[]; weight: number }
+export interface SimilarExplanation {
+  /** coincidencias relevantes (rasgos y temáticas específicas), con las referencias con que coinciden */
+  strong: { text: string; refs: TitleKey[]; source: string }[];
+  semantic?: { text: string; refs: TitleKey[] };
+  people: string[];
+  /** coincidencias débiles: sólo información secundaria */
+  weak: string[];
+  differences: string[];
+  evidence: string;
+}
+
 export interface SimilarResult {
   key: TitleKey;
-  similarity: number; // 0-1, relativo al mejor candidato
-  rawSimilarity: number;
+  /** 0-1 absoluto (no relativo al mejor) */
+  similarity: number;
+  percent: number;
+  confidence: 'alta' | 'media' | 'baja';
+  perRef: { key: TitleKey; percent: number }[];
   affinity?: RecommendationItem;
-  shared: SharedFeature[];
-  tmdbRelated: TitleKey[];
+  explanation: SimilarExplanation;
+  sameFranchise: boolean;
+  franchise?: string;
+  inCatalog: boolean;
+  /** orden «Relevancia»: similitud (y afinidad si hay historial) con variedad */
   order: number;
+  /** compatibilidad v3.0 */
+  rawSimilarity: number;
+  tmdbRelated: TitleKey[];
 }
+
 export interface SimilarResponse {
   results: SimilarResult[];
+  mode: SimilarMode;
   personalized: boolean;
   ratedCount: number;
   candidates: number;
-  profile: SharedFeature[];
+  semantic: { available: boolean; refsWithVector: number; catalog?: string; model?: string; titles?: number };
+  profile: { core: { label: string; refs: TitleKey[] }[]; distinctive: { key: TitleKey; labels: string[] }[]; contrasts: string[] };
   warning?: string;
+  timing: { ms: number };
 }
 
-const familyName: Record<string, string> = { k: 'temática', d: 'dirección', w: 'guion', c: 'reparto', g: 'género', len: 'duración', end: 'final' };
+const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | undefined> => Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
+const normTitle = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, '').trim();
 
-export async function findSimilar(profileId: string, refKeys: TitleKey[], f: RankFilters, o: { onlyMyPlatforms?: boolean } = {}): Promise<SimilarResponse> {
+export async function findSimilar(profileId: string, refKeys: TitleKey[], f: RankFilters, o: { onlyMyPlatforms?: boolean; mode?: SimilarMode; weights?: Partial<Record<TitleKey, RefWeight>> } = {}): Promise<SimilarResponse> {
+  const t0 = Date.now();
+  const mode = o.mode ?? 'common';
   const refsIn = [...new Set(refKeys)].slice(0, MAX_REFS);
   const settings = await getSettings(profileId);
   const opts = { language: settings.language, country: settings.country };
   const ratings = await listRatings(profileId);
   const byKey = new Map(ratings.map((r) => [r.key, r]));
   let warning: string | undefined;
-  // 1) Fichas completas de las referencias
-  const refMetas = (await Promise.all(refsIn.map(async (k) => { const r = await getTitle(k, opts); if (r.error) warning ??= friendlyError(r.error); return r.meta; })))
-    .filter((m): m is TitleMeta => Boolean(m));
-  if (!refMetas.length) return { results: [], personalized: false, ratedCount: 0, candidates: 0, profile: [], warning: warning ?? 'No se pudieron cargar los títulos de referencia.' };
+  const empty = (w: string): SimilarResponse => ({ results: [], mode, personalized: false, ratedCount: 0, candidates: 0, semantic: { available: false, refsWithVector: 0 }, profile: { core: [], distinctive: [], contrasts: [] }, warning: w, timing: { ms: Date.now() - t0 } });
+
+  // 1) Referencias + catálogo narrativo (en paralelo)
+  const [refMetasRaw, idx, names] = await Promise.all([
+    Promise.all(refsIn.map(async (k) => { const r = await getTitle(k, opts); if (r.error) warning ??= friendlyError(r.error); return r.meta; })),
+    withTimeout(loadNarrativeIndex(), 12000),
+    genreNames(settings.language).catch(() => new Map<number, string>()),
+  ]);
+  const refMetas = refMetasRaw.filter((m): m is TitleMeta => Boolean(m));
+  if (!refMetas.length) return empty(warning ?? 'No se pudieron cargar los títulos de referencia.');
+  if (!idx) warning ??= `No se pudo cargar el catálogo narrativo (${narrativeCatalogError() ?? 'sin conexión'}): la similitud usa sólo rasgos de TMDB, con menos precisión.`;
   const refs = new Set(refMetas.map((m) => m.key));
+  const narr = (k: TitleKey, m?: TitleMeta): Narrative | undefined => (idx ? idx.narrativeOf(k, m) : m ? narrativeFromMeta(m) : undefined);
+  const refIn: RefIn[] = refMetas.map((m) => {
+    const n = narr(m.key, m)!;
+    // Si la ficha trae palabras clave que el catálogo no tiene, se suman (misma fuente: TMDB)
+    for (const k of m.keywords) if (!n.kw.has(k.id)) n.kw.set(k.id, k.name);
+    return { n, weight: o.weights?.[m.key] ?? 1 };
+  });
+  const prof = buildRefProfile(refIn, idx);
 
-  // 2) Perfil personal (si existe) para ponderar referencias y rasgos
-  const histTitles = new Map((await db.titles.bulkGet(ratings.map((r) => r.key))).filter((m): m is TitleMeta => Boolean(m)).map((m) => [m.key, m]));
-  for (const m of refMetas) histTitles.set(m.key, m);
-  const profile = getEngine().buildProfile(ratings, histTitles, settings);
-  const personalized = profile.ratedCount >= 5;
-  const refWeight = (m: TitleMeta) => {
-    const r = byKey.get(m.key);
-    if (r?.overall === undefined) return 1;
-    return Math.max(0.3, Math.min(1.8, 1 + (r.overall - profile.mean) / 3));
-  };
-
-  // 3) Candidatos de varias fuentes
+  // 2) Recuperación amplia de candidatos
   const cand = new Set<TitleKey>();
   const tmdbRel = new Map<TitleKey, TitleKey[]>();
   for (const m of refMetas) for (const k of m.related ?? []) { cand.add(k); tmdbRel.set(k, [...(tmdbRel.get(k) ?? []), m.key]); }
-  const featCount = new Map<string, number>();
-  for (const m of refMetas) for (const x of rawFeatures(m)) featCount.set(x, (featCount.get(x) ?? 0) + refWeight(m));
-  const top = (fam: string, n: number) => [...featCount].filter(([x]) => family(x) === fam).sort((a, b) => b[1] - a[1]).slice(0, n).map(([x]) => Number(x.slice(x.indexOf(':') + 1)));
-  const kw = top('k', 4), cast = top('c', 2), crew = [...top('d', 2), ...top('w', 1)];
+  let catalogTop: { key: TitleKey; s: MultiScore }[] = [];
+  if (idx) {
+    const scored: { key: TitleKey; s: MultiScore }[] = [];
+    for (const c of idx.titles) {
+      if (refs.has(c.key)) continue;
+      const n = idx.narrativeOf(c.key)!;
+      const s = scoreMulti(refIn, prof, n, mode, idx);
+      if (s.score > 0.08) scored.push({ key: c.key, s });
+    }
+    catalogTop = scored.sort((a, b) => b.s.score - a.s.score).slice(0, 300);
+    for (const x of catalogTop) cand.add(x.key);
+  }
+  // Descubrimiento en TMDB por lo distintivo (no por etiquetas genéricas ni lugares)
+  const distinctiveKw = prof.core.filter((c) => c.kind === 'kw').slice(0, 5).map((c) => c.id);
+  const perRefKw = refIn.flatMap((r) => [...r.n.kw].filter(([, n]) => !weakKind(n)).sort((a, b) => (idx ? idx.kwIdf(b[0]) - idx.kwIdf(a[0]) : 0)).slice(0, 2).map(([id]) => String(id)));
+  const kw = [...new Set([...distinctiveKw, ...perRefKw])].slice(0, 6);
+  const crew = [...new Set(refMetas.flatMap((m) => [...m.directors.slice(0, 1), ...(m.writers ?? []).slice(0, 1)].map((p) => p.id)))].slice(0, 4);
   const types = [...new Set(refMetas.map((m) => m.type))];
   const ids = o.onlyMyPlatforms === false ? [] : PLATFORMS.filter((p) => settings.platforms.includes(p.id)).flatMap((p) => p.tmdbIds);
   const jobs: Promise<unknown>[] = [];
   for (const type of types) {
-    const base = { type, ...opts, providerIds: ids, sort: 'vote_count.desc', minVotes: 50 };
+    const base = { type, ...opts, providerIds: ids, sort: 'vote_average.desc', minVotes: 30 };
     if (kw.length) jobs.push(discoverCandidates({ ...base, extra: { with_keywords: kw.join('|') } }).then((r) => r.forEach((x) => cand.add(x.key))));
-    if (type === 'movie' && cast.length) jobs.push(discoverCandidates({ ...base, extra: { with_cast: cast.join('|') } }).then((r) => r.forEach((x) => cand.add(x.key))));
     if (type === 'movie' && crew.length) jobs.push(discoverCandidates({ ...base, extra: { with_crew: crew.join('|') } }).then((r) => r.forEach((x) => cand.add(x.key))));
   }
   const res = await Promise.allSettled(jobs);
@@ -94,90 +139,158 @@ export async function findSimilar(profileId: string, refKeys: TitleKey[], f: Ran
   for (const k of run?.pool ?? []) cand.add(k);
   for (const k of refs) cand.delete(k);
 
-  // 4) Preselección con lo que ya hay y ficha completa para los mejores
-  const score = (metas: Map<TitleKey, TitleMeta>) => {
-    const keys = [...cand].filter((k) => metas.has(k));
-    const corpus = [...refMetas, ...keys.map((k) => metas.get(k)!)];
-    const idf = computeIdf(corpus.map(rawFeatures));
-    const tIdf = textIdf(corpus.map((m) => tokens(m.overview)));
-    // Perfil temporal: rasgos compartidos ponderados por cuántas referencias los tienen (y cuánto te gustó cada una)
-    const totalW = refMetas.reduce((a, m) => a + refWeight(m), 0);
-    const prof: FeatureVec = new Map();
-    const shared: SharedFeature[] = [];
-    for (const [x, c] of featCount) {
-      const fam = family(x);
-      if (GENERIC.has(fam)) continue;
-      let w = (c / totalW) * (SIMILARITY_WEIGHT[fam] ?? 0.3) * (idf.get(x) ?? 1);
-      const fa = profile.features.get(x);
-      // No se asume que te gustó todo lo compartido: los rasgos que solés puntuar bajo pesan menos
-      if (fa && fa.count >= 2) w *= 1 + Math.max(-0.6, Math.min(0.6, fa.affinity / 2));
-      prof.set(x, w);
-      shared.push({ f: x, label: '', family: fam, refs: refMetas.filter((m) => rawFeatures(m).includes(x)).map((m) => m.key), weight: w });
-    }
-    const refText = new Map<string, number>();
-    for (const m of refMetas) for (const [t, v] of textVector(tokens(m.overview), tIdf)) refText.set(t, (refText.get(t) ?? 0) + v * refWeight(m));
-    const out = keys.map((k) => {
-      const m = metas.get(k)!;
-      const fs = rawFeatures(m).filter((x) => !GENERIC.has(family(x)));
-      const v: FeatureVec = new Map(fs.map((x) => [x, (SIMILARITY_WEIGHT[family(x)] ?? 0.3) * (idf.get(x) ?? 1)]));
-      const raw = 0.85 * cosine(prof, v) + 0.15 * textCosine(refText, textVector(tokens(m.overview), tIdf)) + (tmdbRel.has(k) ? 0.03 * tmdbRel.get(k)!.length : 0);
-      return { key: k, raw, fs };
-    });
-    return { out, prof, shared };
-  };
-  let metas = new Map((await db.titles.bulkGet([...cand])).filter((m): m is TitleMeta => Boolean(m)).map((m) => [m.key, m]));
-  const pre = score(metas).out.sort((a, b) => b.raw - a.raw);
-  const needFull = pre.filter((x) => metas.get(x.key)?.completeness !== 'full').slice(0, 40).map((x) => x.key);
-  const relFirst = [...tmdbRel.keys()].filter((k) => metas.get(k)?.completeness !== 'full' && !needFull.includes(k)).slice(0, 10);
-  if (needFull.length || relFirst.length) {
-    try { await ensureFullTitles([...needFull, ...relFirst], opts, 50); } catch (e) { warning ??= friendlyError(e); }
-    metas = new Map((await db.titles.bulkGet([...cand])).filter((m): m is TitleMeta => Boolean(m)).map((m) => [m.key, m]));
+  // 3) Fichas: las del dispositivo, y del catálogo para las que falten
+  const loadMetas = async () => new Map((await db.titles.bulkGet([...cand])).filter((m): m is TitleMeta => Boolean(m)).map((m) => [m.key, m]));
+  let metas = await loadMetas();
+  if (idx) {
+    const add: TitleMeta[] = [];
+    for (const k of cand) if (!metas.has(k)) { const m = metaFromCatalog(idx, k, names); if (m) { add.push(m); metas.set(k, m); } }
+    if (add.length) await db.titles.bulkPut(add).catch(() => undefined);
   }
-  const { out, shared } = score(metas);
-  const info = describeFeatures([...refMetas, ...metas.values()]);
-  for (const s of shared) s.label = featureLabel(s.f, info);
+  const scoreAll = () => [...cand].filter((k) => metas.has(k)).map((k) => {
+    const n = narr(k, metas.get(k))!;
+    const pre = catalogTop.find((x) => x.key === k);
+    return { key: k, s: pre && n.inCatalog ? pre.s : scoreMulti(refIn, prof, n, mode, idx), n };
+  });
+  let scored = scoreAll().sort((a, b) => b.s.score - a.s.score);
+  // Ficha completa (palabras clave, créditos, disponibilidad) para los mejores
+  const needFull = scored.filter((x) => metas.get(x.key)?.completeness !== 'full').slice(0, 45).map((x) => x.key);
+  if (needFull.length) {
+    try { await ensureFullTitles(needFull, opts, 45); } catch (e) { warning ??= friendlyError(e); }
+    metas = await loadMetas();
+    scored = scoreAll().sort((a, b) => b.s.score - a.s.score);
+  }
 
-  // 5) Filtros avanzados + disponibilidad + exclusiones
-  const keys = out.map((x) => x.key);
+  // 4) Filtros, disponibilidad y exclusiones
+  const keys = scored.map((x) => x.key);
   const snaps = await db.availability.bulkGet(keys.map((k) => `${k}|${settings.country}`));
   const snapOf = new Map(keys.map((k, i) => [k, snaps[i]]));
-  const passing = out.filter((x) => {
+  const passing = scored.filter((x) => {
     const c: Candidate = { meta: metas.get(x.key)!, snap: snapOf.get(x.key), rating: byKey.get(x.key) };
     if (c.rating?.notInterested) return false;
     if (o.onlyMyPlatforms !== false && !matchesPlatforms(c.snap, settings.platforms, settings.includeUnconfirmed)) return false;
     return matchesContent(c, f) && matchesWatched(c, f);
-  }).filter((x) => x.raw > 0.02).sort((a, b) => b.raw - a.raw).slice(0, 120);
+  }).filter((x) => x.s.score >= 0.12).slice(0, 120);
 
-  // 6) Afinidad personal («Para vos») separada de la similitud
+  // 5) Afinidad personal separada
   const preds = await predictFor(profileId, passing.map((x) => x.key));
-  const maxRaw = Math.max(1e-6, ...passing.map((x) => x.raw));
-  const sharedByF = new Map(shared.map((s) => [s.f, s]));
-  let results: SimilarResult[] = passing.map((x) => ({
-    key: x.key,
-    rawSimilarity: x.raw,
-    similarity: x.raw / maxRaw,
-    affinity: preds.get(x.key),
-    shared: x.fs.map((f2) => sharedByF.get(f2)).filter((s): s is SharedFeature => Boolean(s) && !info.get(s!.f)?.spoiler && s!.family !== 'end')
-      .sort((a, b) => b.weight - a.weight).slice(0, 5),
-    tmdbRelated: tmdbRel.get(x.key) ?? [],
-    order: 0,
-  }));
+  const profileRated = ratings.filter((r) => r.overall !== undefined).length;
+  const personalized = profileRated >= 5;
+  const refTitle = new Map(refMetas.map((m) => [m.key, m.title]));
+  let results: SimilarResult[] = passing.map((x) => {
+    const m = metas.get(x.key)!;
+    const fr = m.collection?.id ? `c${m.collection.id}` : m.type === 'tv' && m.directors[0] ? `p${m.directors[0].id}:${normTitle(m.title).slice(0, 8)}` : undefined;
+    return {
+      key: x.key, similarity: x.s.score, rawSimilarity: x.s.score, percent: similarityPercent(x.s.score), confidence: confidenceLabel(x.s.evidence),
+      perRef: x.s.perRef.map((p) => ({ key: p.key as TitleKey, percent: similarityPercent(p.s.score) })),
+      affinity: preds.get(x.key), explanation: explain(x.s, x.n, refIn, refTitle), sameFranchise: x.s.sameFranchise, franchise: fr,
+      inCatalog: x.n.inCatalog, order: 0, tmdbRelated: tmdbRel.get(x.key) ?? [],
+    };
+  });
   if (f.minScore) results = results.filter((r) => (r.affinity?.score ?? 0) >= f.minScore!);
-  // Orden combinado: con historial suficiente, la similitud se combina con tu afinidad; sin historial, sólo similitud
-  for (const r of results) r.order = personalized && r.affinity ? 0.7 * r.similarity + 0.3 * ((r.affinity.score - 1) / 9) : r.similarity;
-  results.sort((a, b) => b.order - a.order);
-  return { results, personalized, ratedCount: profile.ratedCount, candidates: cand.size, profile: shared.sort((a, b) => b.weight - a.weight).slice(0, 12), warning };
+  for (const r of results) r.order = personalized && r.affinity ? 0.8 * r.similarity + 0.2 * ((r.affinity.score - 1) / 9) : r.similarity;
+  results = diversify(results, idx);
+  return {
+    results, mode, personalized, ratedCount: profileRated, candidates: cand.size,
+    semantic: { available: Boolean(idx?.emb), refsWithVector: refIn.filter((r) => r.n.row >= 0).length, catalog: idx?.meta.version, model: idx?.meta.model, titles: idx?.size },
+    profile: {
+      core: prof.core.filter((c) => c.kind === 'facet' || !SPOILER_PATTERN.test(c.label)).slice(0, 8).map((c) => ({ label: c.kind === 'kw' ? keywordLabel(c.label) : c.label, refs: c.refs as TitleKey[] })),
+      distinctive: [...prof.distinctive].map(([k, list]) => ({ key: k as TitleKey, labels: list.filter((c) => !SPOILER_PATTERN.test(c.label)).slice(0, 4).map((c) => (c.kind === 'kw' ? keywordLabel(c.label) : c.label)) })),
+      contrasts: prof.contrasts.map((c) => `${c.label}: en ${c.in.map((k) => refTitle.get(k as TitleKey) ?? k).join(', ')}, no en ${c.notIn.map((k) => refTitle.get(k as TitleKey) ?? k).join(', ')}`),
+    },
+    warning, timing: { ms: Date.now() - t0 },
+  };
 }
 
+/** Variedad para el orden «Relevancia»: una saga no monopoliza los primeros puestos y se evita la redundancia semántica. */
+export function diversify(results: SimilarResult[], idx?: NarrativeIndex): SimilarResult[] {
+  const pool = [...results].sort((a, b) => b.order - a.order);
+  const out: SimilarResult[] = [];
+  const seenFr = new Map<string, number>();
+  const rowOf = (k: TitleKey) => idx?.get(k)?.row ?? -1;
+  while (pool.length) {
+    let best = 0, bestV = -Infinity;
+    for (let i = 0; i < Math.min(pool.length, 40); i++) {
+      const r = pool[i];
+      let red = 0;
+      const ri = rowOf(r.key);
+      if (idx?.emb && ri >= 0) for (const s of out.slice(-10)) { const rs = rowOf(s.key); if (rs >= 0) red = Math.max(red, idx.semScore(idx.cosRows(ri, rs))); }
+      const frPen = r.franchise && seenFr.has(r.franchise) ? 0.25 * seenFr.get(r.franchise)! : 0;
+      const v = 0.88 * r.order - 0.12 * red - frPen;
+      if (v > bestV) { bestV = v; best = i; }
+    }
+    const [r] = pool.splice(best, 1);
+    if (r.franchise) seenFr.set(r.franchise, (seenFr.get(r.franchise) ?? 0) + 1);
+    out.push(r);
+  }
+  out.forEach((r, i) => { r.order = out.length - i; });
+  return out;
+}
+
+function explain(s: MultiScore, C: Narrative, refs: RefIn[], refTitle: Map<TitleKey, string>): SimilarExplanation {
+  const nRefs = refs.length;
+  const names = (ks: string[]) => ks.map((k) => refTitle.get(k as TitleKey) ?? k).join(', ');
+  // Rasgos compartidos, agrupados por rasgo con las referencias que lo tienen
+  const facetMap = new Map<string, { label: string; refs: string[]; kw: Set<string>; semantic: boolean; w: number; strength: string }>();
+  const kwMap = new Map<number, { name: string; refs: string[]; w: number }>();
+  const weakSet = new Set<string>();
+  const people = new Set<string>();
+  for (const p of s.perRef) {
+    for (const fc of p.s.facets) {
+      if (fc.strength === 'weak') { weakSet.add(fc.label); continue; }
+      const e = facetMap.get(fc.id) ?? { label: fc.label, refs: [], kw: new Set<string>(), semantic: false, w: 0, strength: fc.strength };
+      e.refs.push(p.key); fc.kw.forEach((k) => e.kw.add(k)); e.semantic ||= fc.semantic; e.w += fc.weight * p.weight; facetMap.set(fc.id, e);
+    }
+    for (const k of p.s.keywords) {
+      if (SPOILER_PATTERN.test(k.name)) continue;
+      const e = kwMap.get(k.id) ?? { name: k.name, refs: [], w: 0 };
+      e.refs.push(p.key); e.w += k.weight * p.weight; kwMap.set(k.id, e);
+    }
+    for (const k of p.s.weak) if (!SPOILER_PATTERN.test(k.name)) weakSet.add(keywordLabel(k.name));
+    if (p.s.people.length) people.add(`mismo equipo creativo que ${names([p.key])}`);
+  }
+  const strong: SimilarExplanation['strong'] = [...facetMap.values()].sort((a, b) => b.w * b.refs.length - a.w * a.refs.length).slice(0, 4).map((e) => ({
+    text: e.label, refs: e.refs as TitleKey[],
+    source: [e.kw.size ? `palabras clave de TMDB: ${[...e.kw].slice(0, 2).map(keywordLabel).join(', ')}` : '', e.semantic ? 'detectado en la sinopsis/argumento (inferido)' : ''].filter(Boolean).join(' · ') || 'palabras clave de TMDB',
+  }));
+  const specificKw = [...kwMap.values()].sort((a, b) => b.w * b.refs.length - a.w * a.refs.length).slice(0, 3);
+  if (specificKw.length) strong.push({ text: `temáticas específicas: ${specificKw.map((k) => keywordLabel(k.name)).join(', ')}`, refs: [...new Set(specificKw.flatMap((k) => k.refs))] as TitleKey[], source: 'palabras clave de TMDB poco frecuentes en el catálogo' });
+  let semantic: SimilarExplanation['semantic'];
+  const semRefs = s.perRef.filter((p) => (p.s.components.sem ?? 0) >= 0.45).sort((a, b) => (b.s.components.sem ?? 0) - (a.s.components.sem ?? 0));
+  if (semRefs.length) {
+    const top = semRefs[0].s.components.sem!;
+    semantic = { text: `argumento ${top >= 0.75 ? 'muy parecido' : top >= 0.6 ? 'parecido' : 'algo parecido'} según el análisis semántico de sinopsis${C.textQ === 2 ? ' y argumento' : ''}`, refs: semRefs.map((p) => p.key) as TitleKey[] };
+  }
+  // Diferencias relevantes
+  const differences: string[] = [];
+  const seenD = new Set<string>();
+  for (const p of s.perRef) for (const d of p.s.differences) {
+    const t = d.kind === 'opposite' ? `tono distinto: ${d.other} (en lugar de ${d.label}${nRefs > 1 ? `, de ${names([p.key])}` : ''})` : `no tiene ${d.label}${nRefs > 1 ? ` (de ${names([p.key])})` : ''}`;
+    if (!seenD.has(t)) { seenD.add(t); differences.push(t); }
+  }
+  if (nRefs > 1) {
+    const weakRefs = s.perRef.filter((p) => p.s.score < 0.2).map((p) => p.key);
+    if (weakRefs.length && weakRefs.length < nRefs) differences.push(`se parece poco a ${names(weakRefs)}`);
+  }
+  const ev = s.evidence;
+  const evidence = `Confianza ${confidenceLabel(ev)}: ${C.row >= 0 ? `vector semántico (${C.textQ === 2 ? 'sinopsis + argumento de Wikipedia' : 'sólo sinopsis'})` : 'sin vector semántico'}, ${C.facets.size} rasgos narrativos, ${C.kw.size} palabras clave de TMDB.`;
+  return { strong, semantic, people: [...people], weak: [...weakSet].slice(0, 4), differences: differences.slice(0, 3), evidence };
+}
+
+/** Líneas de explicación para la tarjeta (las débiles van al final y nunca solas como justificación). */
 export function explainSimilar(r: SimilarResult, refTitle: (k: TitleKey) => string, nRefs: number): string[] {
+  const e = r.explanation;
+  const withRefs = (refs: TitleKey[]) => (nRefs > 1 && refs.length ? ` (con ${[...new Set(refs)].map(refTitle).join(', ')})` : '');
   const lines: string[] = [];
-  const byFam = (fams: string[]) => r.shared.filter((s) => fams.includes(s.family));
-  const themes = byFam(['k']).slice(0, 3), people = byFam(['d', 'w', 'c']).slice(0, 2), genres = byFam(['g']).slice(0, 2);
-  const refsOf = (s: SharedFeature[]) => [...new Set(s.flatMap((x) => x.refs))].map(refTitle);
-  if (themes.length) lines.push(`Comparte ${themes.map((t) => `«${t.label}»`).join(', ')}${nRefs > 1 ? ` (con ${refsOf(themes).join(', ')})` : ''}.`);
-  if (people.length) lines.push(`Mismo equipo o reparto: ${people.map((p) => `${p.label} (${familyName[p.family]})`).join(', ')}.`);
-  if (genres.length && !themes.length) lines.push(`Coincide en género: ${genres.map((g) => g.label).join(', ')} (similitud más general).`);
-  if (r.tmdbRelated.length) lines.push(`TMDB la relaciona con ${r.tmdbRelated.map(refTitle).join(', ')}.`);
-  if (!lines.length) lines.push('Parecido leve: comparte pocos rasgos específicos con las referencias.');
+  if (e.semantic) lines.push(`${cap(e.semantic.text)}${withRefs(e.semantic.refs)}.`);
+  for (const s of e.strong) lines.push(`Comparte ${s.text}${withRefs(s.refs)}. Fuente: ${s.source}.`);
+  for (const p of e.people) lines.push(`${cap(p)}.`);
+  if (!lines.length) lines.push('Parecido leve: comparte pocos rasgos narrativos específicos con las referencias.');
+  for (const d of e.differences) lines.push(`Diferencia: ${d}.`);
+  if (e.weak.length) lines.push(`Coincidencias secundarias (no justifican la similitud): ${e.weak.join(', ')}.`);
+  lines.push(e.evidence);
   return lines;
 }
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+export type { SimilarMode };
+export type { CoreFeature };

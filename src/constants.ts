@@ -27,6 +27,9 @@ export const PLATFORMS: { id: PlatformId; label: string; color: string; match: R
   { id: 'prime', label: 'Prime Video', color: '#00a8e1', match: /^amazon prime video|^prime video/i, tmdbIds: [119, 9] },
   { id: 'disney', label: 'Disney+', color: '#1f6feb', match: /^disney ?(\+|plus)/i, tmdbIds: [337] },
   { id: 'max', label: 'Max (HBO)', color: '#7b2ff7', match: /^(hbo )?max$|^hbo max/i, tmdbIds: [1899, 384] },
+  // v3.1: Paramount+ (proveedor 531 de TMDB, verificado en Argentina). No incluye «Paramount Network» ni el canal
+  // de Amazon («Paramount+ Amazon Channel», que se contrata dentro de Prime Video y se informa aparte).
+  { id: 'paramount', label: 'Paramount+', color: '#0064ff', match: /^paramount ?(\+|plus)/i, tmdbIds: [531] },
 ];
 
 export const COUNTRIES: { code: string; name: string }[] = [

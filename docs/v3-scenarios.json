@@ -32,21 +32,22 @@
   },
   "Pesos aprendidos (escenario sintético, 40 notas)": {
     "pesos": {
-      "theme": 1.7244989926323502,
+      "theme": 1.916774452935425,
       "comments": 0.9,
       "aspects": 1.4,
       "actors": 0,
       "crew": 0.7,
-      "similar": 1.813160668405671,
+      "narrative": 1.2,
+      "similar": 1.5723880613172483,
       "genre": 0.9,
-      "format": 0.25209768156757095,
+      "format": 0.40564736623245057,
       "rejection": 1,
-      "quality": 0.23823689608370863
+      "quality": 0.23299314230883658
     },
     "ecm": {
       "baseline": 2.54862317807208,
-      "prior": 1.2552580282616994,
-      "learned": 0.458599815209664
+      "prior": 1.5294569938713607,
+      "learned": 0.5023984023463357
     }
   },
   "Actores: candidatos por filmografía": {

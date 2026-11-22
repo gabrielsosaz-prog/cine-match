@@ -54,7 +54,20 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         navigateFallback: 'index.html',
+        // El catálogo narrativo (varios MB) no se precarga: se descarga al usarse y queda en caché por versión
+        globIgnores: ['catalog/**'],
+        navigateFallbackDenylist: [/^\/catalog\//, /^\/api\//],
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) => /\/catalog\/manifest\.json$/.test(url.pathname),
+            handler: 'NetworkFirst',
+            options: { cacheName: 'catalog-manifest', networkTimeoutSeconds: 4 },
+          },
+          {
+            urlPattern: ({ url }) => /\/catalog\/v[^/]+\//.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'catalog-data', expiration: { maxEntries: 6 } },
+          },
           {
             urlPattern: /^https:\/\/image\.tmdb\.org\//,
             handler: 'CacheFirst',

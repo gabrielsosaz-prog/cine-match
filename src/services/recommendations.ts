@@ -2,13 +2,15 @@ import { PLATFORMS } from '../constants';
 import { db } from '../db/db';
 import { getSettings, listRatings } from '../db/repo';
 import { featureLabel, describeFeatures } from '../engine/features';
-import { hybridEngine, type RecommenderEngine } from '../engine/recommender';
+import { hybridEngine, setDefaultNarrative, type RecommenderEngine } from '../engine/recommender';
+import { loadNarrativeIndex, metaFromCatalog } from './narrativeCatalog';
+import type { NarrativeIndex } from '../engine/narrative';
 import { friendlyError } from '../providers/errors';
 import { META_VERSION } from '../providers/tmdb';
 import type { MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
 import { diagnose, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
 import { matchesPlatforms } from './availability';
-import { discoverCandidates, ensureFullTitles, getTitle, personFilmography, refreshAvailability } from './catalog';
+import { discoverCandidates, ensureFullTitles, genreNames, getTitle, personFilmography, refreshAvailability } from './catalog';
 import type { UserProfile } from '../engine/profile';
 
 let engine: RecommenderEngine = hybridEngine;
@@ -53,7 +55,7 @@ export async function actorCandidates(profile: UserProfile, settings: ProfileSet
 }
 
 /** Genera el conjunto de candidatos: relacionados de lo que te gustó + descubrimiento por plataforma + actores. */
-async function buildPool(ratings: Rating[], settings: ProfileSettings, titles: Map<TitleKey, TitleMeta>): Promise<{ pool: TitleKey[]; warning?: string; priority: TitleKey[] }> {
+async function buildPool(ratings: Rating[], settings: ProfileSettings, titles: Map<TitleKey, TitleMeta>, nidx?: NarrativeIndex): Promise<{ pool: TitleKey[]; warning?: string; priority: TitleKey[] }> {
   const opts = { language: settings.language, country: settings.country };
   const pool = new Set<TitleKey>();
   let warning: string | undefined;
@@ -79,11 +81,43 @@ async function buildPool(ratings: Rating[], settings: ProfileSettings, titles: M
   const act = await actorCandidates(profile, settings);
   for (const k of act.keys) pool.add(k);
   warning ??= act.warning;
-  return { pool: [...pool], warning, priority: act.keys };
+  // v3.1: vecinos narrativos (catálogo precalculado) de lo que más te gustó; no depende de la popularidad
+  const narrKeys = nidx ? narrativeNeighbors(nidx, liked.map((s) => s.key), settings, 90) : [];
+  for (const k of narrKeys) pool.add(k);
+  if (narrKeys.length && nidx) {
+    const names = await genreNames(settings.language).catch(() => new Map<number, string>());
+    const have = await db.titles.bulkGet(narrKeys);
+    const add = narrKeys.filter((_, i) => !have[i]).map((k) => metaFromCatalog(nidx, k, names)).filter((m): m is TitleMeta => Boolean(m));
+    if (add.length) await db.titles.bulkPut(add).catch(() => undefined);
+  }
+  return { pool: [...pool], warning, priority: [...act.keys, ...narrKeys.slice(0, 30)] };
+}
+
+/**
+ * Vecinos semánticos en el catálogo de los títulos que más te gustaron. La disponibilidad del catálogo es sólo una
+ * pista (de la fecha de construcción): la real se verifica después con TMDB.
+ */
+export function narrativeNeighbors(idx: NarrativeIndex, liked: TitleKey[], settings: ProfileSettings, max: number): TitleKey[] {
+  if (!idx.emb) return [];
+  const mine = new Set(PLATFORMS.filter((p) => settings.platforms.includes(p.id)).flatMap((p) => p.tmdbIds));
+  const rows = liked.map((k) => idx.get(k)?.row ?? -1).filter((r) => r >= 0);
+  if (!rows.length) return [];
+  const skip = new Set(liked);
+  const best = new Map<TitleKey, number>();
+  for (const r of rows.slice(0, 15)) {
+    const top: [TitleKey, number][] = [];
+    for (const c of idx.titles) {
+      if (c.row < 0 || skip.has(c.key) || (mine.size && c.provAR.length && !c.provAR.some((p) => mine.has(p)))) continue;
+      top.push([c.key, idx.cosRows(r, c.row)]);
+    }
+    top.sort((a, b) => b[1] - a[1]);
+    for (const [k, v] of top.slice(0, 12)) best.set(k, Math.max(best.get(k) ?? 0, v));
+  }
+  return [...best].sort((a, b) => b[1] - a[1]).slice(0, max).map(([k]) => k);
 }
 
 /** Búsqueda adicional en TMDB para los filtros avanzados (p. ej. «series de ciencia ficción desde 2015 en Netflix»). */
-export interface DiscoverHints { types: MediaType[]; genres: number[]; excludeGenres: number[]; yearMin?: number; yearMax?: number; platforms: PlatformId[]; runtimeMin?: number; runtimeMax?: number }
+export interface DiscoverHints { types: MediaType[]; genres: number[]; excludeGenres: number[]; yearMin?: number; yearMax?: number; platforms: PlatformId[]; runtimeMin?: number; runtimeMax?: number; countries?: string[] }
 export interface RefreshOptions { trigger: string; rebuildPool?: boolean; extraKeys?: TitleKey[]; discover?: DiscoverHints; actorDiscovery?: boolean }
 
 async function discoverWithHints(h: DiscoverHints, settings: ProfileSettings, pages = 1): Promise<TitleKey[]> {
@@ -101,6 +135,7 @@ async function discoverWithHints(h: DiscoverHints, settings: ProfileSettings, pa
         [`${dateField}.lte`]: h.yearMax ? `${h.yearMax}-12-31` : undefined,
         without_genres: h.excludeGenres.length ? h.excludeGenres.join(',') : undefined,
         'with_runtime.gte': h.runtimeMin, 'with_runtime.lte': h.runtimeMax,
+        with_origin_country: h.countries?.length ? h.countries.join('|') : undefined,
       },
     });
     out.push(...r.map((x) => x.key));
@@ -112,7 +147,15 @@ async function discoverWithHints(h: DiscoverHints, settings: ProfileSettings, pa
  * Aprendizaje continuo: recalcula perfil y ranking. Se llama después de cada valoración
  * (reutilizando candidatos en caché) y al abrir la app (reconstruye candidatos una vez por día).
  */
+/** Catálogo narrativo con tope de espera: si no llega a tiempo, el ranking sigue sin el canal semántico. */
+export async function narrativeReady(ms = 6000): Promise<NarrativeIndex | undefined> {
+  const idx = await Promise.race([loadNarrativeIndex(), new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
+  if (idx) setDefaultNarrative(idx);
+  return idx;
+}
+
 export async function refreshRecommendations(profileId: string, o: RefreshOptions): Promise<RecommendationRun> {
+  const nidx = await narrativeReady();
   const settings = await getSettings(profileId);
   const opts = { language: settings.language, country: settings.country };
   const ratings = await listRatings(profileId);
@@ -128,7 +171,7 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   let priority: TitleKey[] = [];
   const stalePool = !last || Date.now() - last.createdAt > 24 * 3600 * 1000 || last.country !== settings.country || pool.length < 20;
   if (o.rebuildPool || stalePool) {
-    const built = await buildPool(ratings, settings, titles);
+    const built = await buildPool(ratings, settings, titles, nidx);
     if (built.pool.length) pool = [...new Set([...built.pool, ...(last?.country === settings.country ? (last?.pool ?? []).slice(0, 150) : [])])];
     warning = built.warning;
     priority = built.priority;
@@ -208,7 +251,7 @@ export async function loadTitleWithRelated(key: TitleKey, settings: ProfileSetti
 }
 
 export function hintsFromFilters(f: RankFilters): DiscoverHints {
-  return { types: f.types, genres: f.includeGenres, excludeGenres: f.excludeGenres, yearMin: f.yearMin, yearMax: f.yearMax, platforms: f.platforms, runtimeMin: f.runtimeMin, runtimeMax: f.runtimeMax };
+  return { types: f.types, genres: f.includeGenres, excludeGenres: f.excludeGenres, yearMin: f.yearMin, yearMax: f.yearMax, platforms: f.platforms, runtimeMin: f.runtimeMin, runtimeMax: f.runtimeMax, countries: f.includeCountries };
 }
 
 /** Por debajo de esta cantidad de candidatos filtrados se busca automáticamente en TMDB */
