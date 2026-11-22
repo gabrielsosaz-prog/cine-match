@@ -1,7 +1,8 @@
 import { db } from './db';
 import type {
-  AppConfig, DimensionScores, Profile, ProfileSettings, Rating, TitleKey, WatchStatus,
+  AppConfig, DimensionScores, ListStatus, Profile, ProfileSettings, Rating, TitleKey,
 } from '../types';
+import { cleanDimensions, hasScore, migrateRating } from './migrations';
 
 export const DEFAULT_PROFILE_ID = 'p-principal';
 
@@ -66,38 +67,43 @@ const clampScore = (v: unknown): number | undefined => {
   return Math.min(10, Math.max(1, Math.round(v * 2) / 2));
 };
 
-export interface RatingInput {
-  status: WatchStatus;
-  overall?: number;
-  dimensions?: DimensionScores;
-  abandonReason?: string;
+/**
+ * Cambios parciales sobre el registro de un título. Lo que no se envía, no se toca:
+ * así marcar «vista» no altera la puntuación y puntuar no marca «vista».
+ * `null` borra el valor.
+ */
+export interface RatingPatch {
+  watched?: boolean;
+  list?: ListStatus | null;
+  overall?: number | null;
+  dimensions?: DimensionScores; // reemplaza el conjunto de aspectos
+  abandonReason?: string | null;
 }
 
-/** Guarda o modifica una valoración. Normaliza valores y deduce el estado "puntuada". */
-export async function saveRating(profileId: string, key: TitleKey, input: RatingInput): Promise<Rating> {
+/** Guarda o modifica. Si el registro queda vacío (no vista, sin lista ni notas) se elimina. */
+export async function saveRating(profileId: string, key: TitleKey, patch: RatingPatch): Promise<Rating | undefined> {
   const id = `${profileId}|${key}`;
-  const prev = await db.ratings.get(id);
-  const dims: DimensionScores = {};
-  for (const [d, v] of Object.entries(input.dimensions ?? {})) {
-    const c = clampScore(v);
-    if (c !== undefined) dims[d as keyof DimensionScores] = c;
-  }
-  const overall = clampScore(input.overall);
-  let status = input.status;
-  const hasScore = overall !== undefined || Object.keys(dims).length > 0;
-  if (status === 'watched' && hasScore) status = 'rated';
-  if (status === 'rated' && !hasScore) status = 'watched';
+  const prevRaw = await db.ratings.get(id);
+  const prev = prevRaw ? migrateRating(prevRaw) : undefined;
   const now = Date.now();
-  const rating: Rating = {
-    id, profileId, key, status,
-    overall, dimensions: dims,
-    abandonReason: status === 'abandoned' ? input.abandonReason : undefined,
-    seasons: prev?.seasons,
-    createdAt: prev?.createdAt ?? now,
-    updatedAt: now,
-  };
-  await db.ratings.put(rating);
-  return rating;
+  const next: Rating = prev ? { ...prev } : { id, profileId, key, watched: false, dimensions: {}, createdAt: now, updatedAt: now, schema: 2 };
+  if (patch.watched !== undefined) {
+    if (patch.watched && !next.watched) next.watchedAt = now;
+    if (!patch.watched) next.watchedAt = undefined;
+    next.watched = patch.watched;
+  }
+  if (patch.list !== undefined) next.list = patch.list ?? undefined;
+  if (patch.overall !== undefined) next.overall = patch.overall === null ? undefined : clampScore(patch.overall);
+  if (patch.dimensions !== undefined) next.dimensions = cleanDimensions(patch.dimensions);
+  if (patch.abandonReason !== undefined) next.abandonReason = patch.abandonReason ?? undefined;
+  if (next.list !== 'abandoned') next.abandonReason = undefined;
+  next.updatedAt = now;
+  if (!next.watched && !next.list && !hasScore(next)) {
+    await db.ratings.delete(id);
+    return undefined;
+  }
+  await db.ratings.put(next);
+  return next;
 }
 
 export async function deleteRating(profileId: string, key: TitleKey) {
@@ -105,5 +111,5 @@ export async function deleteRating(profileId: string, key: TitleKey) {
 }
 
 export async function listRatings(profileId: string): Promise<Rating[]> {
-  return db.ratings.where('profileId').equals(profileId).toArray();
+  return (await db.ratings.where('profileId').equals(profileId).toArray()).map(migrateRating);
 }

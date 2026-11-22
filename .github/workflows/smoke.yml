@@ -1,0 +1,43 @@
+name: Verificación del despliegue (TMDB real)
+# Corre cuando Vercel informa un despliegue exitoso, o a mano. No usa ni muestra el token:
+# consulta la app publicada, que agrega la credencial del lado servidor.
+on:
+  status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL de la app (opcional)
+        required: false
+permissions:
+  contents: read
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event.context == 'Vercel' && github.event.state == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar app, versión y TMDB
+        env:
+          INPUT_URL: ${{ github.event.inputs.url }}
+          EXPECTED_SHA: ${{ github.event.sha || github.sha }}
+        run: |
+          set -u
+          candidates="${INPUT_URL:-} https://cine-match.vercel.app https://cine-match-gabrielsosaz-prog.vercel.app https://cine-match-gabrielsosaz-progs-projects.vercel.app https://cine-match-git-main-gabrielsosaz-prog.vercel.app"
+          APP=""
+          for u in $candidates; do
+            [ -z "$u" ] && continue
+            if curl -fsS --max-time 20 "$u/version.json" -o /tmp/v.json 2>/dev/null && grep -q "Cine Match AI" /tmp/v.json; then APP="$u"; break; fi
+          done
+          if [ -z "$APP" ]; then echo "::error::No se encontró la app publicada en las URLs candidatas"; exit 1; fi
+          echo "App: $APP"; echo "Versión publicada: $(cat /tmp/v.json)"
+          echo "--- /api/health"
+          curl -sS --max-time 30 "$APP/api/health" | tee /tmp/h.json; echo
+          grep -q '"ok":true' /tmp/h.json || { echo "::error::TMDB no respondió correctamente a través del servidor"; exit 1; }
+          echo "--- Búsqueda real: Matrix"
+          curl -fsS --max-time 30 "$APP/api/tmdb/search/multi?query=Matrix&language=es-MX" -o /tmp/s.json
+          python3 -c "import json;r=json.load(open('/tmp/s.json'))['results'];print(len(r),'resultados');[print('-',x.get('media_type'),x.get('title') or x.get('name'),(x.get('release_date') or x.get('first_air_date') or '')[:4]) for x in r[:5]];assert any(x.get('id')==603 for x in r)"
+          echo "--- Ficha + disponibilidad en Argentina (The Matrix, id 603)"
+          curl -fsS --max-time 30 "$APP/api/tmdb/movie/603?language=es-MX&append_to_response=keywords,credits,watch/providers" -o /tmp/d.json
+          python3 -c "import json;d=json.load(open('/tmp/d.json'));ar=d['watch/providers']['results'].get('AR',{});print('Título:',d['title'],'| géneros:',[g['name'] for g in d['genres']],'| keywords:',len(d['keywords']['keywords']));print('AR suscripción:',[p['provider_name'] for p in ar.get('flatrate',[])] or 'sin datos')"
+          echo "--- El token no aparece en las respuestas públicas"
+          if grep -l "eyJhbGci" /tmp/*.json; then echo "::error::Se encontró un token en una respuesta"; exit 1; fi
+          echo "OK"

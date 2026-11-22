@@ -85,21 +85,20 @@ export interface AvailabilityEvent {
 
 export type PlatformId = 'netflix' | 'prime' | 'disney' | 'max';
 
-export type WatchStatus =
-  | 'rated' // vista y puntuada
-  | 'watched' // vista sin puntuar
-  | 'want' // quiero verla
-  | 'watching' // viéndola
-  | 'abandoned' // abandonada
-  | 'not_interested'; // no me interesa
+/** Seguimiento opcional, independiente de la marca de visto y de la puntuación. */
+export type ListStatus = 'want' | 'watching' | 'abandoned' | 'not_interested';
+
+/** Estados combinados de la v1 (sólo para migrar datos y exportaciones antiguas). */
+export type LegacyStatus = 'rated' | 'watched' | 'want' | 'watching' | 'abandoned' | 'not_interested';
 
 export type DimensionId =
   | 'story'
-  | 'characters'
   | 'pacing'
+  | 'characters'
   | 'suspense'
   | 'originality'
   | 'emotion'
+  | 'acting'
   | 'visuals'
   | 'ending';
 
@@ -112,19 +111,29 @@ export interface SeasonRating {
   updatedAt: number;
 }
 
+/**
+ * Registro del usuario sobre un título (esquema v2).
+ * `watched`, `list` y las puntuaciones son independientes entre sí.
+ */
 export interface Rating {
   id: string; // `${profileId}|${key}`
   profileId: string;
   key: TitleKey;
-  status: WatchStatus;
+  /** Marca explícita de visto. No implica satisfacción. */
+  watched: boolean;
+  watchedAt?: number;
+  /** Quiero verla, viéndola, abandonada o no me interesa (opcional) */
+  list?: ListStatus;
   /** Valoración general 1-10, independiente de la media de dimensiones */
   overall?: number;
+  /** Puntuaciones opcionales por aspecto (1-10). Ausente ≠ baja. */
   dimensions: DimensionScores;
   abandonReason?: string;
-  /** Preparado para valoraciones por temporada (la UI v1 usa la global) */
+  /** Preparado para valoraciones por temporada (la UI usa la global) */
   seasons?: SeasonRating[];
   createdAt: number;
   updatedAt: number;
+  schema: 2;
 }
 
 export interface Profile {
@@ -163,6 +172,8 @@ export interface RecommendationItem {
   explanation: string[];
   exploration: boolean;
   provisional: boolean;
+  /** Notas estimadas por aspecto (sólo donde hay evidencia) */
+  dimensionEstimates?: DimensionScores;
 }
 
 export interface RecommendationRun {

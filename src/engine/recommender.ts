@@ -1,9 +1,9 @@
 import { DIMENSIONS } from '../constants';
-import type { DimensionId, ProfileSettings, Rating, RecommendationItem, TitleKey, TitleMeta } from '../types';
+import type { DimensionId, DimensionScores, ProfileSettings, Rating, RecommendationItem, TitleKey, TitleMeta } from '../types';
 import { computeIdf, cosine, describeFeatures, family, FAMILY_WEIGHT, featureLabel, rawFeatures, weightedVector, type FeatureVec } from './features';
 import { buildProfile, LEARNING, type UserProfile } from './profile';
 
-export const ALGORITHM_VERSION = 'hybrid-content-1.0.0';
+export const ALGORITHM_VERSION = 'hybrid-aspects-2.0.0';
 
 /** Interfaz modular: cualquier motor que la implemente puede reemplazar al actual. */
 export interface RecommenderEngine {
@@ -21,11 +21,15 @@ export interface RankInput {
   limit?: number;
   /** semilla para la exploración (estable por día) */
   seed?: number;
+  /** false (predeterminado): excluye títulos marcados como vistos. true: sólo evalúa los candidatos dados. */
+  includeWatched?: boolean;
 }
 
 export const PARAMS = {
   contentGain: 1.7,
   knnGain: 1.3,
+  aspectGain: 1.4, // canal por aspectos (afinidad por aspecto × importancia del aspecto)
+  aspectEstimateGain: 1.8,
   qualityGain: 0.3,
   knnK: 10,
   mmrLambda: 0.8,
@@ -42,6 +46,8 @@ interface Scored {
   neighbors: { key: TitleKey; sim: number; dev: number }[];
   quality: number;
   novelty: number;
+  aspects: { d: DimensionId; dev: number; evidence: number; weighted: number }[];
+  dimensionEstimates: DimensionScores;
 }
 
 function bayesQuality(t: TitleMeta): number {
@@ -78,6 +84,7 @@ export function scoreCandidates(input: RankInput): Scored[] {
     const content = den ? num / (den + 1.5) : 0;
     // 2) Similitud con títulos del historial (kNN ítem-ítem)
     const neigh = rated
+      .filter((s) => s.key !== key) // sin autorreferencia: un título visto no se recomienda por su propia nota
       .map((s) => ({ key: s.key, sim: cosine(vec, vecs.get(s.key)!), dev: Math.max(-LEARNING.maxDeviation, Math.min(LEARNING.maxDeviation, s.value - profile.mean)), w: s.weight }))
       .filter((n) => n.sim > 0.05)
       .sort((a, b) => b.sim - a.sim)
@@ -85,12 +92,29 @@ export function scoreCandidates(input: RankInput): Scored[] {
     let kn = 0, kd = 0.6;
     for (const n of neigh) { kn += n.sim * n.w * n.dev; kd += n.sim * n.w; }
     const knn = kn / kd;
-    // 3) Calidad general (sólo como desempate suave; no domina el ranking)
+    // 3) Canal por aspectos: qué tan bien te resultan, aspecto por aspecto, los rasgos de este título,
+    //    ponderado por cuánto pesa cada aspecto en tus notas generales.
+    const aspects: Scored['aspects'] = [];
+    const dimensionEstimates: DimensionScores = {};
+    let aspectChannel = 0;
+    for (const ds of profile.dimensions) {
+      const dmap = profile.dimFeatures.get(ds.id);
+      if (!dmap || Number.isNaN(ds.mean)) continue;
+      let dn = 0, dd = 0, dev_ = 0;
+      for (const [f, w] of vec) { const fa = dmap.get(f); if (!fa) continue; dn += w * fa.affinity; dd += w; dev_ += Math.min(fa.evidence, 4) * (FAMILY_WEIGHT[family(f)] ?? 0.3); }
+      if (!dd) continue;
+      const dev = dn / (dd + 1.5);
+      aspects.push({ d: ds.id, dev, evidence: dev_, weighted: ds.share * dev });
+      aspectChannel += ds.share * dev;
+      if (dev_ >= 1.5) dimensionEstimates[ds.id] = Math.round(Math.max(1, Math.min(10, ds.mean + PARAMS.aspectEstimateGain * dev)) * 10) / 10;
+    }
+    aspects.sort((a, b) => Math.abs(b.weighted) - Math.abs(a.weighted));
+    // 4) Calidad general (sólo como desempate suave; no domina el ranking)
     const quality = bayesQuality(t);
-    const pred = Math.max(1, Math.min(10, profile.mean + PARAMS.contentGain * content + PARAMS.knnGain * knn + PARAMS.qualityGain * (quality - 6.6)));
+    const pred = Math.max(1, Math.min(10, profile.mean + PARAMS.contentGain * content + PARAMS.knnGain * knn + PARAMS.aspectGain * aspectChannel + PARAMS.qualityGain * (quality - 6.6)));
     const simMass = neigh.reduce((a, n) => a + n.sim, 0);
     const confidence = (1 - Math.exp(-(evid + 3 * simMass) / 8)) * (1 - Math.exp(-profile.ratedCount / 6));
-    out.push({ key, pred, confidence, vec, contributions: contributions.sort((a, b) => Math.abs(b.c) - Math.abs(a.c)), neighbors: neigh.map(({ key, sim, dev }) => ({ key, sim, dev })), quality, novelty: 1 - Math.min(1, evid / 6) });
+    out.push({ key, pred, confidence, vec, contributions: contributions.sort((a, b) => Math.abs(b.c) - Math.abs(a.c)), neighbors: neigh.map(({ key, sim, dev }) => ({ key, sim, dev })), quality, novelty: 1 - Math.min(1, evid / 6), aspects, dimensionEstimates });
   }
   return out;
 }
@@ -129,22 +153,17 @@ export function explain(s: Scored, input: RankInput, info: ReturnType<typeof des
     });
     lines.push(`Se parece a ${list(names)}, que ${good.length === 1 ? 'puntuaste' : 'puntuaste'} por encima de tu media.`);
   }
-  // Dimensión destacada: dónde puntuás más alto en títulos con los rasgos que comparte
-  const dimAgg = new Map<DimensionId, { s: number; n: number }>();
-  for (const c of pos.slice(0, 6)) {
-    const fd = profile.featureDims.get(c.f);
-    if (!fd) continue;
-    for (const [d, v] of Object.entries(fd) as [DimensionId, { mean: number; n: number }][]) {
-      const a = dimAgg.get(d) ?? { s: 0, n: 0 }; a.s += v.mean * v.n; a.n += v.n; dimAgg.set(d, a);
-    }
+  // Aspectos: lo que más pesa en tus notas y cómo te resultan títulos con estos rasgos
+  const label = (d: DimensionId) => DIMENSIONS.find((x) => x.id === d)!.label.toLowerCase();
+  const topImp = [...profile.dimensions].filter((d) => d.count > 0).sort((a, b) => b.share - a.share).slice(0, 3).map((d) => d.id);
+  const posAsp = s.aspects.filter((a) => a.dev > 0.25 && a.evidence >= 1.5 && s.dimensionEstimates[a.d] !== undefined).slice(0, 2);
+  if (posAsp.length) {
+    const parts = posAsp.map((a) => `${label(a.d)} (≈${fmt(s.dimensionEstimates[a.d]!)})`);
+    const key = posAsp.find((a) => topImp.includes(a.d));
+    lines.push(`En títulos con rasgos parecidos puntuás alto ${list(parts)}${key ? `; ${label(key.d)} es de lo que más pesa en tus notas` : ''}.`);
   }
-  const bestDim = [...dimAgg].map(([d, a]) => ({ d, mean: a.s / a.n, n: a.n })).filter((x) => x.n >= 2)
-    .map((x) => ({ ...x, lift: x.mean - (profile.dimensions.find((d) => d.id === x.d)?.mean ?? x.mean) }))
-    .sort((a, b) => b.mean + b.lift - (a.mean + a.lift))[0];
-  if (bestDim && bestDim.mean >= 7.5) {
-    const label = DIMENSIONS.find((d) => d.id === bestDim.d)!.label.toLowerCase();
-    lines.push(`En títulos con estos rasgos valoraste especialmente ${label} (${fmt(bestDim.mean)} de promedio).`);
-  }
+  const negAsp = s.aspects.filter((a) => a.dev < -0.35 && a.evidence >= 1.5 && s.dimensionEstimates[a.d] !== undefined).slice(0, 1);
+  if (negAsp.length && !exploration) lines.push(`Ojo: en títulos parecidos solés puntuar bajo ${label(negAsp[0].d)} (≈${fmt(s.dimensionEstimates[negAsp[0].d]!)}).`);
   const neg = s.contributions.filter((c) => c.c < -0.15 && !info.get(c.f)?.spoiler && ['g', 'k'].includes(family(c.f))).slice(0, 2);
   if (neg.length && !exploration) lines.push(`A tener en cuenta: incluye ${list(neg.map((n) => featureLabel(n.f, info)))}, que solés puntuar más bajo.`);
   if (!lines.length || (lines.length === 1 && exploration)) {
@@ -158,7 +177,8 @@ export function explain(s: Scored, input: RankInput, info: ReturnType<typeof des
 /** Ranking final: afinidad, exclusiones, diversificación (MMR) y espacios de exploración. */
 export function rank(input: RankInput): RecommendationItem[] {
   const limit = input.limit ?? 30;
-  const excluded = new Set(input.ratings.map((r) => r.key)); // vistas, puntuadas, pendientes y rechazadas
+  // Rechazadas y abandonadas nunca se recomiendan; las vistas se excluyen salvo que se pidan explícitamente
+  const excluded = new Set(input.ratings.filter((r) => r.list === 'not_interested' || r.list === 'abandoned' || (!input.includeWatched && r.watched)).map((r) => r.key));
   const excludedGenres = new Set(input.settings?.excludedGenres ?? []);
   const candidates = [...new Set(input.candidates)].filter((k) => !excluded.has(k) && input.titles.has(k))
     .filter((k) => !input.titles.get(k)!.genres.some((g) => excludedGenres.has(g.id)));
@@ -201,6 +221,7 @@ export function rank(input: RankInput): RecommendationItem[] {
     explanation: explain(s, input, info, exploration),
     exploration,
     provisional: input.profile.ratedCount < 5,
+    dimensionEstimates: s.dimensionEstimates,
   }));
 }
 

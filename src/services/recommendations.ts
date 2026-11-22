@@ -73,8 +73,10 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
     warning = built.warning;
   }
   for (const k of o.extraKeys ?? []) for (const r of titles.get(k)?.related ?? []) if (!pool.includes(r)) pool.push(r);
-  const rated = new Set(histKeys);
-  pool = pool.filter((k) => !rated.has(k));
+  // Rechazadas/abandonadas fuera; vistas y puntuadas se evalúan aparte para el filtro «vistos»
+  const blocked = new Set(ratings.filter((r) => r.list === 'not_interested' || r.list === 'abandoned').map((r) => r.key));
+  const watchedKeys = ratings.filter((r) => r.watched && !blocked.has(r.key)).map((r) => r.key);
+  pool = [...new Set([...pool, ...ratings.filter((r) => !r.watched).map((r) => r.key)])].filter((k) => !blocked.has(k));
 
   // Preselección con datos disponibles y luego ficha completa sólo para los mejores
   let all = await titleMap([...histKeys, ...pool]);
@@ -86,14 +88,18 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
     try { await ensureFullTitles(toFetch, opts, 45); } catch (e) { warning ??= friendlyError(e); }
     all = await titleMap([...histKeys, ...pool]);
   }
-  const keysForAvail = [...new Set([...pre.map((p) => p.key), ...unknown])];
+  const keysForAvail = [...new Set([...pre.map((p) => p.key), ...unknown, ...watchedKeys])];
   try { await refreshAvailability(keysForAvail, settings.country, 40); } catch (e) { warning ??= friendlyError(e); }
   const snaps = await db.availability.bulkGet(keysForAvail.map((k) => `${k}|${settings.country}`));
   const availOk = new Set(keysForAvail.filter((_, i) => matchesPlatforms(snaps[i], settings.platforms, settings.includeUnconfirmed)));
 
   const profile2 = engine.buildProfile(ratings, all, settings);
   const seed = Math.floor(Date.now() / 86400000) + profileId.length;
-  const items = engine.rank({ profile: profile2, ratings, titles: all, candidates: [...availOk], settings, limit: 40, seed });
+  const unwatched = engine.rank({ profile: profile2, ratings, titles: all, candidates: [...availOk], settings, limit: 40, seed });
+  const watchedSet = new Set(watchedKeys);
+  const watchedRanked = engine.rank({ profile: profile2, ratings, titles: all, candidates: watchedKeys.filter((k) => availOk.has(k)), settings, limit: 40, seed, includeWatched: true })
+    .filter((i) => watchedSet.has(i.key)).map((i) => ({ ...i, exploration: false }));
+  const items = [...unwatched, ...watchedRanked];
 
   const run: RecommendationRun = {
     profileId, algorithmVersion: engine.version, createdAt: Date.now(), trigger: o.trigger,

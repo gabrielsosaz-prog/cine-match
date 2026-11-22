@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { migrateRating } from './migrations';
 import type {
   ActivityLog, AppConfig, AvailabilityEvent, AvailabilitySnapshot, Profile, ProfileSettings,
   ProfileSnapshot, Rating, RecommendationRun, TitleMeta,
@@ -35,6 +36,10 @@ export class CineDB extends Dexie {
       snapshots: '++id, profileId, at',
       logs: '++id, profileId, at, type',
     });
+    // v2: marca de visto independiente (watched) + lista de seguimiento (list). Migra sin perder datos.
+    this.version(2)
+      .stores({ ratings: 'id, profileId, key, updatedAt, [profileId+list]' })
+      .upgrade((tx) => tx.table('ratings').toCollection().modify((r: any, ref: { value: unknown }) => { ref.value = migrateRating(r); }));
   }
 }
 

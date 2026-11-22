@@ -1,5 +1,5 @@
 import { mapDetails } from '../../src/providers/tmdb';
-import type { Rating, TitleKey, TitleMeta, WatchStatus } from '../../src/types';
+import type { Rating, TitleKey, TitleMeta } from '../../src/types';
 import { buildCatalog, fakeTmdbHandler, rng, type Cluster, type FakeTitle } from './fakeTmdb';
 
 export async function syntheticMetas(perCluster = 25, seed = 42) {
@@ -41,9 +41,9 @@ export function simulateHistory(u: SyntheticUser, catalog: FakeTitle[], n: numbe
   const ratings: Rating[] = watched.map((t) => {
     const key = `${t.type}:${t.id}` as TitleKey;
     const score = scores.get(key)!;
-    const status: WatchStatus = score <= 3 && r() < 0.4 ? 'abandoned' : 'rated';
+    const abandoned = score <= 3 && r() < 0.4;
     const dims = r() < 0.6 ? { story: Math.max(1, Math.min(10, score + Math.round(gauss()))), suspense: t.cluster === 'thriller' ? Math.min(10, score + 1) : Math.max(1, score - 1) } : {};
-    return { id: `u|${key}`, profileId: 'u', key, status, overall: score, dimensions: dims, createdAt: 0, updatedAt: 0 };
+    return { id: `u|${key}`, profileId: 'u', key, watched: !abandoned, list: abandoned ? 'abandoned' : undefined, overall: score, dimensions: dims, createdAt: 0, updatedAt: 0, schema: 2 } as Rating;
   });
   return { ratings, scores };
 }

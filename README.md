@@ -43,17 +43,25 @@ Vercel (plan Hobby gratuito) publica la app y la función `/api/tmdb` en el mism
 
 Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se guardan en tablas separadas; cada verificación registra fuente y fecha.
 
-### Motor de recomendaciones (`hybrid-content-1.0.0`)
+### Novedades v2.0
 
-1. **Rasgos de cada título**: géneros, palabras clave (temáticas), dirección/creación, reparto, tipo, década, duración, cantidad de temporadas, idioma; ponderados por familia × IDF.
-2. **Perfil dinámico**: afinidad por rasgo = desvío medio de tus notas respecto de tu media, con contracción bayesiana (λ=2,5) y recorte de extremos (±3,5) para que una nota aislada no distorsione.
-3. **Señales**: puntuadas (peso 1), abandonadas y «no me interesa» (negativas), «quiero verla» y «viéndola» (positivas suaves), vistas sin nota.
-4. **Dimensiones**: la nota efectiva combina la general (75 %) y la media de aspectos ponderada por importancia aprendida (correlación de cada aspecto con tu nota general) × peso manual ajustable.
-5. **Predicción**: tu media + afinidad de contenido + vecinos más parecidos de tu historial (kNN por coseno) + leve ajuste por valoración del público.
-6. **Confianza** según evidencia compartida y cantidad de valoraciones; con menos de 5 la recomendación se marca provisional.
-7. **Exclusiones**: todo lo ya vista, pendiente o rechazado; géneros excluidos; plataformas no contratadas.
-8. **Diversidad** (MMR) y **exploración**: 1 de cada 6 posiciones se reserva a títulos bien valorados con rasgos poco explorados, marcados como tales.
-9. **Aprendizaje continuo**: cada valoración se guarda, se registra con la versión del algoritmo, recalcula perfil y ranking, y guarda una instantánea del perfil para ver su evolución.
+- **Nota general + 9 aspectos opcionales e independientes**: Trama y guion, Ritmo narrativo, Personajes, Suspenso e intriga, Originalidad, Impacto emocional, Actuaciones, Dirección y calidad visual, Final o desenlace. La nota general no se calcula a partir de los aspectos; un aspecto sin nota queda como «sin dato».
+- **Marca «Vista / No vista» independiente**: se puede marcar vista sin puntuar, puntuar sin marcar vista, y cambiarlo después. «Vista» no es una señal de gusto.
+- **Filtro del inicio**: «Solo no vistos» (predeterminado), «Solo vistos» y «Todos», combinable con plataforma y tipo.
+- **Acciones rápidas en cada tarjeta**: vista con un toque, nota general en línea, panel de aspectos y edición, sin salir del ranking. Se recalcula al guardar, pero el orden no cambia mientras editás.
+- **Migración automática** de los datos v1 (sin pérdida) y exportación `cine-match-export/2`, que también importa archivos v1.
+
+### Motor de recomendaciones (`hybrid-aspects-2.0.0`)
+
+1. **Rasgos de cada título**: géneros, palabras clave, dirección/creación, reparto, tipo, década, duración, temporadas, idioma; ponderados por familia × IDF.
+2. **Afinidad general**: desvío de tus notas generales respecto de tu media por rasgo, con contracción bayesiana (λ=2,5) y recorte (±3,5) para que una nota extrema aislada no distorsione.
+3. **Afinidad por aspecto** (nuevo): para cada aspecto se aprende en qué rasgos (género, temática, autor, formato) puntuás ese aspecto alto o bajo, usando sólo los títulos donde lo puntuaste. Un aspecto faltante no cuenta como negativo.
+4. **Importancia aprendida de cada aspecto**: regresión ridge de tu nota general sobre los desvíos de cada aspecto (cuánto explica cada uno tus notas), mezclada con un prior uniforme mientras hay poca evidencia y multiplicada por el peso manual del perfil de gustos.
+5. **Predicción**: tu media + afinidad general + vecinos parecidos de tu historial (kNN por coseno) + canal de aspectos ponderado por importancia + leve ajuste por valoración del público. Es un modelo de afinidad, no un promedio.
+6. **Señales**: nota general (peso 1), sólo aspectos (0,6), abandonada y «no me interesa» (negativas), «quiero verla»/«viéndola» (positivas suaves). «Vista» sin nota no aporta señal.
+7. **Recalcula** perfil y ranking ante cualquier cambio de nota, aspecto o lista (marcar vista no recalcula el aprendizaje).
+8. **Diversidad** (MMR) y **exploración** (1 de cada 6 posiciones). Explicaciones con tus preferencias reales, incluidos los aspectos que más pesan y los aspectos estimados para el título.
+9. **Confianza** según evidencia; con menos de 5 valoraciones la recomendación se marca provisional.
 
 La nota estimada es una afinidad en escala 1-10, no una probabilidad.
 

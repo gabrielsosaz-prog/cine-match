@@ -1,19 +1,18 @@
-import type { DimensionId, PlatformId, WatchStatus } from './types';
+import type { DimensionId, ListStatus, PlatformId } from './types';
 
 export const DIMENSIONS: { id: DimensionId; label: string; short: string }[] = [
-  { id: 'story', label: 'Historia y guion', short: 'Guion' },
-  { id: 'characters', label: 'Desarrollo de personajes', short: 'Personajes' },
+  { id: 'story', label: 'Trama y guion', short: 'Guion' },
   { id: 'pacing', label: 'Ritmo narrativo', short: 'Ritmo' },
+  { id: 'characters', label: 'Personajes', short: 'Personajes' },
   { id: 'suspense', label: 'Suspenso e intriga', short: 'Suspenso' },
   { id: 'originality', label: 'Originalidad', short: 'Originalidad' },
   { id: 'emotion', label: 'Impacto emocional', short: 'Emoción' },
-  { id: 'visuals', label: 'Calidad visual y dirección', short: 'Visual' },
+  { id: 'acting', label: 'Actuaciones', short: 'Actuaciones' },
+  { id: 'visuals', label: 'Dirección y calidad visual', short: 'Dirección' },
   { id: 'ending', label: 'Final o desenlace', short: 'Final' },
 ];
 
-export const STATUS_LABELS: Record<WatchStatus, string> = {
-  rated: 'Vista y puntuada',
-  watched: 'Vista sin puntuar',
+export const LIST_LABELS: Record<ListStatus, string> = {
   want: 'Quiero verla',
   watching: 'Viéndola',
   abandoned: 'Abandonada',

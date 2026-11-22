@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db/db';
 import { latestRun, refreshRecommendations } from '../services/recommendations';
 import { friendlyError } from '../providers/errors';
 
 let inflight: Promise<unknown> | null = null;
 
+/** Último ranking calculado (en vivo) + acciones para recalcular. */
 export function useRecommendations(profileId: string) {
   const run = useLiveQuery(() => latestRun(profileId), [profileId]);
   const [busy, setBusy] = useState(false);
@@ -19,10 +19,8 @@ export function useRecommendations(profileId: string) {
     await inflight;
   }, [profileId]);
   useEffect(() => {
-    // Recalcular al abrir si no hay ranking o tiene más de 12 h
-    latestRun(profileId).then((r) => { if (!r || Date.now() - r.createdAt > 12 * 3600 * 1000) refresh(false); });
+    // Recalcular al abrir si no hay ranking, tiene más de 12 h o es de una versión anterior del motor
+    latestRun(profileId).then((r) => { if (!r || Date.now() - r.createdAt > 12 * 3600 * 1000 || !r.algorithmVersion.startsWith('hybrid-aspects')) refresh(false); });
   }, [profileId, refresh]);
-  const keys = run?.items.map((i) => i.key) ?? [];
-  const titles = useLiveQuery(() => db.titles.bulkGet(keys), [run?.id]);
-  return { run, titles, busy: busy || run === undefined && busy, error, refresh };
+  return { run, busy, error, refresh };
 }

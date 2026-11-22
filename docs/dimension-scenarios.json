@@ -1,0 +1,48 @@
+{
+  "aviso": "Escenarios sintéticos: muestran cómo responde el motor, no validan su precisión con usuarios reales.",
+  "escenarios": {
+    "Escenario 1: notas generales iguales (8) en thrillers y dramas": {
+      "sinAspectos": {
+        "thriller": 8.28,
+        "drama": 8.37
+      },
+      "suspensoAltoEnThrillers": {
+        "thriller": 9.04,
+        "drama": 8.15
+      },
+      "emocionAltaEnDramas": {
+        "thriller": 8.09,
+        "drama": 9.16
+      }
+    },
+    "Escenario 2: importancia aprendida": {
+      "actuaciones": 1.91,
+      "ritmo": 0.09,
+      "promedio": 1
+    },
+    "Escenario 3: aspecto ausente": {
+      "dramasSinAspectos": 8.37,
+      "dramasConSuspensoSoloEnThrillers": 8.45
+    },
+    "Escenario 4: una nota de suspenso de 1 entre ocho de 9": {
+      "afinidadAntes": 0.42,
+      "afinidadDespues": 0.42
+    },
+    "Escenario 5: editar el suspenso de títulos ya valorados (con historial donde el suspenso pesa)": {
+      "pesoDelSuspenso": 1,
+      "thrillers": {
+        "base": 9.45,
+        "suspensoBajadoA3": 7.34
+      },
+      "cienciaFiccion": {
+        "base": 9.22,
+        "suspensoSubidoA10": 9.99
+      },
+      "cienciaFiccionEnTop10": {
+        "base": 5,
+        "suspensoBajoEnThrillers": 8,
+        "suspensoAltoEnCienciaFiccion": 8
+      }
+    }
+  }
+}

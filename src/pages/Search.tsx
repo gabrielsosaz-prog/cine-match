@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { STATUS_LABELS } from '../constants';
+import { LIST_LABELS } from '../constants';
+import { migrateRating } from '../db/migrations';
 import { db } from '../db/db';
 import { useApp } from '../hooks/useApp';
 import { friendlyError } from '../providers/errors';
@@ -32,7 +33,7 @@ export function useSearch(query: string, language: string, country: string) {
 
 export function SearchResults({ hits, country, profileId }: { hits: SearchHit[]; country: string; profileId: string }) {
   const snaps = useLiveQuery(() => db.availability.bulkGet(hits.map((h) => `${h.key}|${country}`)), [hits, country]);
-  const ratings = useLiveQuery(() => db.ratings.bulkGet(hits.map((h) => `${profileId}|${h.key}`)), [hits, profileId]);
+  const ratings = useLiveQuery(() => db.ratings.bulkGet(hits.map((h) => `${profileId}|${h.key}`)).then((rs) => rs.map((r) => (r ? migrateRating(r) : undefined))), [hits, profileId]);
   return (
     <ul className="space-y-2" aria-label="Resultados">
       {hits.map((h, i) => (
@@ -47,7 +48,7 @@ export function SearchResults({ hits, country, profileId }: { hits: SearchHit[];
               </div>
               <div className="mt-0.5 truncate text-xs text-slate-500">{h.genres.map((g) => g.name).join(' · ') || 'Géneros sin datos'}</div>
               <div className="mt-1"><AvailabilityLine snap={snaps?.[i]} compact /></div>
-              {ratings?.[i] && <div className="mt-1 text-xs font-semibold text-accent">{STATUS_LABELS[ratings[i]!.status]}{ratings[i]!.overall ? ` · ${ratings[i]!.overall}/10` : ''}</div>}
+              {ratings?.[i] && <div className="mt-1 text-xs font-semibold text-accent">{[ratings[i]!.watched ? 'Vista' : 'No vista', ratings[i]!.list ? LIST_LABELS[ratings[i]!.list!] : '', ratings[i]!.overall !== undefined ? `${ratings[i]!.overall}/10` : ''].filter(Boolean).join(' · ')}</div>}
             </div>
           </TitleLink>
         </li>

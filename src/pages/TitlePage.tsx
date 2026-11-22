@@ -11,7 +11,8 @@ import type { MediaType, TitleKey, TitleMeta } from '../types';
 import { titleKey } from '../types';
 import { AvailabilityLine, Card, ErrorNote, Poster, Spinner, TitleLink, TypeBadge } from '../ui/components';
 import { dateTime } from '../ui/format';
-import RatingPanel from './RatingPanel';
+import RatingEditor from '../ui/RatingEditor';
+import { migrateRating } from '../db/migrations';
 
 export default function TitlePage() {
   const { type, id } = useParams();
@@ -25,7 +26,7 @@ export default function TitlePage() {
   }, [key, settings.language, settings.country]);
   const meta = useLiveQuery(() => db.titles.get(key), [key]);
   const snap = useLiveQuery(() => db.availability.get(`${key}|${settings.country}`), [key, settings.country]);
-  const rating = useLiveQuery(() => db.ratings.get(`${profileId}|${key}`), [profileId, key]);
+  const rating = useLiveQuery(() => db.ratings.get(`${profileId}|${key}`).then((r) => (r ? migrateRating(r) : undefined)), [profileId, key]);
   const related = useLiveQuery(async () => {
     if (!meta?.related?.length) return [];
     const rel = (await db.titles.bulkGet(meta.related)).filter((m): m is TitleMeta => Boolean(m));
@@ -70,7 +71,7 @@ export default function TitlePage() {
         </p>
       </Card>
 
-      <RatingPanel profileId={profileId} k={key} existing={rating} isTv={meta.type === 'tv'} />
+      <Card><h2 className="mb-3 font-semibold">Tu valoración</h2><RatingEditor profileId={profileId} k={key} existing={rating} isTv={meta.type === 'tv'} /></Card>
 
       {(meta.directors.length > 0 || meta.cast.length > 0) && (
         <Card className="space-y-1 text-sm">

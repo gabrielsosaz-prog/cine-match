@@ -8,7 +8,9 @@ import { useApp } from '../hooks/useApp';
 import { friendlyError } from '../providers/errors';
 import { discoverCandidates } from '../services/catalog';
 import { refreshRecommendations } from '../services/recommendations';
-import type { PlatformId, TitleKey, WatchStatus } from '../types';
+import type { PlatformId, TitleKey } from '../types';
+import type { RatingPatch } from '../db/repo';
+import { migrateRating } from '../db/migrations';
 import type { SearchResult } from '../providers/tmdb';
 import { Chip, ErrorNote, Poster, Spinner, TypeBadge } from '../ui/components';
 import { SearchResults, useSearch } from './Search';
@@ -32,8 +34,9 @@ export function diversePicks(lists: SearchResult[][], n = 24): SearchResult[] {
 }
 
 function QuickRate({ r, profileId, onDone }: { r: SearchResult; profileId: string; onDone: () => void }) {
-  const existing = useLiveQuery(() => db.ratings.get(`${profileId}|${r.key}`), [r.key]);
-  const set = async (status: WatchStatus, overall?: number) => { await saveRating(profileId, r.key as TitleKey, { status, overall }); onDone(); };
+  const existing = useLiveQuery(() => db.ratings.get(`${profileId}|${r.key}`).then((x) => (x ? migrateRating(x) : undefined)), [r.key]);
+  // En este paso se puntúa lo que ya viste: la nota rápida marca «vista» de forma explícita (se puede cambiar luego)
+  const set = async (patch: RatingPatch) => { await saveRating(profileId, r.key as TitleKey, patch); onDone(); };
   return (
     <div className="rounded-2xl bg-ink-900 p-2.5 ring-1 ring-white/5" data-testid="quick-card">
       <div className="flex gap-2.5">
@@ -41,17 +44,18 @@ function QuickRate({ r, profileId, onDone }: { r: SearchResult; profileId: strin
         <div className="min-w-0">
           <div className="font-medium leading-tight">{r.title}</div>
           <div className="flex items-center gap-1 text-xs text-slate-400"><TypeBadge type={r.type} />{r.year}</div>
-          {existing && <div className="text-xs text-accent">{existing.overall ? `Tu nota: ${existing.overall}` : existing.status === 'want' ? 'Quiero verla' : existing.status === 'not_interested' ? 'No me interesa' : 'No la vi'}</div>}
+          {existing && <div className="text-xs text-accent">{existing.overall ? `Vista · tu nota: ${existing.overall}` : existing.list === 'want' ? 'Quiero verla' : existing.list === 'not_interested' ? 'No me interesa' : existing.watched ? 'Vista' : ''}</div>}
         </div>
       </div>
       <div className="mt-2 flex gap-0.5">
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-          <button key={n} onClick={() => set('rated', n)} aria-label={`${r.title}: ${n}`} className={`h-8 flex-1 rounded text-xs font-semibold ${existing?.overall === n ? 'bg-accent text-ink-950' : 'bg-ink-800 text-slate-400'}`}>{n}</button>
+          <button key={n} onClick={() => set({ overall: n, watched: true })} aria-label={`${r.title}: ${n}`} className={`h-8 flex-1 rounded text-xs font-semibold ${existing?.overall === n ? 'bg-accent text-ink-950' : 'bg-ink-800 text-slate-400'}`}>{n}</button>
         ))}
       </div>
       <div className="mt-1.5 flex gap-1.5 text-xs">
-        <button onClick={() => set('want')} className="rounded-full bg-ink-800 px-2.5 py-1">Quiero verla</button>
-        <button onClick={() => set('not_interested')} className="rounded-full bg-ink-800 px-2.5 py-1">No me interesa</button>
+        <button onClick={() => set({ list: 'want', watched: false })} className="rounded-full bg-ink-800 px-2.5 py-1">Quiero verla</button>
+        <button onClick={() => set({ list: 'not_interested' })} className="rounded-full bg-ink-800 px-2.5 py-1">No me interesa</button>
+        <button onClick={() => set({ watched: true })} className="rounded-full bg-ink-800 px-2.5 py-1">Vista, sin nota</button>
       </div>
     </div>
   );
@@ -94,7 +98,7 @@ export default function Onboarding() {
   );
   return (
     <div className="space-y-4">
-      <p className="text-slate-300">Paso 2 de 3 · Puntuá rápido lo que ya viste (nota general del 1 al 10). Podés saltear los que no viste. Más adelante podés puntuar cada aspecto.</p>
+      <p className="text-slate-300">Paso 2 de 3 · Puntuá rápido lo que ya viste (nota general del 1 al 10; queda marcada como vista). Podés saltear los que no viste. Más adelante podés puntuar cada aspecto.</p>
       <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar una película o serie que conozcas…" className="w-full rounded-xl bg-ink-800 px-4 py-3 ring-1 ring-white/10" data-testid="ob-search" />
       {q.trim().length >= 2 ? <SearchResults hits={hits} country={settings.country} profileId={profileId} /> : (
         <>

@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 
 export default function Pending() {
   const { profileId, settings } = useApp();
-  const items = useLiveQuery(() => db.ratings.where('[profileId+status]').anyOf([[profileId, 'want'], [profileId, 'watching']]).toArray(), [profileId]) ?? [];
+  const items = useLiveQuery(() => db.ratings.where('[profileId+list]').anyOf([[profileId, 'want'], [profileId, 'watching']]).toArray(), [profileId]) ?? [];
   const titles = useLiveQuery(() => db.titles.bulkGet(items.map((i) => i.key)), [items]) ?? [];
   const snaps = useLiveQuery(() => db.availability.bulkGet(items.map((i) => `${i.key}|${settings.country}`)), [items, settings.country]) ?? [];
   useEffect(() => { if (items.length) refreshAvailability(items.map((i) => i.key), settings.country, 30).catch(() => undefined); }, [items.length, settings.country]);
@@ -23,7 +23,7 @@ export default function Pending() {
               <Poster path={titles[i]?.posterPath} title={titles[i]?.title ?? r.key} className="h-20 w-14 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{titles[i]?.title ?? r.key}</div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">{titles[i] && <TypeBadge type={titles[i]!.type} />}{r.status === 'watching' ? 'Viéndola' : 'Quiero verla'}</div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-400">{titles[i] && <TypeBadge type={titles[i]!.type} />}{r.list === 'watching' ? 'Viéndola' : 'Quiero verla'}</div>
                 <div className="mt-1"><AvailabilityLine snap={snaps[i]} compact /></div>
               </div>
             </TitleLink>

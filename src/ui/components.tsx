@@ -50,29 +50,29 @@ export function Chip({ active, onClick, children, testId }: { active?: boolean; 
 }
 
 /** Selector 1-10 táctil. Tocar el valor elegido lo borra (dimensión opcional). */
-export function ScoreRow({ label, value, onChange, testId }: { label: string; value?: number; onChange: (v: number | undefined) => void; testId?: string }) {
+export function ScoreRow({ label, value, onChange, testId, compact }: { label: string; value?: number; onChange: (v: number | undefined) => void; testId?: string; compact?: boolean }) {
   return (
-    <div className="mb-3" data-testid={testId}>
+    <div className={compact ? 'mb-2' : 'mb-3'} data-testid={testId}>
       <div className="mb-1 flex justify-between text-sm"><span className="text-slate-300">{label}</span><span className="font-semibold text-accent">{value ?? '—'}</span></div>
       <div className="flex gap-1">
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
           <button key={n} type="button" aria-label={`${label}: ${n}`} onClick={() => onChange(value === n ? undefined : n)}
-            className={`h-9 flex-1 rounded-md text-sm font-semibold ${value !== undefined && n <= value ? 'bg-accent text-ink-950' : 'bg-ink-800 text-slate-400'}`}>{n}</button>
+            className={`${compact ? 'h-7 text-xs' : 'h-9 text-sm'} flex-1 rounded-md font-semibold ${value !== undefined && n <= value ? 'bg-accent text-ink-950' : 'bg-ink-800 text-slate-400'}`}>{n}</button>
         ))}
       </div>
     </div>
   );
 }
 
-export function DimensionEditor({ value, onChange }: { value: DimensionScores; onChange: (v: DimensionScores) => void }) {
-  const [open, setOpen] = useState(Object.keys(value).length > 0);
+export function DimensionEditor({ value, onChange, defaultOpen }: { value: DimensionScores; onChange: (v: DimensionScores) => void; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen ?? Object.keys(value).length > 0);
   return (
     <div>
       <button type="button" className="mb-2 text-sm font-semibold text-accent" onClick={() => setOpen(!open)}>
-        {open ? '▾' : '▸'} Puntuar aspectos (opcional){Object.keys(value).length ? ` · ${Object.keys(value).length}/8` : ''}
+        {open ? '▾' : '▸'} Puntuar aspectos (opcional){Object.keys(value).length ? ` · ${Object.keys(value).length}/${DIMENSIONS.length}` : ''}
       </button>
       {open && DIMENSIONS.map((d) => (
-        <ScoreRow key={d.id} label={d.label} value={value[d.id]} testId={`dim-${d.id}`}
+        <ScoreRow key={d.id} compact label={d.label} value={value[d.id]} testId={`dim-${d.id}`}
           onChange={(v) => { const n = { ...value }; if (v === undefined) delete n[d.id as DimensionId]; else n[d.id as DimensionId] = v; onChange(n); }} />
       ))}
     </div>
