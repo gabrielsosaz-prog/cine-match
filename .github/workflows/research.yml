@@ -11,6 +11,10 @@ on:
         description: Rama donde publicar data/out (vacío = no publicar)
         required: false
         default: ''
+      limit:
+        description: Límite de títulos (0 = todos)
+        required: false
+        default: '0'
 permissions:
   contents: write
 jobs:
@@ -20,11 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+        with: { node-version: 22, cache: npm }
       - run: npm ci
+      - run: npm i --no-save @huggingface/transformers@3.8.1 --onnxruntime-node-install-cuda=skip
       - name: Ejecutar
         env:
           APP: https://cine-match-pied-tau.vercel.app
+          CATALOG_LIMIT: ${{ github.event.inputs.limit }}
         run: mkdir -p data/out && node ${{ github.event.inputs.script }}
       - name: Publicar resultados
         if: github.event.inputs.publish_branch != ''
