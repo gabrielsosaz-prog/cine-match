@@ -512,9 +512,9 @@ test('v3: filtro de un género con pocos candidatos (Terror) y filtro por actor 
   await panel.getByTestId('person-input').fill('Actor 231');
   await expect(panel.getByTestId('person-hit')).toHaveCount(2);
   await expect(panel.getByTestId('person-hit').filter({ hasText: 'Dirección' })).toHaveCount(1);
-  await panel.getByTestId('person-hit').filter({ hasText: 'Actuación' }).click();
-  await expect(panel.getByTestId('person-selected')).toHaveText('Con Actor 231');
-  await expect(page.getByTestId('active-filters')).toContainText('Con Actor 231');
+  await panel.getByTestId('person-hit').filter({ hasText: 'Actuación' }).getByTestId('person-include').click();
+  await expect(panel.getByTestId('person-selected')).toContainText('Actor 231');
+  await expect(page.getByTestId('active-filters')).toContainText('Actores incluidos: Actor 231');
   await page.getByTestId('watched-filter-all').click();
   await expect(page.getByTestId('rec-item').first()).toBeVisible({ timeout: 20000 });
   // Combinable con tipo
@@ -525,7 +525,7 @@ test('v3: filtro de un género con pocos candidatos (Terror) y filtro por actor 
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-v3-actor.png`, fullPage: true });
   await panel.getByTestId('person-clear').click();
-  await expect(page.getByTestId('active-filters')).not.toContainText('Con Actor');
+  await expect(page.getByTestId('active-filters')).not.toContainText('Actores incluidos');
 });
 
 test('v3: Similares con dos referencias, similitud y afinidad separadas, filtros y acciones', async ({ page }, info) => {

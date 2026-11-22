@@ -132,10 +132,11 @@ describe('v3.1 · tráileres', () => {
     expect(chooseTrailer([v({ language: 'en' }), v({ language: 'es', name: 'Tráiler Oficial [Subtitulado]' }), v({ language: 'es', name: 'Tráiler oficial doblado' })], 'en')!.rank).toBe(1);
     expect(chooseTrailer([v({ language: 'en' }), v({ language: 'es', name: 'Tráiler Oficial [Subtitulado]' })], 'en')!.rank).toBe(2);
     const orig = chooseTrailer([v({ language: 'en' })], 'en')!;
-    expect(orig.rank).toBe(3);
-    expect(orig.audio).toMatch(/no están confirmados/);
-    expect(chooseTrailer([v({ language: 'en', type: 'Teaser' })], 'en')!.rank).toBe(4);
-    expect(chooseTrailer([v({ language: 'es', official: false })], 'en')).toBeUndefined();
+    // v3.2: el original pasa a 4, el avance a 5 y el tráiler no oficial en español a 3
+    expect(orig.rank).toBe(4);
+    expect(orig.audio).toMatch(/no confirmados/);
+    expect(chooseTrailer([v({ language: 'en', type: 'Teaser' })], 'en')!.rank).toBe(5);
+    expect(chooseTrailer([v({ language: 'es', official: false })], 'en')!.rank).toBe(3);
     expect(chooseTrailer([], 'en')).toBeUndefined();
     expect(orig.embedUrl).toMatch(/^https:\/\/www\.youtube-nocookie\.com\/embed\//);
   });

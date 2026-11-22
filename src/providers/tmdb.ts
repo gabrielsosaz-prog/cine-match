@@ -63,7 +63,7 @@ export function mapPersonHit(r: any): PersonHit {
       .slice(0, 3).map((k: any) => `${k.title ?? k.name}${(k.release_date ?? k.first_air_date ?? '').slice(0, 4) ? ` (${(k.release_date ?? k.first_air_date).slice(0, 4)})` : ''}`),
   };
 }
-export interface PersonCredit extends SearchResult { kind: 'cast' | 'crew'; character?: string; job?: string; order?: number; episodes?: number }
+export interface PersonCredit extends SearchResult { kind: 'cast' | 'crew'; character?: string; job?: string; department?: string; order?: number; episodes?: number }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -247,7 +247,7 @@ export class TmdbClient {
       if (!Array.isArray(list)) continue;
       for (const c of list) {
         if ((c?.media_type !== 'movie' && c?.media_type !== 'tv') || typeof c.id !== 'number') continue;
-        out.push({ ...mapListItem(c, c.media_type), kind, character: c.character, job: c.job, order: typeof c.order === 'number' ? c.order : undefined, episodes: typeof c.episode_count === 'number' ? c.episode_count : undefined });
+        out.push({ ...mapListItem(c, c.media_type), kind, character: c.character, job: c.job, department: c.department, order: typeof c.order === 'number' ? c.order : undefined, episodes: typeof c.episode_count === 'number' ? c.episode_count : undefined });
       }
     }
     return out;

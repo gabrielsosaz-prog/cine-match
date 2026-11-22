@@ -28,15 +28,35 @@ export interface RankFilters {
    */
   includeCountries?: string[];
   excludeCountries?: string[];
+  /** v3.2: qué campo de TMDB cuenta como país: origen ∪ producción (predeterminado), sólo origen o sólo producción */
+  countryField?: CountryField;
+  /**
+   * v3.2: personas incluidas y excluidas, por id único de TMDB (homónimos distintos = ids distintos).
+   * Actuación: cuenta sólo si tiene un crédito de reparto que no sea «como sí mismo» (ni producción ni equipo técnico).
+   * Dirección/guion: cuenta su crédito en ese departamento. Series: cualquier crédito de reparto en la serie,
+   * también como invitado (TMDB los agrupa por serie con la cantidad de episodios); «Todos» = todos figuran en la
+   * serie, aunque sea en episodios distintos.
+   * Incluir «Cualquiera» = al menos uno; «Todos» = todos. Excluir = se quita si figura cualquiera; la exclusión manda.
+   */
+  includePeople?: PersonRef[];
+  excludePeople?: PersonRef[];
+  peopleMode?: 'any' | 'all';
+  /** v3.2: con filtros de personas, mostrar también los títulos que no están en tus plataformas */
+  anyPlatform?: boolean;
 }
+export interface PersonRef { id: number; name: string; department?: string }
+export type CountryField = 'both' | 'origin' | 'production';
+
+/** Personas incluidas (compatibilidad: el filtro de una sola persona de v3.0 cuenta como incluida). */
+export const includedPeople = (f: RankFilters): PersonRef[] => f.includePeople ?? (f.person ? [f.person] : []);
 
 /** Países de un título: origen (series y películas) + producción (películas). */
-export const countriesOf = (t: TitleMeta): string[] => [...new Set([...(t.originCountry ?? []), ...(t.productionCountries ?? [])])];
+export const countriesOf = (t: TitleMeta, field: CountryField = 'both'): string[] => [...new Set([...(field !== 'production' ? t.originCountry ?? [] : []), ...(field !== 'origin' ? t.productionCountries ?? [] : [])])];
 
 /** «Recomendaciones generales» */
 export const DEFAULT_FILTERS: RankFilters = { types: [], includeGenres: [], excludeGenres: [], platforms: [], watched: 'unwatched' };
 
-type FilterId = 'types' | 'includeGenres' | 'excludeGenres' | 'yearMin' | 'yearMax' | 'platforms' | 'runtime' | 'minScore' | 'person' | 'includeCountries' | 'excludeCountries';
+type FilterId = 'types' | 'includeGenres' | 'excludeGenres' | 'yearMin' | 'yearMax' | 'platforms' | 'runtime' | 'minScore' | 'person' | 'includeCountries' | 'excludeCountries' | 'includePeople' | 'excludePeople';
 export type { FilterId };
 
 /** Filtros que cambian el conjunto de candidatos (el de vistos se maneja aparte, como en v2.0). */
@@ -50,7 +70,8 @@ export function activeFilters(f: RankFilters): FilterId[] {
   if (f.platforms.length) out.push('platforms');
   if (f.runtimeMin || f.runtimeMax) out.push('runtime');
   if (f.minScore) out.push('minScore');
-  if (f.person) out.push('person');
+  if (includedPeople(f).length) out.push('includePeople');
+  if (f.excludePeople?.length) out.push('excludePeople');
   if (f.includeCountries?.length) out.push('includeCountries');
   if (f.excludeCountries?.length) out.push('excludeCountries');
   return out;
@@ -59,7 +80,7 @@ export function activeFilters(f: RankFilters): FilterId[] {
 export const isGeneral = (f: RankFilters) => activeFilters(f).length === 0 && f.watched === 'unwatched';
 export const activeCount = (f: RankFilters) => activeFilters(f).length + (f.watched === 'unwatched' ? 0 : 1);
 
-const without = (f: RankFilters, id: FilterId): RankFilters => {
+export const without = (f: RankFilters, id: FilterId): RankFilters => {
   const g = { ...f };
   if (id === 'types') g.types = [];
   if (id === 'includeGenres') g.includeGenres = [];
@@ -69,7 +90,8 @@ const without = (f: RankFilters, id: FilterId): RankFilters => {
   if (id === 'platforms') g.platforms = [];
   if (id === 'runtime') { g.runtimeMin = undefined; g.runtimeMax = undefined; }
   if (id === 'minScore') g.minScore = undefined;
-  if (id === 'person') g.person = undefined;
+  if (id === 'person' || id === 'includePeople') { g.person = undefined; g.includePeople = []; }
+  if (id === 'excludePeople') g.excludePeople = [];
   if (id === 'includeCountries') g.includeCountries = [];
   if (id === 'excludeCountries') g.excludeCountries = [];
   return g;
@@ -85,11 +107,16 @@ export function filterLabel(id: FilterId, f: RankFilters, genreName: (id: number
     case 'platforms': return f.platforms.map(platformName).join(' o ');
     case 'runtime': return f.runtimeMin && f.runtimeMax ? `${f.runtimeMin}-${f.runtimeMax} min` : f.runtimeMin ? `Más de ${f.runtimeMin} min` : `Hasta ${f.runtimeMax} min`;
     case 'minScore': return `Para vos ≥ ${f.minScore}`;
-    case 'person': return `Con ${f.person?.name}`;
-    case 'includeCountries': return `De ${f.includeCountries!.map(countryName).join(' o ')}`;
-    case 'excludeCountries': return `Sin producciones de ${f.excludeCountries!.map(countryName).join(', ')}`;
+    case 'person':
+    case 'includePeople': { const ps = includedPeople(f); return ps.length === 1 ? `Actores incluidos: ${ps[0].name}` : `Actores incluidos: ${joinY(ps.map((p) => p.name))} · Coincidencia: ${f.peopleMode === 'all' ? 'Todos' : 'Cualquiera'}`; }
+    case 'excludePeople': return `Actores excluidos: ${joinY(f.excludePeople!.map((p) => p.name))}`;
+    case 'includeCountries': return `Países incluidos: ${joinY(f.includeCountries!.map(countryName), 'o')}${fieldNote(f)}`;
+    case 'excludeCountries': return `Países excluidos: ${joinY(f.excludeCountries!.map(countryName))}${fieldNote(f)}`;
   }
 }
+
+const joinY = (xs: string[], y = 'y') => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} ${y} ${xs[xs.length - 1]}`);
+const fieldNote = (f: RankFilters) => (f.countryField === 'origin' ? ' (país de origen)' : f.countryField === 'production' ? ' (país de producción)' : '');
 
 export interface Candidate { meta: TitleMeta; snap?: AvailabilitySnapshot | null; rating?: Rating; score?: number }
 
@@ -106,9 +133,10 @@ export function matchesContent(c: Candidate, f: RankFilters): boolean {
   if (t.runtime && f.runtimeMin && t.runtime < f.runtimeMin) return false;
   if (t.runtime && f.runtimeMax && t.runtime > f.runtimeMax) return false;
   if (f.includeCountries?.length || f.excludeCountries?.length) {
-    const cs = countriesOf(t);
-    if (f.includeCountries?.length && !cs.some((c) => f.includeCountries!.includes(c))) return false;
+    const cs = countriesOf(t, f.countryField);
+    // La exclusión manda: una coproducción con un país excluido no pasa aunque tenga uno incluido
     if (f.excludeCountries?.length && cs.some((c) => f.excludeCountries!.includes(c))) return false;
+    if (f.includeCountries?.length && !cs.some((c) => f.includeCountries!.includes(c))) return false;
   }
   return true;
 }
@@ -149,9 +177,14 @@ const KEY = (profileId: string) => `cine-match:filters:${profileId}`;
 export function loadFilters(profileId: string): RankFilters {
   try {
     const raw = localStorage.getItem(KEY(profileId));
-    if (raw) return { ...DEFAULT_FILTERS, ...JSON.parse(raw) };
+    if (raw) return migrateFilters({ ...DEFAULT_FILTERS, ...JSON.parse(raw) });
   } catch { /* almacenamiento no disponible */ }
   return { ...DEFAULT_FILTERS };
+}
+/** v3.2: el filtro de una persona (v3.0/v3.1) pasa a «personas incluidas». Idempotente, sólo en lectura. */
+export function migrateFilters(f: RankFilters): RankFilters {
+  if (f.person && !f.includePeople) { const { person, ...rest } = f; return { ...rest, includePeople: [person] }; }
+  return f;
 }
 export function saveFilters(profileId: string, f: RankFilters) {
   try { localStorage.setItem(KEY(profileId), JSON.stringify(f)); } catch { /* sin almacenamiento */ }
