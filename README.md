@@ -11,23 +11,24 @@ npm install
 npm run dev          # desarrollo en http://localhost:5173
 npm run build        # compila a dist/ (PWA con service worker)
 npm run preview      # sirve dist/ en http://localhost:4173
-npm test             # 53 pruebas unitarias, de integración y evaluación
+npm test             # 59 pruebas unitarias, de integración y evaluación
 npm run test:e2e     # pruebas de interfaz en Android emulado (Pixel 7 y pantalla chica)
 npm run eval         # evaluación offline del motor (escribe docs/evaluation-results.json)
 ```
 
-Al abrir la app por primera vez pide el **Token de acceso de lectura de TMDB** (gratuito, uso personal): cuenta en themoviedb.org → Configuración → API. Se guarda sólo en el dispositivo; no está en el código.
+## Token de TMDB (nunca en el código ni en GitHub)
+
+La app consulta TMDB a través de su propio servidor (`/api/tmdb`), que agrega la credencial leyendo la variable de entorno **`TMDB_READ_ACCESS_TOKEN`**. El navegador nunca recibe el token.
+
+- **Producción (Vercel):** Project → Settings → Environment Variables → `TMDB_READ_ACCESS_TOKEN` (Production y Preview) → Redeploy. Verificación: abrir `https://<tu-app>.vercel.app/api/health` debe mostrar `"ok": true` (no muestra el token).
+- **Local:** copiar `.env.example` a `.env` y completar el valor. `.env` está en `.gitignore`. `npm run dev` y `npm run preview` sirven el mismo proxy.
+- **Alternativa sin servidor:** en la app, «token guardado sólo en este dispositivo» (para uso personal) o el proxy de Cloudflare de `proxy/`.
+
+El proxy sólo permite rutas de lectura (búsqueda, discover, fichas, proveedores, géneros), descarta parámetros extra y rechaza pedidos desde otros sitios. Hay una prueba que compila con un token falso y verifica que no aparece en `dist/`.
 
 ## Publicación
 
-`.github/workflows/deploy.yml` corre las pruebas y publica `dist/` en GitHub Pages en cada push a `main` (Settings → Pages → Source: GitHub Actions). La app usa rutas relativas y `HashRouter`, así que funciona en cualquier subcarpeta.
-
-## Instalar en Android
-
-1. Abrí la dirección publicada en **Chrome** para Android.
-2. Menú ⋮ → **Instalar app** (o «Agregar a la pantalla principal»).
-3. Se abre a pantalla completa, sin barra del navegador, y funciona sin conexión con los datos guardados.
-4. Pegá el token de TMDB, elegí plataformas y puntuá algunos títulos.
+Vercel (plan Hobby gratuito) publica la app y la función `/api/tmdb` en el mismo dominio, y vuelve a publicar en cada push a `main`. Pasos: vercel.com → *Sign up with GitHub* → *Add New → Project* → importar `cine-match` → agregar `TMDB_READ_ACCESS_TOKEN` → *Deploy*. GitHub Actions (`.github/workflows/tests.yml`) corre las pruebas en cada push.
 
 ## Arquitectura
 
@@ -38,7 +39,7 @@ Al abrir la app por primera vez pide el **Token de acceso de lectura de TMDB** (
 | Metadatos | TMDB API v3 | Gratuita para uso no comercial; películas y series, temporadas, reparto, keywords |
 | Disponibilidad | TMDB `watch/providers` (datos de JustWatch) | Única fuente legítima y gratuita con datos por país (AR) |
 | Motor | Híbrido propio en TS (`src/engine`) | Verificable, explicable, reemplazable vía `RecommenderEngine` |
-| Proxy opcional | Cloudflare Worker (`proxy/`) | Mantiene la clave en el servidor para uso multiusuario |
+| Servidor | Función serverless de Vercel (`api/`) | Guarda el token en una variable de entorno; mismo dominio, sin costo |
 
 Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se guardan en tablas separadas; cada verificación registra fuente y fecha.
 

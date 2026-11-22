@@ -96,6 +96,31 @@ test('error del proveedor: muestra aviso claro sin romper la app', async ({ page
   await expect(page.getByRole('alert')).toContainText('rechazó la clave');
 });
 
+test('con el token en el servidor no pide nada al usuario y usa el proxy propio', async ({ page }) => {
+  let direct = 0;
+  await page.route('https://api.themoviedb.org/**', (r) => { direct++; return r.fulfill({ status: 500 }); });
+  await page.route('**/api/health', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, tokenConfigured: true, tmdbStatus: 200 }) }));
+  const proxied: string[] = [];
+  await page.route('**/api/tmdb/**', async (route) => {
+    const u = new URL(route.request().url());
+    proxied.push(u.pathname);
+    expect(route.request().headers()['authorization']).toBeUndefined();
+    const { status, body } = await handler('https://api.themoviedb.org/3' + u.pathname.replace('/api/tmdb', '') + u.search);
+    await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await page.goto('/');
+  await expect(page.getByText('Paso 1 de 3')).toBeVisible();
+  await page.getByTestId('ob-next').click();
+  await expect(page.getByTestId('quick-card').first()).toBeVisible();
+  expect(proxied.length).toBeGreaterThan(0);
+  expect(direct).toBe(0);
+});
+
+test('servidor sin token: lo indica claramente', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('server-status')).toContainText(/no tiene/);
+});
+
 test('manifest PWA instalable', async ({ page }) => {
   await page.goto('/');
   const manifest = await page.evaluate(async () => (await fetch(document.querySelector('link[rel=manifest]')!.getAttribute('href')!)).json());

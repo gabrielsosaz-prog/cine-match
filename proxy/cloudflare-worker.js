@@ -4,7 +4,7 @@
  *
  * Despliegue:
  *   npm i -g wrangler && wrangler login
- *   wrangler secret put TMDB_TOKEN        # pegar el "Token de acceso de lectura"
+ *   wrangler secret put TMDB_READ_ACCESS_TOKEN        # pegar el "Token de acceso de lectura"
  *   wrangler secret put ALLOWED_ORIGIN    # ej. https://TU_USUARIO.github.io
  *   wrangler deploy proxy/cloudflare-worker.js --name cine-match-proxy --compatibility-date 2024-11-01
  * En la app: Ajustes → Fuente de datos → Proxy = https://cine-match-proxy.TU_SUBDOMINIO.workers.dev/3
@@ -27,7 +27,7 @@ export default {
     if (!ALLOWED_PATHS.test(url.pathname)) return new Response('Ruta no permitida', { status: 404, headers: cors });
     const upstream = new URL('https://api.themoviedb.org' + url.pathname + url.search);
     const res = await fetch(upstream, {
-      headers: { Authorization: `Bearer ${env.TMDB_TOKEN}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${env.TMDB_READ_ACCESS_TOKEN}`, Accept: 'application/json' },
       cf: { cacheTtl: 3600, cacheEverything: true },
     });
     const body = await res.text();

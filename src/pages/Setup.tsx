@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { updateConfig } from '../db/repo';
-import { TmdbClient } from '../providers/tmdb';
+import { BUILTIN_PROXY, TmdbClient, checkServer } from '../providers/tmdb';
 import { friendlyError } from '../providers/errors';
 import { Card, ErrorNote } from '../ui/components';
 import { useApp } from '../hooks/useApp';
@@ -21,6 +21,12 @@ export default function Setup() {
   const [saved, setSaved] = useState(false);
   // Navegar recién cuando la configuración guardada ya está disponible en el contexto
   useEffect(() => { if (saved && (config.tmdbToken || config.proxyUrl)) nav('/'); }, [saved, config.tmdbToken, config.proxyUrl]);
+  const [server, setServer] = useState<Awaited<ReturnType<typeof checkServer>>>();
+  useEffect(() => { checkServer().then(setServer); }, []);
+  const useServer = async () => {
+    setBusy(true); setErr(undefined);
+    try { await updateConfig({ proxyUrl: BUILTIN_PROXY, tmdbToken: undefined }); setSaved(true); } finally { setBusy(false); }
+  };
   const save = async () => {
     setBusy(true); setErr(undefined);
     try {
@@ -32,7 +38,20 @@ export default function Setup() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Cine Match <span className="text-accent">AI</span></h1>
-      <p className="text-slate-300">Para buscar títulos reales y su disponibilidad necesitás una clave gratuita de TMDB (uso personal).</p>
+      <p className="text-slate-300">Para buscar títulos reales y su disponibilidad, la app necesita acceso a TMDB.</p>
+      <Card className="space-y-2 text-sm" >
+        <h2 className="font-semibold">Servidor de la app</h2>
+        <p data-testid="server-status" className={server?.ok ? 'text-emerald-300' : 'text-amber-300'}>
+          {!server ? 'Comprobando…'
+            : server.ok ? 'Conectado: el servidor tiene el token de TMDB y TMDB responde.'
+            : server.tokenConfigured ? `El servidor tiene un token pero TMDB lo rechazó (código ${server.tmdbStatus ?? '?'}). Revisá TMDB_READ_ACCESS_TOKEN.`
+            : server.available ? 'El servidor no tiene configurada la variable TMDB_READ_ACCESS_TOKEN.'
+            : 'Esta copia de la app no tiene servidor propio.'}
+        </p>
+        {server?.ok && <button onClick={useServer} disabled={busy} data-testid="use-server" className="w-full rounded-xl bg-accent py-3 font-semibold text-ink-950">Usar el servidor y continuar</button>}
+        {server && !server.ok && <button onClick={() => checkServer().then(setServer)} className="text-accent underline">Volver a comprobar</button>}
+      </Card>
+      <p className="pt-2 text-sm font-semibold text-slate-300">Alternativa: token guardado sólo en este dispositivo</p>
       <Card className="space-y-3 text-sm text-slate-300">
         <ol className="list-decimal space-y-1 pl-5">
           <li>Creá una cuenta en <a className="text-accent underline" href="https://www.themoviedb.org/signup" target="_blank" rel="noreferrer">themoviedb.org</a>.</li>

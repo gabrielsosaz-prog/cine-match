@@ -1,6 +1,6 @@
 # Resultados de pruebas
 
-## Unitarias e integración (Vitest) — 53/53 OK
+## Unitarias e integración (Vitest) — 59/59 OK
 
 | Archivo | Qué cubre |
 |---|---|
@@ -9,11 +9,12 @@
 | `persistence.test.ts` (8) | Guardar y modificar valoraciones, dimensiones opcionales, normalización, motivo de abandono, persistencia al reabrir la base, perfiles, exportar/importar/borrar |
 | `engine.test.ts` (16) | Actualización de preferencias, robustez ante nota extrema, señales implícitas, importancia de dimensiones, ranking, exclusiones, explicaciones sin spoilers, arranque en frío, confianza, exploración y diversidad, perfiles sintéticos diferenciados |
 | `integration.test.ts` (7) | Flujo completo buscar → valorar → recalcular ranking (con versión del algoritmo), filtro por plataforma, caídas del proveedor, sinopsis faltante |
+| `proxy.test.ts` (6) | Token sólo del lado servidor, rutas y parámetros permitidos, errores, origen |
 | `evaluation.test.ts` (1) | NDCG@10, Recall@10 y cobertura vs. popularidad, calidad y azar |
 
-## Interfaz móvil (Playwright) — 6/6 OK
+## Interfaz móvil (Playwright) — 10/10 OK
 
-Pixel 7 y pantalla chica (360 px): configuración, incorporación con valoración rápida, ranking con explicaciones, filtros por plataforma y tipo, homónimos en búsqueda, ficha con puntuación por aspectos, modificación, persistencia tras recargar, perfil de gustos, sin desplazamiento horizontal, error de clave, manifest PWA.
+Pixel 7 y pantalla chica (360 px): configuración, incorporación con valoración rápida, ranking con explicaciones, filtros por plataforma y tipo, homónimos en búsqueda, ficha con puntuación por aspectos, modificación, persistencia tras recargar, perfil de gustos, sin desplazamiento horizontal, error de clave, manifest PWA, uso del proxy propio sin enviar credenciales desde el navegador, aviso de servidor sin token.
 
 ## Evaluación offline (sintética)
 

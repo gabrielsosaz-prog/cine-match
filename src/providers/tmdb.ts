@@ -9,6 +9,21 @@ export const TMDB_SOURCE = 'TMDB';
 export const AVAILABILITY_SOURCE = 'TMDB / JustWatch';
 const API = 'https://api.themoviedb.org/3';
 export const IMG = 'https://image.tmdb.org/t/p/';
+/** Proxy integrado (mismo dominio que la app): la credencial vive en el servidor. */
+export const BUILTIN_PROXY = '/api/tmdb';
+
+/** Consulta al servidor si tiene el token configurado y TMDB responde. */
+export async function checkServer(fetchImpl: FetchLike = (u, i) => fetch(u, i)): Promise<{ available: boolean; tokenConfigured: boolean; ok: boolean; tmdbStatus?: number }> {
+  try {
+    const r = await fetchImpl('/api/health', { headers: { Accept: 'application/json' } });
+    const ct = r.headers.get('Content-Type') ?? '';
+    if (!ct.includes('json')) return { available: false, tokenConfigured: false, ok: false };
+    const j = await r.json();
+    return { available: true, tokenConfigured: Boolean(j.tokenConfigured), ok: Boolean(j.ok), tmdbStatus: j.tmdbStatus };
+  } catch {
+    return { available: false, tokenConfigured: false, ok: false };
+  }
+}
 
 export interface TmdbAuth {
   /** Token v4 ("eyJ...") o clave v3 de 32 caracteres. Se guarda sólo en el dispositivo. */
@@ -73,7 +88,7 @@ export class TmdbClient {
   async get<T = any>(path: string, params: Record<string, string | number | boolean | undefined> = {}): Promise<T> {
     if (!this.configured) throw new ProviderError('config', 'TMDB sin credenciales');
     const base = this.auth.proxyUrl ? this.auth.proxyUrl.replace(/\/$/, '') : API;
-    const url = new URL(base + path);
+    const url = new URL(base + path, typeof location !== 'undefined' ? location.origin : 'http://localhost');
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
     const headers: Record<string, string> = { Accept: 'application/json' };
     const token = this.auth.token?.trim();
