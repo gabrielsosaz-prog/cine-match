@@ -107,7 +107,24 @@ test('producción v3.4: preferencias con evidencia real, diagnóstico y credenci
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('diag-export').click()]);
   const raw = Buffer.concat(await (await dl.createReadStream()).toArray()).toString('utf8');
   expect(jwt.test(raw)).toBe(false);
-  expect(JSON.parse(raw).engine).toBe(EXPECTED.algorithm);
+  const ex = JSON.parse(raw);
+  expect(ex.engine).toBe(EXPECTED.algorithm);
+  // Todos los resultados filtrados (no sólo la primera página): cada coincidencia con «poco romance» tiene en TMDB
+  // la evidencia que declara, y ese título quedó más abajo que en el orden del motor (o al final de la lista)
+  type DI = { key: string; title: string; rank: number; engineRank?: number; prefs?: { delta: number; matches: { evidence: string[] }[]; unknown: string[] } };
+  const items: DI[] = ex.items;
+  const matched = items.filter((i) => i.prefs?.matches.length);
+  log('exportados:', items.length, '· con coincidencia:', matched.length, '· sin datos:', items.filter((i) => i.prefs?.unknown.length).length);
+  for (const it of matched.slice(0, 8)) {
+    const f = await facts(page, it.key);
+    log('evidencia', it.key, f.title, it.prefs!.matches[0].evidence.join(', '), `· puesto ${it.engineRank} → ${it.rank}`, '| TMDB géneros:', f.genres.join(','));
+    for (const e of it.prefs!.matches[0].evidence) {
+      const g = e.match(/^género (.+)$/), w = e.match(/^«(.+)»$/);
+      if (g) expect(f.genres).toContain(g[1].toLowerCase());
+      if (w) expect(f.kw).toContain(w[1]);
+    }
+    expect(it.rank >= it.engineRank! || it.rank > items.length - 5).toBe(true);
+  }
   await page.screenshot({ path: `test-results/prod-${info.project.name}-v34-diagnostico.png`, fullPage: true });
   await page.goto('/#/ajustes');
   await page.getByTestId('diagnostic-toggle').uncheck();
