@@ -1,3 +1,21 @@
+# Resultados de pruebas (v3.4)
+
+Cuatro tipos de prueba, que no se mezclan:
+1. **Unitarias/funcionales** (Vitest, fichas a mano): comprueban que el código hace lo que dice. No miden calidad.
+2. **Simuladas** (Vitest y Playwright con el catálogo sintético `tests/fixtures/fakeTmdb.ts`): flujos e interfaz en Android.
+3. **Con datos reales** (`tests/prod/*.spec.ts`, GitHub Actions contra la app publicada y TMDB real): integración.
+4. **Evaluación de calidad con referencia independiente** (`npm run eval:v34`): catálogo real + Wikipedia/Wikidata, con desarrollo y evaluación final separados. Es la única que respalda afirmaciones de precisión.
+
+## Resumen v3.4
+
+- Vitest: **235/235 OK**. 21 nuevas en `tests/unit/v34.test.ts`: restricción estricta vs. preferencia flexible («sin romance» filtra, «poco romance» no), texto sin preferencias idéntico a texto-1.0, preferencias no aplicadas con motivo, ajuste sólo con evidencia (sin datos = sin cambio), desplazamiento estable por posiciones, preferencias que no quitan títulos y conservan la posición del motor (integración simulada), combinación con filtros manuales y persistencia, valoraciones y ajustes intactos, orden 3.4.0 = mismo conjunto y mismas notas que 3.1.0, tope de 1 por saga, modo diagnóstico (apagado por defecto, dato vs. inferencia, faltantes, filtros, exportación sin credenciales), y ningún token en `src`, `scripts` ni `dist`.
+- Actualizadas en `v33.test.ts` por cambios intencionales: «atmósfera opresiva» ahora es una preferencia (antes «no interpretado»); con `público-1.1` una animación «G» cuenta como Infantil, así que «Familiar sin Infantil» la excluye.
+- Playwright, Android Pixel 7 y Galaxy S5 (360 px): **66/66 OK**. 2 flujos nuevos (`tests/e2e/v34.spec.ts`): vista previa con preferencia aplicada y no aplicada, restricción + preferencia, «Baja por…» con evidencia, persistencia al recargar, sin desborde horizontal; modo diagnóstico apagado por defecto, panel, exportación JSON sin token, y apagado.
+- Producción con TMDB real: `tests/prod/v34.spec.ts` (versión y motor publicados, ningún token en el HTML ni en el JavaScript, «poco romance» no cambia la cantidad de resultados, cada «Baja por» se verifica contra la ficha de TMDB, Toy Story Infantil con la ficha real, diagnóstico y exportación).
+- Evaluación de calidad: `docs/eval-v3.4.md`, `docs/audience-validation.md`, `docs/preferences-validation.json`.
+- Corregido al probar: (1) «poco romance» subía títulos románticos (sumar puntos a una nota recortada deshacía la diversidad); (2) un texto con sólo preferencias no contaba como filtro activo; (3) «importantes para la trama» y «No mostrar…» dejaban palabras sin interpretar.
+- Las evaluaciones sintéticas previas (`docs/evaluation-results.json`) se regeneraron con el motor 3.4.0: NDCG@10 promedio del motor 0,757 → 0,84 y cobertura 0,525 → 0,46. Es un catálogo sintético: confirma la dirección, no la valida.
+
 # Resultados de pruebas (v3.3)
 
 ## Resumen v3.3

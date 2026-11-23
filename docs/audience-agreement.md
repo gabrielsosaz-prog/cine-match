@@ -1,10 +1,10 @@
 # Diagnóstico de público objetivo (catálogo 2026-11-22, señales audience-2026-11-23.json)
 
-Compara las reglas `público-1.0` (umbral 0,5) con etiquetas que asignó el desarrollador a 36 títulos conocidos.
+Compara las reglas `público-1.1` (umbral 0,5) con etiquetas que asignó el desarrollador a 36 títulos conocidos.
 **No es una validación de precisión**: las etiquetas no vienen de usuarios ni de una fuente independiente, y la muestra es chica y elegida a mano.
 
 - teen: aciertos sí 8, falsos sí 0, sí no detectados 0, aciertos no 20, inciertos 3, discutibles 5
-- kids: aciertos sí 1, falsos sí 0, sí no detectados 0, aciertos no 30, inciertos 5, discutibles 0
+- kids: aciertos sí 3, falsos sí 0, sí no detectados 0, aciertos no 30, inciertos 3, discutibles 0
 - adult: aciertos sí 12, falsos sí 1, sí no detectados 0, aciertos no 15, inciertos 0, discutibles 8
 
 | Título | Adolescente | Infantil | Adulto |
@@ -16,7 +16,7 @@ Compara las reglas `público-1.0` (umbral 0,5) con etiquetas que asignó el desa
 | Sex Education | incierto 0.38 (esperado: discutible) | no 0.00 (esperado: no) | sí 0.60 (esperado: discutible) |
 | Riverdale | sí 0.88 (esperado: sí) | no 0.00 (esperado: no) | no 0.00 (esperado: no) |
 | Bluey | no 0.00 (esperado: no) | sí 0.95 (esperado: sí) | no 0.00 (esperado: no) |
-| Toy Story | no 0.00 (esperado: no) | incierto 0.30 (esperado: sí) | no 0.00 (esperado: no) |
+| Toy Story | no 0.00 (esperado: no) | sí 0.55 (esperado: sí) | no 0.00 (esperado: no) |
 | Frozen | no 0.00 (esperado: no) | incierto 0.28 (esperado: sí) | no 0.00 (esperado: no) |
 | El Padrino | no 0.00 (esperado: no) | no 0.00 (esperado: no) | sí 0.60 (esperado: sí) |
 | Breaking Bad | no 0.00 (esperado: no) | no 0.00 (esperado: no) | sí 0.60 (esperado: sí) |
@@ -33,7 +33,7 @@ Compara las reglas `público-1.0` (umbral 0,5) con etiquetas que asignó el desa
 | The White Lotus | no 0.00 (esperado: no) | no 0.00 (esperado: no) | sí 0.60 (esperado: sí) |
 | Rick y Morty | no 0.00 (esperado: no) | no 0.00 (esperado: no) | sí 0.92 (esperado: sí) |
 | Padre de familia | no 0.00 (esperado: no) | no 0.00 (esperado: no) | sí 0.80 (esperado: sí) |
-| Buscando a Nemo | no 0.00 (esperado: no) | incierto 0.30 (esperado: sí) | no 0.00 (esperado: no) |
+| Buscando a Nemo | no 0.00 (esperado: no) | sí 0.55 (esperado: sí) | no 0.00 (esperado: no) |
 | Batman: El caballero de la noche | no 0.00 (esperado: no) | no 0.00 (esperado: no) | no 0.00 (esperado: discutible) |
 | Diario de una pasión | no 0.00 (esperado: no) | no 0.00 (esperado: no) | no 0.00 (esperado: discutible) |
 | 10 cosas que odio de ti | sí 0.94 (esperado: sí) | no 0.00 (esperado: no) | no 0.00 (esperado: no) |

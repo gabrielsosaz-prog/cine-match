@@ -51,8 +51,8 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
   page.on('pageerror', (e) => errors.push(e.message));
   const v = await (await page.request.get('/version.json')).json();
   log(info.project.name, JSON.stringify(v));
-  expect(v.version).toBe('3.3.0');
-  expect(v.algorithm).toBe('hybrid-narrative-3.1.0');
+  expect(v.version).toBe('3.4.0');
+  expect(v.algorithm).toBe('hybrid-narrative-3.4.0');
   await start(page);
 
   // 11-13. Búsqueda general de personas

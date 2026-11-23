@@ -211,6 +211,10 @@ export interface RecommendationItem {
   base?: number;
   /** v3.0: candidato incorporado por búsqueda extra en TMDB con poca evidencia propia */
   lowEvidence?: boolean;
+  /** v3.4: ajuste por preferencias flexibles del texto libre (reordena, no filtra) */
+  prefs?: { delta: number; matches: { id: string; label: string; polarity: 1 | -1; evidence: string[] }[]; unknown: string[] };
+  /** v3.4: posición que tenía según el motor antes de aplicar preferencias */
+  engineRank?: number;
 }
 
 export type ChannelId = 'theme' | 'comments' | 'aspects' | 'actors' | 'crew' | 'narrative' | 'similar' | 'genre' | 'format' | 'rejection' | 'quality';

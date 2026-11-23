@@ -104,7 +104,7 @@ export function activeFilters(f: RankFilters): FilterId[] {
   if (f.excludeRegions?.length) out.push('excludeRegions');
   if (f.audience?.include.length) out.push('includeAudience');
   if (f.audience?.exclude.length) out.push('excludeAudience');
-  if (f.text && (f.text.include.length || f.text.exclude.length)) out.push('text');
+  if (f.text && (f.text.include.length || f.text.exclude.length || f.text.prefs?.some((x) => x.applied))) out.push('text');
   return out;
 }
 
@@ -258,7 +258,7 @@ export function smartNeeds(f: RankFilters) {
   const audience = Boolean(f.audience?.include.length || f.audience?.exclude.length || all.some((c) => c.k === 'audience'));
   return {
     audience,
-    keywords: audience || all.some((c) => c.k === 'theme'),
+    keywords: audience || all.some((c) => c.k === 'theme') || Boolean(f.text?.prefs?.some((p) => p.applied)),
     countries: Boolean(f.includeCountries?.length || f.excludeCountries?.length || f.includeRegions?.length || f.excludeRegions?.length || all.some((c) => c.k === 'region' || c.k === 'country')),
   };
 }

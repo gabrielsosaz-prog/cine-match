@@ -9,7 +9,8 @@ import { friendlyError } from '../providers/errors';
 import { META_VERSION } from '../providers/tmdb';
 import type { MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
 import { peopleSets, type PeopleSets } from './peopleFilter';
-import { countriesOf, dataGaps, diagnose, matchesContent, matchesWatched, smartNeeds, type Candidate, type DataGaps, type RankFilters } from './filters';
+import { countriesOf, dataGaps, diagnose, keywordNames, matchesContent, matchesWatched, smartNeeds, type Candidate, type DataGaps, type RankFilters } from './filters';
+import { prefAdjust, reorderByPrefs } from './preferences';
 import { loadAudienceData } from './audience';
 import { loadWestern } from './regions';
 import { matchesPlatforms } from './availability';
@@ -375,6 +376,11 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
   const seed = Math.floor(Date.now() / 86400000) + profileId.length;
   let items = engine.rank({ profile, ratings, titles: all, candidates: pass.map((c) => c.meta.key), settings, limit: pass.length, seed, includeWatched: f.watched !== 'unwatched', lowEvidence });
   if (f.minScore) items = items.filter((i) => i.score >= f.minScore!);
+  // v3.4: preferencias flexibles del texto: reordenan con evidencia explícita, nunca quitan títulos
+  const prefs = f.text?.prefs?.filter((p) => p.applied);
+  if (prefs?.length) {
+    items = reorderByPrefs(items.map((it, i) => ({ ...it, engineRank: i + 1, prefs: prefAdjust(prefs, all.get(it.key)!, keywordNames(all.get(it.key)!)) })), (it) => it.prefs!.delta);
+  }
   items = items.map((it, i) => ({ ...it, rank: i + 1 }));
   let diagnostics: { id: string; count: number }[] = [];
   if (!items.length) {

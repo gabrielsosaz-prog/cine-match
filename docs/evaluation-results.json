@@ -1,18 +1,18 @@
 {
-  "algorithmVersion": "hybrid-narrative-3.1.0",
-  "generatedAt": "2026-11-22T22:37:34.263Z",
+  "algorithmVersion": "hybrid-narrative-3.4.0",
+  "generatedAt": "2026-11-23T04:08:01.891Z",
   "dataset": "sintético: 200 títulos, 4 perfiles × 5 semillas, 30 valoraciones de entrenamiento c/u",
   "aviso": "Datos sintéticos: no demuestran precisión con usuarios reales.",
   "resumen": {
     "motor": {
-      "NDCG@10": 0.757,
-      "Recall@10": 0.92,
-      "cobertura": 0.525
+      "NDCG@10": 0.84,
+      "Recall@10": 0.935,
+      "cobertura": 0.46
     },
     "motorPesosAprendidos": {
-      "NDCG@10": 0.781,
+      "NDCG@10": 0.792,
       "Recall@10": 0.885,
-      "cobertura": 0.525
+      "cobertura": 0.53
     },
     "popularidad": {
       "NDCG@10": 0.207,
@@ -32,20 +32,20 @@
   },
   "motorPorPerfil": {
     "fan del suspenso": {
-      "ndcg": 0.807,
-      "recall": 0.92
+      "ndcg": 0.885,
+      "recall": 0.94
     },
     "familia y comedia": {
-      "ndcg": 0.698,
-      "recall": 0.94
+      "ndcg": 0.802,
+      "recall": 0.98
     },
     "drama y romance": {
-      "ndcg": 0.791,
-      "recall": 0.94
+      "ndcg": 0.849,
+      "recall": 0.92
     },
     "acción y ciencia ficción": {
-      "ndcg": 0.733,
-      "recall": 0.88
+      "ndcg": 0.822,
+      "recall": 0.9
     }
   }
 }

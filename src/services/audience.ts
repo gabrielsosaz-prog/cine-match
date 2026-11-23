@@ -20,7 +20,13 @@
  */
 import type { TitleKey, TitleMeta } from '../types';
 
-export const AUDIENCE_RULES = 'público-1.0';
+/**
+ * v3.4 → 'público-1.1': clasificación «todo público» (G, ATP, Ai, AA…) + animación pasa de 0,3 a 0,55 hacia Infantil.
+ * Motivo: TMDB no tiene género «Infantil» para películas, y Toy Story, Frozen o Buscando a Nemo quedaban inciertas.
+ * Decidido con el conjunto de desarrollo y confirmado en el de evaluación contra categorías de Wikipedia
+ * (docs/audience-validation.md): F1 de Infantil 0,60 → 0,72, precisión sin cambios.
+ */
+export const AUDIENCE_RULES = 'público-1.1';
 export type AudienceId = 'kids' | 'teen' | 'adult' | 'family' | 'male' | 'female';
 export const AUDIENCES: { id: AudienceId; name: string; enabled: boolean; note?: string }[] = [
   { id: 'kids', name: 'Infantil', enabled: true },
@@ -136,7 +142,7 @@ export function classifyAudience(meta: Pick<TitleMeta, 'key' | 'genres' | 'keywo
     for (const h of kwHits(KIDS_KW)) pos.push({ p: 0.4, ev: { source: TMDB_KW, method: 'explícita', detail: `«${h}»` } });
     for (const h of kwHits(KIDS_WEAK_KW)) pos.push({ p: 0.15, ev: { source: TMDB_KW, method: 'inferida', detail: `«${h}» (no indica por sí solo el público)` } });
     if (r?.kind === 'kidsTarget') pos.push({ p: 0.7, ev: { source: CERT, method: 'auxiliar', detail: `${certEv}: diseñada para niños` } });
-    if (r?.kind === 'general' && g.has(16)) pos.push({ p: 0.3, ev: { source: CERT, method: 'auxiliar', detail: `${certEv} + animación` } });
+    if (r?.kind === 'general' && g.has(16)) pos.push({ p: 0.55, ev: { source: CERT, method: 'auxiliar', detail: `${certEv} + animación` } });
     if ((z?.kids ?? 0) >= SEM_Z) pos.push({ p: SEM_W, ev: { source: SEM, method: 'inferida', detail: `sinopsis parecida a obras infantiles (z ${z!.kids}) — no suma: método no confiable` } });
     if (r && (r.kind === 'adult' || r.kind === 'teen')) fac.push({ f: 0.1, ev: { source: CERT, method: 'en contra', detail: `${certEv}: no apta para niños` } });
     if (kwHits(ADULT_KW).length) fac.push({ f: 0.05, ev: { source: TMDB_KW, method: 'en contra', detail: '«adult animation»' } });

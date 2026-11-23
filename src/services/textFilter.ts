@@ -19,6 +19,7 @@ import { allCountries, countryName } from './filters';
 import { regionName, type RegionId } from './regions';
 
 export const TEXT_RULES = 'texto-1.0';
+import { extractPrefs, PREF_RULES, type PrefCond } from './preferences';
 export type Cond =
   | { k: 'type'; v: MediaType }
   | { k: 'genre'; v: number[]; name: string }
@@ -38,6 +39,8 @@ export interface ParsedText {
   /** aclaraciones (aproximaciones, categorías deshabilitadas, ambigüedades) */
   notes: string[];
   version: string;
+  /** v3.4: preferencias flexibles (reordenan, no filtran); ver services/preferences.ts */
+  prefs?: PrefCond[];
 }
 
 // ───────────── vocabulario ─────────────
@@ -122,7 +125,7 @@ const FILLER = new Set(('quiero ver un una unos unas el la los las de del que y 
   'significativamente principalmente predominantemente dirigidas dirigidos dirigida dirigido tengan tenga temas tema trate traten tratan sin no nada ni excluir excluyendo excluye exclui evitar evita evito fuera menos excepto salvo ' +
   'posterior posteriores anterior anteriores despues antes desde hasta entre partir ano anos decada estrenadas estrenados lanzadas hechas hechos pero tambien solo solamente prefiero incluir incluye inclui donde haya hay ' +
   'son es les nos se lo le su sus mucho mucha muchos muchas poco poca relaciones peliculas pelicula series serie films film largometrajes nota puntuacion calificacion tmdb gente aclamadas aclamados criticas critica ' +
-  'mal malas peor peores excelente excelentes alta altas paises pais region regiones odio quitar quita saca sacar tampoco ningun ninguna cualquier todo toda todas todos favor por favor que ahora alguna').split(' '));
+  'mostrar mostrame muestres muestren aparezcan aparecer mal malas peor peores excelente excelentes alta altas paises pais region regiones odio quitar quita saca sacar tampoco ningun ninguna cualquier todo toda todas todos favor por favor que ahora alguna').split(' '));
 
 export const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[“”«»"¿?¡!()]/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -130,7 +133,14 @@ interface Hit { start: number; end: number; conds: Cond[]; note?: string }
 
 /** Interpreta el texto. `now` = año actual (para «últimos N años»). */
 export function parseText(text: string, now = new Date().getFullYear()): ParsedText {
-  const t = norm(text);
+  // v3.4: primero las preferencias flexibles; el resto pasa al analizador de restricciones (texto-1.0)
+  const { prefs, rest } = extractPrefs(text);
+  const p = parseStrict(text, rest, now);
+  if (prefs.length) { p.prefs = prefs; p.version = `${TEXT_RULES} + ${PREF_RULES}`; }
+  return p;
+}
+function parseStrict(text: string, source: string, now: number): ParsedText {
+  const t = norm(source);
   const out: ParsedText = { text: text.trim(), include: [], exclude: [], unparsed: [], notes: [], version: TEXT_RULES };
   if (!t) return out;
   // Cláusulas: puntuación, «pero», «aunque», «y que», «y sin», «excepto/salvo» (abre su propia cláusula negativa)

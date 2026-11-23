@@ -1,0 +1,360 @@
+{
+ "rules": "preferencias-1.0",
+ "criterion": "precisión ≥ 0,30 y lift ≥ 3 en desarrollo",
+ "prefs": {
+  "time-travel": {
+   "label": "viajes en el tiempo importantes para la trama",
+   "applied": true,
+   "dev": {
+    "n": 2933,
+    "base": 0.026,
+    "keywords": {
+     "matched": 64,
+     "precision": 0.73,
+     "recall": 0.63,
+     "lift": 28.7
+    },
+    "semantic": {
+     "matched": 0,
+     "precision": 0,
+     "lift": 0
+    }
+   },
+   "test": {
+    "n": 2962,
+    "base": 0.026,
+    "keywords": {
+     "matched": 60,
+     "precision": 0.82,
+     "recall": 0.64,
+     "lift": 31.4
+    },
+    "semantic": {
+     "matched": 0,
+     "precision": 0,
+     "lift": 0
+    }
+   },
+   "passes": true
+  },
+  "nonlinear": {
+   "label": "narración no lineal",
+   "applied": true,
+   "dev": {
+    "n": 2933,
+    "base": 0.029,
+    "keywords": {
+     "matched": 42,
+     "precision": 0.33,
+     "recall": 0.17,
+     "lift": 11.6
+    },
+    "semantic": {
+     "matched": 15,
+     "precision": 0.07,
+     "lift": 2.3
+    }
+   },
+   "test": {
+    "n": 2962,
+    "base": 0.026,
+    "keywords": {
+     "matched": 41,
+     "precision": 0.32,
+     "recall": 0.17,
+     "lift": 12
+    },
+    "semantic": {
+     "matched": 7,
+     "precision": 0,
+     "lift": 0
+    }
+   },
+   "passes": true
+  },
+  "unsettling": {
+   "label": "atmósfera inquietante",
+   "applied": true,
+   "dev": {
+    "n": 2933,
+    "base": 0.12,
+    "keywords": {
+     "matched": 215,
+     "precision": 0.51,
+     "recall": 0.31,
+     "lift": 4.3
+    },
+    "semantic": {
+     "matched": 36,
+     "precision": 0.28,
+     "lift": 2.3
+    }
+   },
+   "test": {
+    "n": 2962,
+    "base": 0.124,
+    "keywords": {
+     "matched": 208,
+     "precision": 0.56,
+     "recall": 0.32,
+     "lift": 4.5
+    },
+    "semantic": {
+     "matched": 38,
+     "precision": 0.32,
+     "lift": 2.5
+    }
+   },
+   "passes": true
+  },
+  "gradual-mystery": {
+   "label": "misterios que se resuelven gradualmente",
+   "applied": true,
+   "dev": {
+    "n": 2933,
+    "base": 0.065,
+    "keywords": {
+     "matched": 173,
+     "precision": 0.43,
+     "recall": 0.39,
+     "lift": 6.7
+    },
+    "semantic": {
+     "matched": 40,
+     "precision": 0.3,
+     "lift": 4.6
+    }
+   },
+   "test": {
+    "n": 2962,
+    "base": 0.052,
+    "keywords": {
+     "matched": 160,
+     "precision": 0.34,
+     "recall": 0.35,
+     "lift": 6.5
+    },
+    "semantic": {
+     "matched": 39,
+     "precision": 0.31,
+     "lift": 6
+    }
+   },
+   "passes": true
+  },
+  "less-romance": {
+   "label": "poco protagonismo del romance",
+   "applied": true,
+   "dev": {
+    "n": 2933,
+    "base": 0.135,
+    "keywords": {
+     "matched": 387,
+     "precision": 0.72,
+     "recall": 0.7,
+     "lift": 5.3
+    },
+    "semantic": {
+     "matched": 7,
+     "precision": 0.43,
+     "lift": 3.2
+    }
+   },
+   "test": {
+    "n": 2962,
+    "base": 0.125,
+    "keywords": {
+     "matched": 388,
+     "precision": 0.73,
+     "recall": 0.77,
+     "lift": 5.8
+    },
+    "semantic": {
+     "matched": 9,
+     "precision": 0.78,
+     "lift": 6.2
+    }
+   },
+   "passes": true
+  },
+  "twists": {
+   "label": "giros argumentales",
+   "applied": false,
+   "dev": null,
+   "test": null,
+   "passes": false
+  },
+  "complex": {
+   "label": "historias complejas",
+   "applied": false,
+   "dev": {
+    "n": 2933,
+    "base": 0.03,
+    "keywords": {
+     "matched": 61,
+     "precision": 0.15,
+     "recall": 0.1,
+     "lift": 4.9
+    },
+    "semantic": {
+     "matched": 14,
+     "precision": 0.14,
+     "lift": 4.7
+    }
+   },
+   "test": {
+    "n": 2962,
+    "base": 0.027,
+    "keywords": {
+     "matched": 40,
+     "precision": 0.03,
+     "recall": 0.01,
+     "lift": 0.9
+    },
+    "semantic": {
+     "matched": 27,
+     "precision": 0.11,
+     "lift": 4.1
+    }
+   },
+   "passes": false
+  }
+ },
+ "ranking": [
+  {
+   "profile": "p1-scifi-tiempo",
+   "pref": "nonlinear",
+   "seed": 1,
+   "shareBefore": 0,
+   "shareAfter": 0,
+   "p10Before": 0.8,
+   "p10After": 0.8
+  },
+  {
+   "profile": "p1-scifi-tiempo",
+   "pref": "nonlinear",
+   "seed": 2,
+   "shareBefore": 0.1,
+   "shareAfter": 0.1,
+   "p10Before": 0.8,
+   "p10After": 0.8
+  },
+  {
+   "profile": "p1-scifi-tiempo",
+   "pref": "nonlinear",
+   "seed": 3,
+   "shareBefore": 0,
+   "shareAfter": 0,
+   "p10Before": 0.2,
+   "p10After": 0.2
+  },
+  {
+   "profile": "p2-thriller-psicologico",
+   "pref": "unsettling",
+   "seed": 1,
+   "shareBefore": 0.9,
+   "shareAfter": 0.9,
+   "p10Before": 0.8,
+   "p10After": 0.8
+  },
+  {
+   "profile": "p2-thriller-psicologico",
+   "pref": "unsettling",
+   "seed": 2,
+   "shareBefore": 0.4,
+   "shareAfter": 0.5,
+   "p10Before": 0.9,
+   "p10After": 0.9
+  },
+  {
+   "profile": "p2-thriller-psicologico",
+   "pref": "unsettling",
+   "seed": 3,
+   "shareBefore": 0.6,
+   "shareAfter": 0.5,
+   "p10Before": 0.8,
+   "p10After": 0.8
+  },
+  {
+   "profile": "p2-thriller-psicologico",
+   "pref": "less-romance",
+   "seed": 1,
+   "shareBefore": 0.1,
+   "shareAfter": 0.1,
+   "p10Before": 0.8,
+   "p10After": 0.8
+  },
+  {
+   "profile": "p2-thriller-psicologico",
+   "pref": "less-romance",
+   "seed": 2,
+   "shareBefore": 0,
+   "shareAfter": 0,
+   "p10Before": 0.9,
+   "p10After": 0.9
+  },
+  {
+   "profile": "p2-thriller-psicologico",
+   "pref": "less-romance",
+   "seed": 3,
+   "shareBefore": 0.2,
+   "shareAfter": 0.2,
+   "p10Before": 0.8,
+   "p10After": 0.8
+  },
+  {
+   "profile": "p1-scifi-tiempo",
+   "pref": "time-travel",
+   "seed": 1,
+   "shareBefore": 0.2,
+   "shareAfter": 0.2,
+   "p10Before": 0.8,
+   "p10After": 0.8
+  },
+  {
+   "profile": "p1-scifi-tiempo",
+   "pref": "time-travel",
+   "seed": 2,
+   "shareBefore": 0.4,
+   "shareAfter": 0.4,
+   "p10Before": 0.8,
+   "p10After": 0.8
+  },
+  {
+   "profile": "p1-scifi-tiempo",
+   "pref": "time-travel",
+   "seed": 3,
+   "shareBefore": 0.2,
+   "shareAfter": 0.3,
+   "p10Before": 0.2,
+   "p10After": 0.3
+  },
+  {
+   "profile": "p5-variado",
+   "pref": "gradual-mystery",
+   "seed": 1,
+   "shareBefore": 0,
+   "shareAfter": 0,
+   "p10Before": 0.4,
+   "p10After": 0.4
+  },
+  {
+   "profile": "p5-variado",
+   "pref": "gradual-mystery",
+   "seed": 2,
+   "shareBefore": 0,
+   "shareAfter": 0,
+   "p10Before": 0.5,
+   "p10After": 0.5
+  },
+  {
+   "profile": "p5-variado",
+   "pref": "gradual-mystery",
+   "seed": 3,
+   "shareBefore": 0,
+   "shareAfter": 0,
+   "p10Before": 0.6,
+   "p10After": 0.6
+  }
+ ]
+}

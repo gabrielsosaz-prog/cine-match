@@ -8,7 +8,16 @@ import { SPOILER_PATTERN } from './keywordsEs';
 import { textCosine, textIdf, textVector, tokens } from './text';
 import { narrativeFromMeta, pairSimilarity, type Narrative, type NarrativeIndex } from './narrative';
 
-export const ALGORITHM_VERSION = 'hybrid-narrative-3.1.0';
+/**
+ * v3.4.0: mismos canales, pesos y perfil que hybrid-narrative-3.1.0. Cambia sólo el ORDEN:
+ *  1. ordena por la suma de canales sin recortar a 10 (antes muchos títulos empataban en 10 y el orden entre ellos
+ *     lo decidía la diversidad, por eso quitar una valoración cambiaba hasta 9 de los 10 primeros);
+ *  2. como máximo 1 título por saga de TMDB en el top 10.
+ * La nota mostrada sigue recortada a 1-10. Decidido en el conjunto de desarrollo y confirmado en el de evaluación
+ * contra una referencia editorial independiente (docs/eval-v3.4.md). `rankBy: 'capped', collectionCap: false`
+ * reproduce exactamente el orden de 3.1.0.
+ */
+export const ALGORITHM_VERSION = 'hybrid-narrative-3.4.0';
 
 /** Índice narrativo por defecto (lo fija la app al cargar el catálogo; en pruebas puede no existir). */
 let defaultNarrative: NarrativeIndex | undefined;
@@ -37,6 +46,13 @@ export interface RankInput {
   lowEvidence?: Set<TitleKey>;
   /** v3.1: índice narrativo (vectores semánticos y rasgos). Sin él, el canal narrativo queda en 0 (desconocido). */
   narrative?: NarrativeIndex | null;
+  /**
+   * Orden. Predeterminado (3.4.0): 'uncapped', la suma de canales sin recortar. 'capped' = orden de 3.1.0
+   * (la nota mostrada siempre se recorta a 1-10, en ambos casos).
+   */
+  rankBy?: 'capped' | 'uncapped';
+  /** Como máximo 1 título por saga/colección de TMDB en el top 10. Predeterminado (3.4.0): sí. */
+  collectionCap?: boolean;
 }
 
 /**
@@ -97,6 +113,8 @@ export const priorWeights = (): Record<ChannelId, number> => Object.fromEntries(
 interface Scored {
   key: TitleKey;
   pred: number;
+  /** v3.4: suma sin recortar a 1-10 (se usa para ordenar; la nota mostrada es `pred`) */
+  predRaw: number;
   confidence: number;
   vec: FeatureVec;
   /** valor crudo de cada canal (puntos, antes del peso) */
@@ -252,10 +270,11 @@ export function scoreCandidates(input: RankInput): Scored[] {
       if (c.id === 'genre') contribution = Math.max(-PARAMS.genreCap, Math.min(PARAMS.genreCap, contribution));
       return { id: c.id, value: rawCh[c.id], weight: W[c.id], contribution, evidence: evidence[c.id] };
     });
-    const pred = Math.max(1, Math.min(10, profile.mean + channels.reduce((a, c) => a + c.contribution, 0)));
+    const predRaw = profile.mean + channels.reduce((a, c) => a + c.contribution, 0);
+    const pred = Math.max(1, Math.min(10, predRaw));
     const simMass = evidence.similar + evidence.narrative;
     const confidence = (1 - Math.exp(-(evid + 3 * simMass + 0.5 * Math.min(actorEvid, 4)) / 8)) * (1 - Math.exp(-profile.ratedCount / 6));
-    out.push({ key, pred, confidence, vec, raw: rawCh, channels, contributions: contributions.sort((a, b) => Math.abs(b.c) - Math.abs(a.c)), neighbors: neigh.map(({ key, sim, dev }) => ({ key, sim, dev })), narrNeighbors, quality, novelty: 1 - Math.min(1, evid / 6), aspects, dimensionEstimates, actors, concepts, rejection });
+    out.push({ key, pred, predRaw, confidence, vec, raw: rawCh, channels, contributions: contributions.sort((a, b) => Math.abs(b.c) - Math.abs(a.c)), neighbors: neigh.map(({ key, sim, dev }) => ({ key, sim, dev })), narrNeighbors, quality, novelty: 1 - Math.min(1, evid / 6), aspects, dimensionEstimates, actors, concepts, rejection });
   }
   return out;
 }
@@ -444,7 +463,8 @@ export function rank(input: RankInput): RecommendationItem[] {
   const info = describeFeatures([...input.titles.values()]);
   const rand = mulberry32(input.seed ?? 1);
 
-  const pool = [...scored].sort((a, b) => b.pred - a.pred || (a.key < b.key ? -1 : 1));
+  const order = (s: Scored) => ((input.rankBy ?? 'uncapped') === 'uncapped' ? s.predRaw : s.pred);
+  const pool = [...scored].sort((a, b) => order(b) - order(a) || (a.key < b.key ? -1 : 1));
   const explorePool = scored
     .filter((s) => s.novelty > 0.6 && s.quality >= PARAMS.minExplorationQuality)
     .map((s) => ({ s, r: s.quality * (0.8 + 0.4 * rand()) }))
@@ -461,6 +481,7 @@ export function rank(input: RankInput): RecommendationItem[] {
   const actorCount = new Map<number, number>();
   const leadActor = (s: Scored) => s.actors.find((a) => a.c > 0.08)?.id;
   const useExploration = input.profile.ratedCount >= 3;
+  const usedCollections = new Set<number>();
 
   while (selected.length < limit && used.size < scored.length) {
     const pos = selected.length + 1;
@@ -472,16 +493,20 @@ export function rank(input: RankInput): RecommendationItem[] {
     let best: Scored | undefined, bestVal = -Infinity, fallback: Scored | undefined, fallbackVal = -Infinity;
     for (const s of pool) {
       if (used.has(s.key)) continue;
-      const upper = PARAMS.mmrLambda * ((s.pred - 1) / 9);
+      const upper = PARAMS.mmrLambda * ((order(s) - 1) / 9);
       if (upper < bestVal) break; // poda exacta: el resto tiene menor nota y la diversidad sólo resta
       const val = upper - (1 - PARAMS.mmrLambda) * maxSim.get(s.key)!;
       const la = capActive ? leadActor(s) : undefined;
       if (la !== undefined && (actorCount.get(la) ?? 0) >= PARAMS.maxPerActorTop10) { if (val > fallbackVal) { fallbackVal = val; fallback = s; } continue; }
+      const col = capActive && (input.collectionCap ?? true) ? input.titles.get(s.key)!.collection?.id : undefined;
+      if (col !== undefined && usedCollections.has(col)) { if (val > fallbackVal) { fallbackVal = val; fallback = s; } continue; }
       if (val > bestVal) { bestVal = val; best = s; }
     }
     const pick = best ?? fallback;
     if (!pick) break;
     if (capActive) { const la = leadActor(pick); if (la !== undefined) actorCount.set(la, (actorCount.get(la) ?? 0) + 1); }
+    const pc = input.titles.get(pick.key)!.collection?.id;
+    if (pc !== undefined) usedCollections.add(pc);
     choose(pick, false);
   }
 

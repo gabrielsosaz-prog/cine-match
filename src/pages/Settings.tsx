@@ -11,6 +11,8 @@ import { deleteAllData, exportData, importData } from '../services/dataPortabili
 import type { PlatformId } from '../types';
 import { Card, Chip } from '../ui/components';
 
+import { diagnosticOn, setDiagnostic } from '../services/diagnostics';
+
 export default function Settings() {
   const { profileId, settings, config } = useApp();
   const profiles = useLiveQuery(() => db.profiles.toArray()) ?? [];
@@ -71,6 +73,12 @@ export default function Settings() {
         <h2 className="font-semibold">Fuente de datos</h2>
         <p className="text-sm text-slate-300">{config.proxyUrl ? 'Proxy propio configurado.' : config.tmdbToken ? 'Clave de TMDB guardada en este dispositivo.' : 'Sin configurar.'}</p>
         <Link to="/configurar" className="text-sm text-accent underline">Cambiar clave o proxy</Link>
+      </Card>
+      <Card className="space-y-2">
+        <h2 className="font-semibold">Modo diagnóstico (desarrollo)</h2>
+        <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" data-testid="diagnostic-toggle" defaultChecked={diagnosticOn()} onChange={(e) => { setDiagnostic(e.target.checked); setMsg(e.target.checked ? 'Modo diagnóstico activado: en Inicio, cada recomendación muestra su cálculo y se puede exportar.' : 'Modo diagnóstico desactivado.'); }} />
+          Mostrar el cálculo de cada recomendación y permitir exportarlo</label>
+        <p className="text-[11px] text-slate-500">No cambia el ranking ni tus datos. Distingue datos (TMDB, tus notas) de inferencias aproximadas (análisis semántico, textos).</p>
       </Card>
       <Card className="space-y-2">
         <h2 className="font-semibold">Gestión de datos</h2>

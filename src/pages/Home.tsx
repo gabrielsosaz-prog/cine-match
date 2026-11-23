@@ -20,6 +20,24 @@ import RatingEditor, { readDraft } from '../ui/RatingEditor';
 import { num, relTime } from '../ui/format';
 
 export type { WatchedFilter } from '../services/filters';
+import { diagnose, diagnosticOn, exportDiagnostics, type Diagnostic } from '../services/diagnostics';
+
+/** v3.4: panel de diagnóstico (sólo con el modo activado en Ajustes). Muestra lo calculado; no agrega explicaciones. */
+function DiagnosticPanel({ d }: { d: Diagnostic }) {
+  return (
+    <details className="mt-1.5 rounded-lg bg-violet-500/10 p-2 text-[11px] text-violet-100" data-testid="diag-panel">
+      <summary className="cursor-pointer">Diagnóstico: puesto {d.rank}{d.engineRank && d.engineRank !== d.rank ? ` (motor: ${d.engineRank})` : ''} · nota {d.score} · base {d.base ?? '–'} · confianza {d.confidence}</summary>
+      <p className="mt-1 font-semibold">Señales (puntos sobre tu media)</p>
+      <ul>{d.channels.map((c) => <li key={c.id} data-testid="diag-channel" data-basis={c.basis}>{c.contribution > 0 ? '+' : ''}{c.contribution} · {c.label} <span className="opacity-70">({c.basis === 'aproximado' ? 'inferencia aproximada' : 'dato'}: {c.source}; peso {c.weight}, evidencia {c.evidence})</span></li>)}</ul>
+      {d.prefs && <p className="mt-1">Preferencias: {d.prefs.matches.length ? d.prefs.matches.map((m) => `${m.label} (${m.evidence.join(', ')})`).join('; ') : 'ninguna coincidencia'}{d.prefs.unknown.length ? ` · sin datos para: ${d.prefs.unknown.join(', ')}` : ''} · {d.prefs.delta ? `${d.prefs.delta > 0 ? 'sube' : 'baja'} ${Math.abs(d.prefs.delta)} posiciones (posición del motor: ${d.engineRank})` : 'sin cambio de posición'}</p>}
+      <p className="mt-1">Penalizaciones: {d.penalties.length ? d.penalties.join('; ') : 'ninguna'}</p>
+      <p>Metadatos faltantes: {d.missing.length ? d.missing.join(', ') : 'ninguno'}</p>
+      <p>Filtros aplicados: {d.filters.length ? d.filters.join(' · ') : 'ninguno'}</p>
+      <p className="mt-1 font-semibold">Motivo de inclusión</p>
+      <ul>{d.reason.map((r, i) => <li key={i}>• {r}</li>)}</ul>
+    </details>
+  );
+}
 
 type Editing = { key: TitleKey; mode: 'score' | 'aspects'; savedScore?: number };
 
@@ -28,7 +46,7 @@ interface CardProps {
   editing?: Editing; onEdit: (e?: Editing) => void; onSave: (p: Promise<unknown>) => void; onTouch: (k: TitleKey) => void;
 }
 
-function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, onSave, onTouch, strictScore }: CardProps & { strictScore?: boolean }) {
+function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, onSave, onTouch, strictScore, diag }: CardProps & { strictScore?: boolean; diag?: Diagnostic }) {
   const [open, setOpen] = useState(false);
   const watched = rating?.watched ?? false;
   const dismissed = Boolean(rating?.notInterested);
@@ -65,6 +83,12 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             {open ? shownItem.explanation.map((l, i) => <p key={i} className="mb-0.5">• {l}</p>) : <span className="line-clamp-2">{shownItem.explanation[0]}</span>}
             {open && dims.length > 0 && <p className="mt-1 text-[11px] text-slate-400">Estimado para vos: {dims.map(([d, v]) => `${DIMENSIONS.find((x) => x.id === d)!.short} ${num(v)}★`).join(' · ')}</p>}
           </button>
+          {item.prefs && item.prefs.matches.length > 0 && (
+            <p className="mt-1 text-[11px] text-sky-200" data-testid="rec-prefs">
+              {item.prefs.matches.map((m) => `${m.polarity < 0 ? 'Baja por' : 'Sube por'} «${m.label}» (TMDB: ${m.evidence.join(', ')})`).join(' · ')}
+            </p>
+          )}
+          {diag && <DiagnosticPanel d={diag} />}
           {open && (
             <div className="mt-2 rounded-lg bg-ink-950/60 p-2">
               {shownItem.lowEvidence && <p className="mb-1 text-[11px] text-amber-200">Este título se sumó con una búsqueda en TMDB para tus filtros y tu historial casi no tiene información sobre algo parecido: la estimación es de baja confianza y se apoya en datos públicos.</p>}
@@ -188,6 +212,7 @@ export default function Home() {
   }, [latest?.id, applyNext, saving]);
 
   const advanced = activeFilters(filters).length > 0;
+  const [diagOn] = useState(diagnosticOn);
   const filtersKey = JSON.stringify(filters);
   const [filteredState, setFiltered] = useState<Awaited<ReturnType<typeof rankWithFilters>> & { for: string }>();
   // Resultado sólo válido para los filtros y el ranking con los que se calculó: evita mostrar «ningún título» un instante al cambiar filtros
@@ -297,6 +322,17 @@ export default function Home() {
           aria-label="Invertir el orden">{sort === 'title' ? (dir === 'asc' ? 'A→Z' : 'Z→A') : dir === 'desc' ? '↓ Mayor' : '↑ Menor'}</button>
         {(sort !== 'recommended' || dir !== 'desc') && <button type="button" data-testid="home-sort-reset" onClick={() => setSort('recommended')} className="text-[11px] text-accent underline">Restablecer</button>}
       </div>
+      {diagOn && rows.length > 0 && (
+        <div className="flex items-center gap-2 rounded-xl bg-violet-500/10 p-2 text-[11px] text-violet-100" data-testid="diag-bar">
+          <span className="flex-1">Modo diagnóstico activo (Ajustes). Muestra cómo se calculó cada posición.</span>
+          <button type="button" data-testid="diag-export" className="rounded bg-violet-500/20 px-2 py-1 font-semibold" onClick={() => {
+            const data = exportDiagnostics(rows.filter((r) => r.meta).map((r) => diagnose(r.item, r.meta!, filters, { genre: genreName, platform: platformName as never })), filters);
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+            a.download = `cine-match-diagnostico-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+          }}>Exportar JSON</button>
+        </div>
+      )}
       {advanced && (
         <div className="flex flex-wrap gap-1.5" data-testid="active-filters">
           {activeFilters(filters).map((id) => (
@@ -377,7 +413,7 @@ export default function Home() {
       )}
       <ol className="space-y-3" aria-label="Ranking personalizado">
         {pageRows.map((r) => (
-          <RecCard key={r.key} strictScore={sort === 'affinity'} item={r.item} live={liveItems.get(r.key)} meta={r.meta!} snap={r.snap} rating={ratings.get(r.key)} profileId={profileId}
+          <RecCard key={r.key} diag={diagOn ? diagnose(r.item, r.meta!, filters, { genre: genreName, platform: platformName as never }) : undefined} strictScore={sort === 'affinity'} item={r.item} live={liveItems.get(r.key)} meta={r.meta!} snap={r.snap} rating={ratings.get(r.key)} profileId={profileId}
             editing={editing?.key === r.key ? editing : undefined}
             onEdit={setEditing} onSave={trackSave}
             onTouch={(k) => setTouched((s) => (s.has(k) ? s : new Set(s).add(k)))} />

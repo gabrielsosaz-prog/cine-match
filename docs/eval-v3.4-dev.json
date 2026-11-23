@@ -1,0 +1,3971 @@
+{
+ "phase": "dev",
+ "version": "3.4.0",
+ "engine": "hybrid-narrative-3.1.0",
+ "catalog": "2026-11-22",
+ "reference": "2026-11-23",
+ "split": "hash FNV-1a de la clave del título: 50 % desarrollo (valoraciones) / 50 % evaluación (candidatos y juicios)",
+ "seeds": [
+  1,
+  2,
+  3
+ ],
+ "lowVotes": 160,
+ "generatedAt": "2026-11-23",
+ "byProfile": [
+  {
+   "profile": "p1-scifi-tiempo",
+   "name": "Ciencia ficción compleja y viajes temporales",
+   "description": "Le encantan las historias de viajes en el tiempo; le gusta la ciencia ficción en general; rechaza comedias románticas y obras infantiles.",
+   "ratings": 27,
+   "liked": 15,
+   "disliked": 6,
+   "candidates": 3227,
+   "judged": {
+    "positives": 397,
+    "negatives": 642
+   },
+   "usable": true,
+   "algos": {
+    "A-popularidad": {
+     "p5": 0,
+     "p10": 0.10000000000000002,
+     "ndcg10": 0.02613275632622511,
+     "rejectedIn10": 2,
+     "genreDiversity": 0.7410582010582011,
+     "semanticDiversity": 0.452278504557009,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8421665612689608,
+     "medianVotes": 5666,
+     "stability": 1,
+     "ms": 3.3333333333333335
+    },
+    "B-generos": {
+     "p5": 0.8666666666666667,
+     "p10": 0.8666666666666667,
+     "ndcg10": 0.3451202503435337,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.24320987654320989,
+     "semanticDiversity": 0.31855388155220754,
+     "sameCollectionPairs": 0.3333333333333333,
+     "novelty": 0.9293383462715097,
+     "medianVotes": 9510,
+     "stability": 0.8927738927738927,
+     "ms": 4.666666666666667
+    },
+    "C-contenido": {
+     "p5": 0.26666666666666666,
+     "p10": 0.3666666666666667,
+     "ndcg10": 0.15043408641542005,
+     "rejectedIn10": 1,
+     "genreDiversity": 0.8293827160493827,
+     "semanticDiversity": 0.4363118652163231,
+     "sameCollectionPairs": 0,
+     "novelty": 1.4649416885128328,
+     "medianVotes": 3214,
+     "stability": 0.7299922299922299,
+     "ms": 69
+    },
+    "D-motor": {
+     "p5": 0.5333333333333333,
+     "p10": 0.46666666666666673,
+     "ndcg10": 0.2770813757716578,
+     "rejectedIn10": 1,
+     "genreDiversity": 0.8269664902998238,
+     "semanticDiversity": 0.33377697866506845,
+     "sameCollectionPairs": 0,
+     "novelty": 0.9610702952716205,
+     "medianVotes": 6781.666666666667,
+     "stability": 0.21658107687519454,
+     "ms": 1099.6666666666667
+    },
+    "E-motor-sin-recorte": {
+     "p5": 0.6,
+     "p10": 0.6,
+     "ndcg10": 0.33685226518777656,
+     "rejectedIn10": 1,
+     "genreDiversity": 0.7147442680776015,
+     "semanticDiversity": 0.3220966145635995,
+     "sameCollectionPairs": 0,
+     "novelty": 0.9916293954983134,
+     "medianVotes": 6534,
+     "stability": 0.5316627816627816,
+     "ms": 1026.6666666666667
+    },
+    "D-sin-datos-narrativos": {
+     "p5": 0.5333333333333333,
+     "p10": 0.5,
+     "ndcg10": 0.26881720664881426,
+     "rejectedIn10": 1.6666666666666667,
+     "genreDiversity": 0.6803703703703704,
+     "semanticDiversity": 0.34924577997304146,
+     "sameCollectionPairs": 0,
+     "novelty": 1.067519602195871,
+     "medianVotes": 6206.666666666667,
+     "stability": 0.5197580197580197,
+     "ms": 366
+    }
+   }
+  },
+  {
+   "profile": "p2-thriller-psicologico",
+   "name": "Thrillers psicológicos y misterio",
+   "description": "Prefiere thrillers psicológicos; le gustan misterio y neo-noir; rechaza comedias románticas, sitcoms e infantiles.",
+   "ratings": 27,
+   "liked": 15,
+   "disliked": 6,
+   "candidates": 3227,
+   "judged": {
+    "positives": 731,
+    "negatives": 699
+   },
+   "usable": true,
+   "algos": {
+    "A-popularidad": {
+     "p5": 0.4000000000000001,
+     "p10": 0.20000000000000004,
+     "ndcg10": 0.1017449613132337,
+     "rejectedIn10": 3,
+     "genreDiversity": 0.7410582010582011,
+     "semanticDiversity": 0.452278504557009,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8421665612689608,
+     "medianVotes": 5666,
+     "stability": 1,
+     "ms": 3.6666666666666665
+    },
+    "B-generos": {
+     "p5": 0.8000000000000002,
+     "p10": 0.9,
+     "ndcg10": 0.5466665884177614,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.25555555555555554,
+     "semanticDiversity": 0.3357853234224987,
+     "sameCollectionPairs": 0,
+     "novelty": 1.1832882923738284,
+     "medianVotes": 2351.6666666666665,
+     "stability": 1,
+     "ms": 4.333333333333333
+    },
+    "C-contenido": {
+     "p5": 0.5333333333333333,
+     "p10": 0.4666666666666666,
+     "ndcg10": 0.26105869050696073,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.5720987654320987,
+     "semanticDiversity": 0.4342800981898261,
+     "sameCollectionPairs": 0,
+     "novelty": 2.196240647223805,
+     "medianVotes": 403.6666666666667,
+     "stability": 0.914141414141414,
+     "ms": 76
+    },
+    "D-motor": {
+     "p5": 0.5333333333333333,
+     "p10": 0.6333333333333334,
+     "ndcg10": 0.37843247545508363,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7241269841269841,
+     "semanticDiversity": 0.31344415281423155,
+     "sameCollectionPairs": 0,
+     "novelty": 1.0991948411164094,
+     "medianVotes": 5378.666666666667,
+     "stability": 0.394140989729225,
+     "ms": 1177
+    },
+    "E-motor-sin-recorte": {
+     "p5": 0.7999999999999999,
+     "p10": 0.7666666666666667,
+     "ndcg10": 0.5546737752974437,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.6019753086419753,
+     "semanticDiversity": 0.332463035296441,
+     "sameCollectionPairs": 0,
+     "novelty": 1.17619012314389,
+     "medianVotes": 5144.333333333333,
+     "stability": 0.7424242424242425,
+     "ms": 1131.6666666666667
+    },
+    "D-sin-datos-narrativos": {
+     "p5": 0.8000000000000002,
+     "p10": 0.7333333333333334,
+     "ndcg10": 0.48019696681591056,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.6644444444444445,
+     "semanticDiversity": 0.3399126946402042,
+     "sameCollectionPairs": 0,
+     "novelty": 1.205105909664024,
+     "medianVotes": 5333.333333333333,
+     "stability": 0.8030303030303031,
+     "ms": 364
+    }
+   }
+  },
+  {
+   "profile": "p3-calidad-narrativa",
+   "name": "Calidad narrativa por encima del género",
+   "description": "Le gustan obras premiadas o candidatas por su guion (Óscar, BAFTA, Globo de Oro, WGA, Emmy de guion…), de cualquier género; rechaza obras candidatas a los Razzie.",
+   "ratings": 34,
+   "liked": 20,
+   "disliked": 8,
+   "candidates": 3220,
+   "judged": {
+    "positives": 123,
+    "negatives": 21
+   },
+   "usable": true,
+   "algos": {
+    "A-popularidad": {
+     "p5": 0.39999999999999997,
+     "p10": 0.3,
+     "ndcg10": 0.35106294951950706,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7882186948853617,
+     "semanticDiversity": 0.45147020664411697,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8862858828076231,
+     "medianVotes": 6464,
+     "stability": 1,
+     "ms": 2.6666666666666665
+    },
+    "B-generos": {
+     "p5": 0.4000000000000001,
+     "p10": 0.26666666666666666,
+     "ndcg10": 0.37523306060173606,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.2666666666666668,
+     "semanticDiversity": 0.4194391055448778,
+     "sameCollectionPairs": 0,
+     "novelty": 1.0249961908190917,
+     "medianVotes": 4610.666666666667,
+     "stability": 0.6452991452991453,
+     "ms": 4.333333333333333
+    },
+    "C-contenido": {
+     "p5": 0,
+     "p10": 0,
+     "ndcg10": 0,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7220987654320988,
+     "semanticDiversity": 0.4713837279526411,
+     "sameCollectionPairs": 0,
+     "novelty": 2.027013182805108,
+     "medianVotes": 753.6666666666666,
+     "stability": 0.6011072261072261,
+     "ms": 103.33333333333333
+    },
+    "D-motor": {
+     "p5": 0.26666666666666666,
+     "p10": 0.19999999999999998,
+     "ndcg10": 0.22529013416037272,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7062610229276897,
+     "semanticDiversity": 0.4306928169411894,
+     "sameCollectionPairs": 0,
+     "novelty": 1.3077720425895845,
+     "medianVotes": 3216,
+     "stability": 0.4876079086605402,
+     "ms": 1594.3333333333333
+    },
+    "E-motor-sin-recorte": {
+     "p5": 0.26666666666666666,
+     "p10": 0.20000000000000004,
+     "ndcg10": 0.24828241583084698,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.6555202821869489,
+     "semanticDiversity": 0.42231040017635596,
+     "sameCollectionPairs": 0,
+     "novelty": 1.3471809288492558,
+     "medianVotes": 2628.3333333333335,
+     "stability": 0.6477272727272728,
+     "ms": 1555
+    },
+    "D-sin-datos-narrativos": {
+     "p5": 0.20000000000000004,
+     "p10": 0.16666666666666666,
+     "ndcg10": 0.1856065954222009,
+     "rejectedIn10": 0.3333333333333333,
+     "genreDiversity": 0.774567901234568,
+     "semanticDiversity": 0.4292190510306946,
+     "sameCollectionPairs": 0,
+     "novelty": 1.1931927429813087,
+     "medianVotes": 4573.333333333333,
+     "stability": 0.663059163059163,
+     "ms": 350.6666666666667
+    }
+   }
+  },
+  {
+   "profile": "p4-poco-conocidas",
+   "name": "Producciones poco conocidas",
+   "description": "Busca obras poco votadas (cuartil inferior de votos en TMDB) con reconocimiento editorial (premio, candidatura, cine independiente o ópera prima); rechaza superhéroes.",
+   "ratings": 27,
+   "liked": 15,
+   "disliked": 6,
+   "candidates": 3227,
+   "judged": {
+    "positives": 527,
+    "negatives": 164
+   },
+   "usable": true,
+   "algos": {
+    "A-popularidad": {
+     "p5": 0,
+     "p10": 0,
+     "ndcg10": 0,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7410582010582011,
+     "semanticDiversity": 0.452278504557009,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8421665612689608,
+     "medianVotes": 5666,
+     "stability": 1,
+     "ms": 3
+    },
+    "B-generos": {
+     "p5": 0,
+     "p10": 0,
+     "ndcg10": 0,
+     "rejectedIn10": 0.3333333333333333,
+     "genreDiversity": 0.11419753086419754,
+     "semanticDiversity": 0.3321851828888843,
+     "sameCollectionPairs": 0,
+     "novelty": 1.414969000195214,
+     "medianVotes": 2734.6666666666665,
+     "stability": 0.6409932659932659,
+     "ms": 5.666666666666667
+    },
+    "C-contenido": {
+     "p5": 0.20000000000000004,
+     "p10": 0.36666666666666664,
+     "ndcg10": 0.19718964959352062,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.6760493827160494,
+     "semanticDiversity": 0.42202657738648813,
+     "sameCollectionPairs": 0,
+     "novelty": 2.443554542951997,
+     "medianVotes": 191.33333333333334,
+     "stability": 0.8018648018648019,
+     "ms": 90.33333333333333
+    },
+    "D-motor": {
+     "p5": 0.20000000000000004,
+     "p10": 0.20000000000000004,
+     "ndcg10": 0.124083014479219,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7493298059964726,
+     "semanticDiversity": 0.43571069364360954,
+     "sameCollectionPairs": 0,
+     "novelty": 2.3400694541998193,
+     "medianVotes": 174,
+     "stability": 0.4698047050988227,
+     "ms": 1039
+    },
+    "E-motor-sin-recorte": {
+     "p5": 0.06666666666666667,
+     "p10": 0.10000000000000002,
+     "ndcg10": 0.04655290739235881,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.6971957671957671,
+     "semanticDiversity": 0.4249575758410776,
+     "sameCollectionPairs": 0,
+     "novelty": 2.0936007091455586,
+     "medianVotes": 352.6666666666667,
+     "stability": 0.6164391164391164,
+     "ms": 976.3333333333334
+    },
+    "D-sin-datos-narrativos": {
+     "p5": 0.13333333333333333,
+     "p10": 0.13333333333333333,
+     "ndcg10": 0.06979609770272323,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7581128747795415,
+     "semanticDiversity": 0.4656953313906628,
+     "sameCollectionPairs": 0,
+     "novelty": 2.3742472556681915,
+     "medianVotes": 320,
+     "stability": 0.6958041958041958,
+     "ms": 376.3333333333333
+    }
+   }
+  },
+  {
+   "profile": "p5-variado",
+   "name": "Preferencias variadas",
+   "description": "Le gustan tres grupos distintos: viajes en el tiempo, atracos y comedias románticas; rechaza slashers e infantiles.",
+   "ratings": 30,
+   "liked": 18,
+   "disliked": 6,
+   "candidates": 3224,
+   "judged": {
+    "positives": 318,
+    "negatives": 471
+   },
+   "usable": true,
+   "algos": {
+    "A-popularidad": {
+     "p5": 0,
+     "p10": 0,
+     "ndcg10": 0,
+     "rejectedIn10": 2,
+     "genreDiversity": 0.7646384479717813,
+     "semanticDiversity": 0.45377385569585954,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8564017011914906,
+     "medianVotes": 5666,
+     "stability": 1,
+     "ms": 3.3333333333333335
+    },
+    "B-generos": {
+     "p5": 0,
+     "p10": 0.13333333333333333,
+     "ndcg10": 0.09089005189649269,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.231604938271605,
+     "semanticDiversity": 0.35674228385493806,
+     "sameCollectionPairs": 0.3333333333333333,
+     "novelty": 0.9534892918844484,
+     "medianVotes": 6585,
+     "stability": 0.7268518518518517,
+     "ms": 5.333333333333333
+    },
+    "C-contenido": {
+     "p5": 0.4000000000000001,
+     "p10": 0.3,
+     "ndcg10": 0.3560737144437427,
+     "rejectedIn10": 0.3333333333333333,
+     "genreDiversity": 0.5798765432098766,
+     "semanticDiversity": 0.4593483557337485,
+     "sameCollectionPairs": 0,
+     "novelty": 2.1666846831319355,
+     "medianVotes": 485,
+     "stability": 0.9444444444444443,
+     "ms": 110.66666666666667
+    },
+    "D-motor": {
+     "p5": 0.20000000000000004,
+     "p10": 0.3666666666666667,
+     "ndcg10": 0.2827133072498287,
+     "rejectedIn10": 0.3333333333333333,
+     "genreDiversity": 0.7895679012345678,
+     "semanticDiversity": 0.34939549879099757,
+     "sameCollectionPairs": 0,
+     "novelty": 1.3645538512057431,
+     "medianVotes": 3249.3333333333335,
+     "stability": 0.546994671994672,
+     "ms": 1179.6666666666667
+    },
+    "E-motor-sin-recorte": {
+     "p5": 0.6666666666666666,
+     "p10": 0.4666666666666666,
+     "ndcg10": 0.5175474507727481,
+     "rejectedIn10": 0.3333333333333333,
+     "genreDiversity": 0.6251851851851851,
+     "semanticDiversity": 0.326082074386371,
+     "sameCollectionPairs": 1.6666666666666667,
+     "novelty": 1.1416028340879043,
+     "medianVotes": 4834.666666666667,
+     "stability": 0.665057165057165,
+     "ms": 1141.6666666666667
+    },
+    "D-sin-datos-narrativos": {
+     "p5": 0.5333333333333333,
+     "p10": 0.4666666666666666,
+     "ndcg10": 0.5390865753526999,
+     "rejectedIn10": 0.3333333333333333,
+     "genreDiversity": 0.7383333333333333,
+     "semanticDiversity": 0.35777332295405334,
+     "sameCollectionPairs": 0,
+     "novelty": 1.1974594107360297,
+     "medianVotes": 3495,
+     "stability": 0.668109668109668,
+     "ms": 358
+    }
+   }
+  },
+  {
+   "profile": "p6-especifico",
+   "name": "Gusto muy específico: películas de atracos",
+   "description": "Sólo le interesan las historias de atracos; rechaza comedias románticas, musicales e infantiles.",
+   "ratings": 20,
+   "liked": 10,
+   "disliked": 6,
+   "candidates": 3234,
+   "judged": {
+    "positives": 41,
+    "negatives": 671
+   },
+   "usable": true,
+   "algos": {
+    "A-popularidad": {
+     "p5": 0,
+     "p10": 0,
+     "ndcg10": 0,
+     "rejectedIn10": 2,
+     "genreDiversity": 0.7410582010582011,
+     "semanticDiversity": 0.452278504557009,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8421665612689608,
+     "medianVotes": 5666,
+     "stability": 1,
+     "ms": 3
+    },
+    "B-generos": {
+     "p5": 0.13333333333333333,
+     "p10": 0.20000000000000004,
+     "ndcg10": 0.16750168529598886,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.2851851851851852,
+     "semanticDiversity": 0.370427318632415,
+     "sameCollectionPairs": 0.3333333333333333,
+     "novelty": 1.534310346516672,
+     "medianVotes": 4356,
+     "stability": 0.7407407407407408,
+     "ms": 4
+    },
+    "C-contenido": {
+     "p5": 0.06666666666666667,
+     "p10": 0.19999999999999998,
+     "ndcg10": 0.1662993051945353,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7300000000000001,
+     "semanticDiversity": 0.42258641554320153,
+     "sameCollectionPairs": 0,
+     "novelty": 2.017349127178662,
+     "medianVotes": 487.6666666666667,
+     "stability": 0.8069153069153069,
+     "ms": 79.33333333333333
+    },
+    "D-motor": {
+     "p5": 0.26666666666666666,
+     "p10": 0.2333333333333333,
+     "ndcg10": 0.27872539785678363,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.6906172839506173,
+     "semanticDiversity": 0.32333661704360445,
+     "sameCollectionPairs": 0,
+     "novelty": 1.1367231660252262,
+     "medianVotes": 7254.666666666667,
+     "stability": 0.5103785103785103,
+     "ms": 968.3333333333334
+    },
+    "E-motor-sin-recorte": {
+     "p5": 0.5333333333333333,
+     "p10": 0.3666666666666667,
+     "ndcg10": 0.4125346311946679,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.565925925925926,
+     "semanticDiversity": 0.3208322712941722,
+     "sameCollectionPairs": 0.3333333333333333,
+     "novelty": 1.2175074054299064,
+     "medianVotes": 4694,
+     "stability": 0.7116772116772117,
+     "ms": 942.6666666666666
+    },
+    "D-sin-datos-narrativos": {
+     "p5": 0.06666666666666667,
+     "p10": 0.16666666666666666,
+     "ndcg10": 0.1631949745017233,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.6579541446208114,
+     "semanticDiversity": 0.3898728538197817,
+     "sameCollectionPairs": 0.3333333333333333,
+     "novelty": 1.3613964878191498,
+     "medianVotes": 2866.3333333333335,
+     "stability": 0.6056166056166056,
+     "ms": 350.3333333333333
+    }
+   }
+  },
+  {
+   "profile": "p7-usuario-nuevo",
+   "name": "Usuario nuevo (3 valoraciones)",
+   "description": "Mismo gusto que el perfil de thrillers psicológicos, pero con sólo 3 valoraciones.",
+   "ratings": 3,
+   "liked": 3,
+   "disliked": 0,
+   "candidates": 3251,
+   "judged": {
+    "positives": 743,
+    "negatives": 705
+   },
+   "usable": true,
+   "algos": {
+    "A-popularidad": {
+     "p5": 0.4000000000000001,
+     "p10": 0.20000000000000004,
+     "ndcg10": 0.1017449613132337,
+     "rejectedIn10": 3,
+     "genreDiversity": 0.7410582010582011,
+     "semanticDiversity": 0.452278504557009,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8421665612689608,
+     "medianVotes": 5666,
+     "stability": 1,
+     "ms": 3.3333333333333335
+    },
+    "B-generos": {
+     "p5": 0.6666666666666666,
+     "p10": 0.5666666666666668,
+     "ndcg10": 0.31086023010233316,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.0925925925925926,
+     "semanticDiversity": 0.35441475327395094,
+     "sameCollectionPairs": 0,
+     "novelty": 1.1683222220480136,
+     "medianVotes": 4961.333333333333,
+     "stability": 0.16666666666666666,
+     "ms": 4.333333333333333
+    },
+    "C-contenido": {
+     "p5": 0.3333333333333333,
+     "p10": 0.26666666666666666,
+     "ndcg10": 0.12477517336090826,
+     "rejectedIn10": 2.3333333333333335,
+     "genreDiversity": 0.6199206349206349,
+     "semanticDiversity": 0.40025167457742317,
+     "sameCollectionPairs": 0,
+     "novelty": 1.8849087383753897,
+     "medianVotes": 1238.3333333333333,
+     "stability": 0.18218954248366015,
+     "ms": 15.333333333333334
+    },
+    "D-motor": {
+     "p5": 0.7999999999999999,
+     "p10": 0.7000000000000001,
+     "ndcg10": 0.5075097493900707,
+     "rejectedIn10": 0.3333333333333333,
+     "genreDiversity": 0.7315343915343915,
+     "semanticDiversity": 0.317704709483493,
+     "sameCollectionPairs": 0,
+     "novelty": 0.9244261448232335,
+     "medianVotes": 7083,
+     "stability": 0.3791423001949317,
+     "ms": 385.3333333333333
+    },
+    "E-motor-sin-recorte": {
+     "p5": 0.8666666666666667,
+     "p10": 0.6999999999999998,
+     "ndcg10": 0.5515549147285267,
+     "rejectedIn10": 0.6666666666666666,
+     "genreDiversity": 0.6919047619047619,
+     "semanticDiversity": 0.3122652319378713,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8748602386828447,
+     "medianVotes": 8706,
+     "stability": 0.4681981245448738,
+     "ms": 389.3333333333333
+    },
+    "D-sin-datos-narrativos": {
+     "p5": 0.7999999999999999,
+     "p10": 0.6333333333333333,
+     "ndcg10": 0.48389283692217394,
+     "rejectedIn10": 0.6666666666666666,
+     "genreDiversity": 0.7885185185185185,
+     "semanticDiversity": 0.39949481380444246,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8456306212327265,
+     "medianVotes": 8408,
+     "stability": 0.4175824175824176,
+     "ms": 247.33333333333334
+    }
+   }
+  },
+  {
+   "profile": "p8-contradictorio",
+   "name": "Muchas valoraciones y gustos contradictorios",
+   "description": "Le gusta el terror sobrenatural y psicológico y también las comedias románticas, pero detesta los slashers (también terror); 20 valoraciones más con notas al azar.",
+   "ratings": 62,
+   "liked": 33,
+   "disliked": 16,
+   "candidates": 3192,
+   "judged": {
+    "positives": 325,
+    "negatives": 33
+   },
+   "usable": true,
+   "algos": {
+    "A-popularidad": {
+     "p5": 0,
+     "p10": 0,
+     "ndcg10": 0,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7410582010582011,
+     "semanticDiversity": 0.452278504557009,
+     "sameCollectionPairs": 0,
+     "novelty": 0.8421665612689608,
+     "medianVotes": 5666,
+     "stability": 1,
+     "ms": 3.6666666666666665
+    },
+    "B-generos": {
+     "p5": 0.6,
+     "p10": 0.6333333333333333,
+     "ndcg10": 0.6299847056169866,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.04444444444444445,
+     "semanticDiversity": 0.379323647536184,
+     "sameCollectionPairs": 0.6666666666666666,
+     "novelty": 1.031200048102162,
+     "medianVotes": 6104.333333333333,
+     "stability": 0.7727272727272728,
+     "ms": 5
+    },
+    "C-contenido": {
+     "p5": 0.26666666666666666,
+     "p10": 0.3333333333333333,
+     "ndcg10": 0.33576474376061505,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.5062962962962962,
+     "semanticDiversity": 0.41582886128735214,
+     "sameCollectionPairs": 0,
+     "novelty": 2.550402258739721,
+     "medianVotes": 134,
+     "stability": 0.8333333333333334,
+     "ms": 226
+    },
+    "D-motor": {
+     "p5": 0.26666666666666666,
+     "p10": 0.26666666666666666,
+     "ndcg10": 0.30164307194036544,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.638015873015873,
+     "semanticDiversity": 0.404009341352016,
+     "sameCollectionPairs": 0,
+     "novelty": 2.16781077609652,
+     "medianVotes": 399.3333333333333,
+     "stability": 0.6819153069153069,
+     "ms": 2488.6666666666665
+    },
+    "E-motor-sin-recorte": {
+     "p5": 0.6,
+     "p10": 0.5666666666666668,
+     "ndcg10": 0.6177963159730818,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.5209700176366843,
+     "semanticDiversity": 0.38098525085939067,
+     "sameCollectionPairs": 0,
+     "novelty": 2.0870034142186955,
+     "medianVotes": 574.3333333333334,
+     "stability": 0.8585858585858586,
+     "ms": 2410.6666666666665
+    },
+    "D-sin-datos-narrativos": {
+     "p5": 0.5333333333333333,
+     "p10": 0.43333333333333335,
+     "ndcg10": 0.4723861668879947,
+     "rejectedIn10": 0,
+     "genreDiversity": 0.7215432098765432,
+     "semanticDiversity": 0.41645666995037695,
+     "sameCollectionPairs": 0,
+     "novelty": 1.8318376488216328,
+     "medianVotes": 840.3333333333334,
+     "stability": 0.6530691530691531,
+     "ms": 496
+    }
+   }
+  }
+ ],
+ "aggregate": {
+  "A-popularidad": {
+   "p5": 0.15,
+   "p10": 0.10000000000000002,
+   "ndcg10": 0.07258570355902497,
+   "rejectedIn10": 1.5,
+   "genreDiversity": 0.7499007936507941,
+   "semanticDiversity": 0.452364386210254,
+   "sameCollectionPairs": 0,
+   "novelty": 0.8494608689516099,
+   "medianVotes": 5765.75,
+   "stability": 1,
+   "ms": 3.25,
+   "coverage": 0.0036877688998156115
+  },
+  "B-generos": {
+   "p5": 0.4333333333333334,
+   "p10": 0.4458333333333333,
+   "ndcg10": 0.30828207153435405,
+   "rejectedIn10": 0.041666666666666664,
+   "genreDiversity": 0.1916820987654321,
+   "semanticDiversity": 0.3583589370882445,
+   "sameCollectionPairs": 0.20833333333333334,
+   "novelty": 1.1549892172763676,
+   "medianVotes": 5151.708333333333,
+   "stability": 0.6982566045066045,
+   "ms": 4.708333333333333,
+   "coverage": 0.047633681622618315
+  },
+  "C-contenido": {
+   "p5": 0.25833333333333336,
+   "p10": 0.2875,
+   "ndcg10": 0.1989494204094628,
+   "rejectedIn10": 0.4583333333333333,
+   "genreDiversity": 0.6544653880070547,
+   "semanticDiversity": 0.43275219698587547,
+   "sameCollectionPairs": 0,
+   "novelty": 2.0938868586149315,
+   "medianVotes": 863.4583333333334,
+   "stability": 0.7267485374103022,
+   "ms": 96.25,
+   "coverage": 0.0626920712968654
+  },
+  "D-motor": {
+   "p5": 0.38333333333333336,
+   "p10": 0.3833333333333333,
+   "ndcg10": 0.2969348157879227,
+   "rejectedIn10": 0.20833333333333334,
+   "genreDiversity": 0.7320524691358025,
+   "semanticDiversity": 0.36350885109177633,
+   "sameCollectionPairs": 0,
+   "novelty": 1.4127025714160195,
+   "medianVotes": 4192.083333333333,
+   "stability": 0.4608206837309005,
+   "ms": 1241.5,
+   "coverage": 0.0645359557467732
+  },
+  "E-motor-sin-recorte": {
+   "p5": 0.55,
+   "p10": 0.47083333333333327,
+   "ndcg10": 0.4107243345471813,
+   "rejectedIn10": 0.25,
+   "genreDiversity": 0.6341776895943562,
+   "semanticDiversity": 0.3552490567944098,
+   "sameCollectionPairs": 0.25,
+   "novelty": 1.3661968811320466,
+   "medianVotes": 4183.541666666667,
+   "stability": 0.6552214716398154,
+   "ms": 1196.75,
+   "coverage": 0.06146281499692686
+  },
+  "D-sin-datos-narrativos": {
+   "p5": 0.4500000000000001,
+   "p10": 0.4041666666666666,
+   "ndcg10": 0.33287217753178006,
+   "rejectedIn10": 0.375,
+   "genreDiversity": 0.7229805996472662,
+   "semanticDiversity": 0.39345881469540717,
+   "sameCollectionPairs": 0.041666666666666664,
+   "novelty": 1.3845487098898668,
+   "medianVotes": 4005.375,
+   "stability": 0.6282536907536906,
+   "ms": 363.5833333333333,
+   "coverage": 0.06177012907191149
+  }
+ },
+ "comparison": {
+  "A-popularidad": {
+   "ndcg10": {
+    "meanDiff": 0.22434911222889772,
+    "ci95": [
+     0.1468960797949249,
+     0.3063660454355543
+    ],
+    "motorBetter": 21,
+    "motorWorse": 3,
+    "ties": 0,
+    "n": 24
+   },
+   "p10": {
+    "meanDiff": 0.2833333333333333,
+    "ci95": [
+     0.1958333333333334,
+     0.38749999999999996
+    ],
+    "motorBetter": 20,
+    "motorWorse": 2,
+    "ties": 2,
+    "n": 24
+   }
+  },
+  "B-generos": {
+   "ndcg10": {
+    "meanDiff": -0.011347255746431388,
+    "ci95": [
+     -0.12217620762583671,
+     0.10112052475391026
+    ],
+    "motorBetter": 13,
+    "motorWorse": 11,
+    "ties": 0,
+    "n": 24
+   },
+   "p10": {
+    "meanDiff": -0.06250000000000003,
+    "ci95": [
+     -0.19166666666666668,
+     0.062499999999999965
+    ],
+    "motorBetter": 8,
+    "motorWorse": 10,
+    "ties": 6,
+    "n": 24
+   }
+  },
+  "C-contenido": {
+   "ndcg10": {
+    "meanDiff": 0.09798539537845986,
+    "ci95": [
+     0.02157321656347197,
+     0.18078440121007186
+    ],
+    "motorBetter": 15,
+    "motorWorse": 9,
+    "ties": 0,
+    "n": 24
+   },
+   "p10": {
+    "meanDiff": 0.09583333333333333,
+    "ci95": [
+     0.012500000000000004,
+     0.19166666666666662
+    ],
+    "motorBetter": 12,
+    "motorWorse": 7,
+    "ties": 5,
+    "n": 24
+   }
+  },
+  "E-motor-sin-recorte": {
+   "ndcg10": {
+    "meanDiff": -0.11378951875925862,
+    "ci95": [
+     -0.18977253038110897,
+     -0.040461001651303306
+    ],
+    "motorBetter": 7,
+    "motorWorse": 13,
+    "ties": 4,
+    "n": 24
+   },
+   "p10": {
+    "meanDiff": -0.08750000000000001,
+    "ci95": [
+     -0.15416666666666665,
+     -0.025000000000000005
+    ],
+    "motorBetter": 4,
+    "motorWorse": 12,
+    "ties": 8,
+    "n": 24
+   }
+  },
+  "D-sin-datos-narrativos": {
+   "ndcg10": {
+    "meanDiff": -0.03593736174385739,
+    "ci95": [
+     -0.11849226075220985,
+     0.04469364771617811
+    ],
+    "motorBetter": 12,
+    "motorWorse": 11,
+    "ties": 1,
+    "n": 24
+   },
+   "p10": {
+    "meanDiff": -0.02083333333333333,
+    "ci95": [
+     -0.09166666666666663,
+     0.04583333333333333
+    ],
+    "motorBetter": 10,
+    "motorWorse": 7,
+    "ties": 7,
+    "n": 24
+   }
+  }
+ },
+ "lists": {
+  "p1-scifi-tiempo": {
+   "A-popularidad": [
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:276161",
+     "title": "Así aprenderás",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:37854",
+     "title": "One Piece",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:278",
+     "title": "Sueño de fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:238",
+     "title": "El Padrino",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:70785",
+     "title": "Anne with an E",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "tv:1398",
+     "title": "Los Soprano",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": true
+    }
+   ],
+   "B-generos": [
+    {
+     "key": "movie:17654",
+     "title": "Sector 9",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:603",
+     "title": "Matrix",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:557",
+     "title": "El hombre araña",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:335983",
+     "title": "Venom",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:10529",
+     "title": "Outlander",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:406759",
+     "title": "Moonfall",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:1705",
+     "title": "La batalla por el planeta de los simios",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:687163",
+     "title": "Proyecto Fin del Mundo",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:438631",
+     "title": "Duna",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:168",
+     "title": "Viaje a las estrellas IV: Misión salvar a la Tierra",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "C-contenido": [
+    {
+     "key": "movie:568",
+     "title": "Apolo 13",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:312359",
+     "title": "Dragon Ball Super: Beerus",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:1437",
+     "title": "Firefly",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:363676",
+     "title": "Sully: Hazaña en el Hudson",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:90811",
+     "title": "Avenue 5",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:78484",
+     "title": "Inazuma Eleven Ares",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:580",
+     "title": "Viaje a las estrellas: Espacio Profundo Nueve",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:75612",
+     "title": "Oblivion: El Tiempo del Olvido",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:216228",
+     "title": "Los días",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-motor": [
+    {
+     "key": "movie:10134",
+     "title": "Cyborg",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:85949",
+     "title": "Star Trek: Picard",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:458576",
+     "title": "Monster Hunter: La cacería comienza",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:86834",
+     "title": "Noé",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:558449",
+     "title": "Gladiador II",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1091",
+     "title": "La cosa del otro mundo",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:85",
+     "title": "Los cazadores del arca perdida",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1575337",
+     "title": "La princesa Kaguya del cosmos",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:19995",
+     "title": "Avatar",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:287947",
+     "title": "¡Shazam!",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "E-motor-sin-recorte": [
+    {
+     "key": "movie:126963",
+     "title": "Dragon Ball Z: La batalla de los dioses",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:87101",
+     "title": "Terminator: Génesis",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:54138",
+     "title": "Star Trek: En la oscuridad",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:76170",
+     "title": "Wolverine: Inmortal",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:460465",
+     "title": "Mortal Kombat",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1705",
+     "title": "La batalla por el planeta de los simios",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:76600",
+     "title": "Avatar: El camino del agua",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:1081003",
+     "title": "Supergirl",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:2067",
+     "title": "Misión a Marte",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:395",
+     "title": "Alien vs. Depredador",
+     "grade": 1,
+     "rejected": false
+    }
+   ],
+   "D-sin-datos-narrativos": [
+    {
+     "key": "movie:87101",
+     "title": "Terminator: Génesis",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:126963",
+     "title": "Dragon Ball Z: La batalla de los dioses",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:34851",
+     "title": "Depredadores",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:299687",
+     "title": "La Quinta Ola",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:188927",
+     "title": "Star Trek Sin Límites",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:1406657",
+     "title": "Scarlet",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:2067",
+     "title": "Misión a Marte",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:1705",
+     "title": "La batalla por el planeta de los simios",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:912649",
+     "title": "Venom: El último baile",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:861",
+     "title": "El vengador del futuro",
+     "grade": 1,
+     "rejected": false
+    }
+   ]
+  },
+  "p2-thriller-psicologico": {
+   "A-popularidad": [
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:276161",
+     "title": "Así aprenderás",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:37854",
+     "title": "One Piece",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:278",
+     "title": "Sueño de fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:238",
+     "title": "El Padrino",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:70785",
+     "title": "Anne with an E",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "tv:1398",
+     "title": "Los Soprano",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": true
+    }
+   ],
+   "B-generos": [
+    {
+     "key": "movie:645710",
+     "title": "Los Voyeristas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1290159",
+     "title": "Una casa de dinamita",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:241251",
+     "title": "Cercana Obsesión",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:670",
+     "title": "Oldboy: Cinco días para vengarse",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:2832",
+     "title": "Identidad",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1368166",
+     "title": "La Empleada",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:179826",
+     "title": "Odd Thomas: Cazador de fantasmas",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:833425",
+     "title": "Sin salida",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:591",
+     "title": "El Código Da Vinci",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:10675",
+     "title": "Búsqueda frenética",
+     "grade": 1,
+     "rejected": false
+    }
+   ],
+   "C-contenido": [
+    {
+     "key": "tv:273977",
+     "title": "El arte de Sarah",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:220056",
+     "title": "La locura",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1630409",
+     "title": "El Cobrador De Deudas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:152742",
+     "title": "Al Mejor Postor",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:65497",
+     "title": "Noche y Día",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:72615",
+     "title": "Alias Grace",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1589891",
+     "title": "La hora de los valientes",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:39276",
+     "title": "Inolvidable",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:66276",
+     "title": "The Night Of",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:214088",
+     "title": "La Dama De Los Muertos",
+     "grade": 1,
+     "rejected": false
+    }
+   ],
+   "D-motor": [
+    {
+     "key": "movie:1032823",
+     "title": "La trampa",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:205587",
+     "title": "El Juez",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1088514",
+     "title": "La habitación de al lado",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1844",
+     "title": "La Emboscada",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:241848",
+     "title": "El huésped",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:11087",
+     "title": "La mano que mece la cuna",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:546554",
+     "title": "Entre Navajas y Secretos",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:376290",
+     "title": "Sola contra el poder",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:369885",
+     "title": "Aliados",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:591",
+     "title": "El Código Da Vinci",
+     "grade": 1,
+     "rejected": false
+    }
+   ],
+   "E-motor-sin-recorte": [
+    {
+     "key": "movie:339527",
+     "title": "En la mente del asesino",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:1032823",
+     "title": "La trampa",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:9585",
+     "title": "No me iré sin mi hija",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:274",
+     "title": "El Silencio de los Inocentes",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:11092",
+     "title": "Presunto inocente",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:845",
+     "title": "Pacto siniestro",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:570670",
+     "title": "El Hombre Invisible",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:278",
+     "title": "Sueño de fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:11087",
+     "title": "La mano que mece la cuna",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:984",
+     "title": "Harry, el sucio",
+     "grade": 1,
+     "rejected": false
+    }
+   ],
+   "D-sin-datos-narrativos": [
+    {
+     "key": "movie:1032823",
+     "title": "La trampa",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:339527",
+     "title": "En la mente del asesino",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:9585",
+     "title": "No me iré sin mi hija",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:335796",
+     "title": "Ouija 2: El origen del mal",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:220801",
+     "title": "Engaños",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:1134433",
+     "title": "Thi Yot - Susurros Mortales",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:631843",
+     "title": "Viejos",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:722149",
+     "title": "Luther: Cae la noche",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:11087",
+     "title": "La mano que mece la cuna",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:11423",
+     "title": "Memorias de un Asesino",
+     "grade": 1,
+     "rejected": false
+    }
+   ]
+  },
+  "p3-calidad-narrativa": {
+   "A-popularidad": [
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:276161",
+     "title": "Así aprenderás",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:238",
+     "title": "El Padrino",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:70785",
+     "title": "Anne with an E",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:1398",
+     "title": "Los Soprano",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:687163",
+     "title": "Proyecto Fin del Mundo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:1408",
+     "title": "Dr. House",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "B-generos": [
+    {
+     "key": "movie:11216",
+     "title": "Cinema Paradiso",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:527641",
+     "title": "A Dos Metros de Ti",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:4348",
+     "title": "Orgullo y Prejuicio",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:289",
+     "title": "Casablanca",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:76",
+     "title": "Antes del Amanecer",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:43949",
+     "title": "Mi Primer Amor",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:597",
+     "title": "Titanic",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:11036",
+     "title": "Diario de una pasión",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:331482",
+     "title": "Mujercitas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:266856",
+     "title": "La Teoría del Todo",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "C-contenido": [
+    {
+     "key": "movie:109418",
+     "title": "Son Como Niños 2",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:133808",
+     "title": "Tom a los 10",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:280180",
+     "title": "Un detective suelto en Hollywood: Axel F.",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:295751",
+     "title": "一畳間まんきつ暮らし！",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:102619",
+     "title": "I May Destroy You",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:249042",
+     "title": "Adolescencia",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:67549",
+     "title": "La ley de Milo Murphy",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:47",
+     "title": "El Chavo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:134373",
+     "title": "La vida sexual de las universitarias",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:219063",
+     "title": "La primera vez",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-motor": [
+    {
+     "key": "movie:122",
+     "title": "El señor de los anillos: El retorno del rey",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:207",
+     "title": "La Sociedad de los Poetas Muertos",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:152584",
+     "title": "La vida de Adèle",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:114500",
+     "title": "Ganes o Pierdas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:527641",
+     "title": "A Dos Metros de Ti",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1585",
+     "title": "¡Qué Bello es Vivir!",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:280180",
+     "title": "Un detective suelto en Hollywood: Axel F.",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:858024",
+     "title": "Hamnet",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:12637",
+     "title": "Rebelde",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:11216",
+     "title": "Cinema Paradiso",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "E-motor-sin-recorte": [
+    {
+     "key": "movie:122",
+     "title": "El señor de los anillos: El retorno del rey",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:207",
+     "title": "La Sociedad de los Poetas Muertos",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:152584",
+     "title": "La vida de Adèle",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:114500",
+     "title": "Ganes o Pierdas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:527641",
+     "title": "A Dos Metros de Ti",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1585",
+     "title": "¡Qué Bello es Vivir!",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:280180",
+     "title": "Un detective suelto en Hollywood: Axel F.",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:858024",
+     "title": "Hamnet",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:12637",
+     "title": "Rebelde",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:11216",
+     "title": "Cinema Paradiso",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "D-sin-datos-narrativos": [
+    {
+     "key": "movie:527641",
+     "title": "A Dos Metros de Ti",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:12637",
+     "title": "Rebelde",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:72637",
+     "title": "O11CE",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:43949",
+     "title": "Mi Primer Amor",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:313369",
+     "title": "La La Land: Una historia de amor",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:935",
+     "title": "Dr. Insólito o: Cómo aprendí a dejar de preocuparme y amar la bomba",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:429",
+     "title": "El Bueno, El Malo y El Feo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:90239",
+     "title": "El juego de las llaves",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:6537",
+     "title": "El orfanato",
+     "grade": 0,
+     "rejected": false
+    }
+   ]
+  },
+  "p4-poco-conocidas": {
+   "A-popularidad": [
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:276161",
+     "title": "Así aprenderás",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:37854",
+     "title": "One Piece",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:278",
+     "title": "Sueño de fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:238",
+     "title": "El Padrino",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:70785",
+     "title": "Anne with an E",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:1398",
+     "title": "Los Soprano",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "B-generos": [
+    {
+     "key": "tv:13023",
+     "title": "El Chapulín Colorado",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "movie:771",
+     "title": "Mi pobre angelito",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:31072",
+     "title": "La familia P. Luche",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:107171",
+     "title": "La CQ",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:4313",
+     "title": "Tres por tres",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:4610",
+     "title": "Hannah Montana",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:65291",
+     "title": "Atrapada en el medio",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:66456",
+     "title": "Bizaardvark",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:84915",
+     "title": "Sydney como Max",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:279601",
+     "title": "Hombre vs. Bebé",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "C-contenido": [
+    {
+     "key": "tv:539",
+     "title": "Squidbillies",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:30916",
+     "title": "Imagination Movers",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:77410",
+     "title": "Muppet Babies",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:250480",
+     "title": "Las aventuras de Winnie Pooh",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:1567",
+     "title": "CatDog",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:2005",
+     "title": "Las nuevas aventuras de Winnie the Pooh",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:13465",
+     "title": "Las Aventuras de Ichabod y el Sr. Sapo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:138663",
+     "title": "Café Minamdang",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:61833",
+     "title": "Expedición a lo desconocido",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:47480",
+     "title": "El show de Tom y Jerry",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-motor": [
+    {
+     "key": "movie:1359005",
+     "title": "Sueños galácticos",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:1567",
+     "title": "CatDog",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:90293",
+     "title": "Ghost in the Shell: SAC_2045",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:225385",
+     "title": "Palomas negras",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:74415",
+     "title": "Grizzy y los Lemmings",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:136342",
+     "title": "Disney Twisted-Wonderland: La serie",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:61330",
+     "title": "La Sheriff Callie",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:127289",
+     "title": "Ridley Jones",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:90808",
+     "title": "Gremlins: Los secretos de los Mogwai",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:214875",
+     "title": "Rubble y Equipo",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "E-motor-sin-recorte": [
+    {
+     "key": "tv:1567",
+     "title": "CatDog",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:3934",
+     "title": "La Casa de Mickey Mouse",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:61886",
+     "title": "Las Aventuras del Gato con Botas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:47480",
+     "title": "El show de Tom y Jerry",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:258901",
+     "title": "SANDA",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:3527",
+     "title": "Mis Amigos Tigger y Pooh",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:2085",
+     "title": "Coraje, el perro cobarde",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:46928",
+     "title": "Princesita Sofía",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:90293",
+     "title": "Ghost in the Shell: SAC_2045",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:4232",
+     "title": "Don Gato y su Pandilla",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-sin-datos-narrativos": [
+    {
+     "key": "tv:1567",
+     "title": "CatDog",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:258901",
+     "title": "SANDA",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:215401",
+     "title": "BULLET/BULLET",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:9921",
+     "title": "La granja",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:300527",
+     "title": "¿Por casualidad hablaban de mí?",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:3527",
+     "title": "Mis Amigos Tigger y Pooh",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:127289",
+     "title": "Ridley Jones",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:228669",
+     "title": "Ariel: Los cuentos de la Sirenita",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:90293",
+     "title": "Ghost in the Shell: SAC_2045",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:80281",
+     "title": "라바",
+     "grade": 0,
+     "rejected": false
+    }
+   ]
+  },
+  "p5-variado": {
+   "A-popularidad": [
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:276161",
+     "title": "Así aprenderás",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:37854",
+     "title": "One Piece",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:278",
+     "title": "Sueño de fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:70785",
+     "title": "Anne with an E",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "tv:1398",
+     "title": "Los Soprano",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "movie:687163",
+     "title": "Proyecto Fin del Mundo",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "B-generos": [
+    {
+     "key": "movie:569982",
+     "title": "Mr. 365",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1903",
+     "title": "Vanilla Sky",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:17654",
+     "title": "Sector 9",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:50619",
+     "title": "Crepúsculo:  Amanecer - Parte 1",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:162",
+     "title": "El joven manos de tijera",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:4922",
+     "title": "El curioso caso de Benjamin Button",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:293863",
+     "title": "El secreto de Adaline",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:994108",
+     "title": "Todos somos extraños",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:399055",
+     "title": "La forma del agua",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:152603",
+     "title": "Sólo los amantes sobreviven",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "C-contenido": [
+    {
+     "key": "tv:259265",
+     "title": "Algo terrible está a punto de suceder",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:250220",
+     "title": "La mujer miniatura",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:287011",
+     "title": "Un amor que no se agota",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:135251",
+     "title": "El ídolo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:88324",
+     "title": "Un lugar para soñar",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:227554",
+     "title": "Citas Barcelona",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:124800",
+     "title": "Amor y muerte",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:281011",
+     "title": "Amor de mentira",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:203857",
+     "title": "La diplomática",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:62984",
+     "title": "Los misterios de Laura",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-motor": [
+    {
+     "key": "movie:25642",
+     "title": "Ben 10: Invasión Alienígena",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:50619",
+     "title": "Crepúsculo:  Amanecer - Parte 1",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:8874",
+     "title": "La boda de mi mejor amigo",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:7985",
+     "title": "Penelope",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:14202",
+     "title": "Al otro lado del mundo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:429",
+     "title": "El Bueno, El Malo y El Feo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:634",
+     "title": "El diario de Bridget Jones",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1093231",
+     "title": "La Madre de la Novia",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:19995",
+     "title": "Avatar",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:259694",
+     "title": "Cómo ser soltera",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "E-motor-sin-recorte": [
+    {
+     "key": "movie:25642",
+     "title": "Ben 10: Invasión Alienígena",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:50619",
+     "title": "Crepúsculo:  Amanecer - Parte 1",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:8874",
+     "title": "La boda de mi mejor amigo",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:7985",
+     "title": "Penelope",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:14202",
+     "title": "Al otro lado del mundo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:429",
+     "title": "El Bueno, El Malo y El Feo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:634",
+     "title": "El diario de Bridget Jones",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1093231",
+     "title": "La Madre de la Novia",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:19995",
+     "title": "Avatar",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:259694",
+     "title": "Cómo ser soltera",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "D-sin-datos-narrativos": [
+    {
+     "key": "movie:15566",
+     "title": "Sobreviviendo a la Navidad",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:25642",
+     "title": "Ben 10: Invasión Alienígena",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:339846",
+     "title": "Baywatch: Guardianes de la bahía",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1903",
+     "title": "Vanilla Sky",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:6557",
+     "title": "27 bodas",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:429",
+     "title": "El Bueno, El Malo y El Feo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:9327",
+     "title": "El Profesor Chiflado",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1093231",
+     "title": "La Madre de la Novia",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:7985",
+     "title": "Penelope",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1891",
+     "title": "El Imperio contraataca",
+     "grade": 0,
+     "rejected": false
+    }
+   ]
+  },
+  "p6-especifico": {
+   "A-popularidad": [
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:276161",
+     "title": "Así aprenderás",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:37854",
+     "title": "One Piece",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:278",
+     "title": "Sueño de fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:238",
+     "title": "El Padrino",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:70785",
+     "title": "Anne with an E",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "tv:1398",
+     "title": "Los Soprano",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": true
+    }
+   ],
+   "B-generos": [
+    {
+     "key": "tv:95638",
+     "title": "Capitani",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:66584",
+     "title": "99.9 -刑事専門弁護士-",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:75656",
+     "title": "Los Ilusionistas: Nada es lo que Parece",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:276907",
+     "title": "Leyendas del crimen",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1817",
+     "title": "Enlace Mortal",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:628704",
+     "title": "Crímenes de medianoche",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:291805",
+     "title": "Los Ilusionistas 2",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:179",
+     "title": "La Intérprete",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1274706",
+     "title": "La desconocida",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:64689",
+     "title": "Mátalos suavemente",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "C-contenido": [
+    {
+     "key": "tv:4946",
+     "title": "Deal or No Deal",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1293167",
+     "title": "Protocolo de Fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:156902",
+     "title": "Caleidoscopio",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:198102",
+     "title": "Hijack",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:385128",
+     "title": "Rápidos y furiosos 9",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1291143",
+     "title": "How to Rob a Bank",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:238084",
+     "title": "Gatillo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:375794",
+     "title": "No manches, Frida",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1571955",
+     "title": "Colisión",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:7299",
+     "title": "Equilibrium",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-motor": [
+    {
+     "key": "movie:11524",
+     "title": "Ladrón",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:201088",
+     "title": "Hacker: Amenaza en la red",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:400535",
+     "title": "Sicario: El Día Del Soldado",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:388",
+     "title": "El Plan Perfecto",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:500682",
+     "title": "Emboscada Final",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:414",
+     "title": "Batman eternamente",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:249039",
+     "title": "Black Rabbit",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:37094",
+     "title": "Un día de furia",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1538",
+     "title": "Colateral",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:504172",
+     "title": "La Mula",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "E-motor-sin-recorte": [
+    {
+     "key": "movie:201088",
+     "title": "Hacker: Amenaza en la red",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:11524",
+     "title": "Ladrón",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:400535",
+     "title": "Sicario: El Día Del Soldado",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:388",
+     "title": "El Plan Perfecto",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:500682",
+     "title": "Emboscada Final",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:414",
+     "title": "Batman eternamente",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:249039",
+     "title": "Black Rabbit",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:37094",
+     "title": "Un día de furia",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1538",
+     "title": "Colateral",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:504172",
+     "title": "La Mula",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-sin-datos-narrativos": [
+    {
+     "key": "movie:273481",
+     "title": "Sicario: Tierra de nadie",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1616687",
+     "title": "No nos rendimos",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:393",
+     "title": "Kill Bill: Vol. 2",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:9361",
+     "title": "El último de los mohicanos",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:20083",
+     "title": "La venganza del dragón",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:118357",
+     "title": "1883",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:117",
+     "title": "Los Intocables",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1701",
+     "title": "Riesgo en el aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1291143",
+     "title": "How to Rob a Bank",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:400535",
+     "title": "Sicario: El Día Del Soldado",
+     "grade": 0,
+     "rejected": false
+    }
+   ]
+  },
+  "p7-usuario-nuevo": {
+   "A-popularidad": [
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:276161",
+     "title": "Así aprenderás",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:37854",
+     "title": "One Piece",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:278",
+     "title": "Sueño de fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:238",
+     "title": "El Padrino",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:70785",
+     "title": "Anne with an E",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "tv:1398",
+     "title": "Los Soprano",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": true
+    }
+   ],
+   "B-generos": [
+    {
+     "key": "movie:670",
+     "title": "Oldboy: Cinco días para vengarse",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:985939",
+     "title": "Vértigo",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:2832",
+     "title": "Identidad",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1368166",
+     "title": "La Empleada",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:179826",
+     "title": "Odd Thomas: Cazador de fantasmas",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:833425",
+     "title": "Sin salida",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:591",
+     "title": "El Código Da Vinci",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:10675",
+     "title": "Búsqueda frenética",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:63929",
+     "title": "마을 - 아치아라의 비밀",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:332401",
+     "title": "Ciudad de sangre",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "C-contenido": [
+    {
+     "key": "movie:13885",
+     "title": "Sweeney Todd: El Barbero Demoniaco",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:61859",
+     "title": "El infiltrado",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:72615",
+     "title": "Alias Grace",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:241259",
+     "title": "Bebé Reno",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:225385",
+     "title": "Palomas negras",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:122196",
+     "title": "La Escalera",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:363676",
+     "title": "Sully: Hazaña en el Hudson",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:4344",
+     "title": "Rescue Me",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:73126",
+     "title": "American Vandal",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:103023",
+     "title": "El asesino sin rostro",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-motor": [
+    {
+     "key": "movie:539",
+     "title": "Psicosis",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:388",
+     "title": "El Plan Perfecto",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:626872",
+     "title": "Emergencia en el aire",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:311",
+     "title": "Érase una vez en América",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:1236045",
+     "title": "Animales",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:31911",
+     "title": "Fullmetal Alchemist: Brotherhood",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:629",
+     "title": "Los sospechosos de siempre",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:21510",
+     "title": "Cuello Blanco",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:807",
+     "title": "Se7en: Los Siete Pecados Capitales",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:11324",
+     "title": "La Isla Siniestra",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "E-motor-sin-recorte": [
+    {
+     "key": "movie:539",
+     "title": "Psicosis",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:388",
+     "title": "El Plan Perfecto",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:626872",
+     "title": "Emergencia en el aire",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:311",
+     "title": "Érase una vez en América",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:1236045",
+     "title": "Animales",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:31911",
+     "title": "Fullmetal Alchemist: Brotherhood",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:629",
+     "title": "Los sospechosos de siempre",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:21510",
+     "title": "Cuello Blanco",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:807",
+     "title": "Se7en: Los Siete Pecados Capitales",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:11324",
+     "title": "La Isla Siniestra",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "D-sin-datos-narrativos": [
+    {
+     "key": "movie:539",
+     "title": "Psicosis",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1236045",
+     "title": "Animales",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:311",
+     "title": "Érase una vez en América",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "movie:629",
+     "title": "Los sospechosos de siempre",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 1,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 0,
+     "rejected": true
+    },
+    {
+     "key": "movie:488623",
+     "title": "Olvidado",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:807",
+     "title": "Se7en: Los Siete Pecados Capitales",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:969681",
+     "title": "Spider-Man: Un nuevo día",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:238",
+     "title": "El Padrino",
+     "grade": 1,
+     "rejected": false
+    }
+   ]
+  },
+  "p8-contradictorio": {
+   "A-popularidad": [
+    {
+     "key": "tv:1396",
+     "title": "Breaking Bad",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:276161",
+     "title": "Así aprenderás",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:37854",
+     "title": "One Piece",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:278",
+     "title": "Sueño de fuga",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:238",
+     "title": "El Padrino",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:60625",
+     "title": "Rick y Morty",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:980431",
+     "title": "Avatar: Aang, El último Maestro Aire",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:70785",
+     "title": "Anne with an E",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:1398",
+     "title": "Los Soprano",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:1007757",
+     "title": "Intercambiados",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "B-generos": [
+    {
+     "key": "movie:872",
+     "title": "Cantando bajo la lluvia",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:930094",
+     "title": "Rojo, Blanco y Sangre Azul",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:935",
+     "title": "Dr. Insólito o: Cómo aprendí a dejar de preocuparme y amar la bomba",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:583083",
+     "title": "El stand de los besos 2",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1032863",
+     "title": "La hipótesis del amor",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:621",
+     "title": "Vaselina",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:454983",
+     "title": "El stand de los besos",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:1581",
+     "title": "El descanso",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:615665",
+     "title": "Amor de calendario",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "movie:10653",
+     "title": "La comezón del séptimo año",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "C-contenido": [
+    {
+     "key": "tv:91621",
+     "title": "Las Amazonas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:229891",
+     "title": "¿Cómo se traduce este amor?",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:314939",
+     "title": "Un amor distinto al tuyo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:119279",
+     "title": "Solos",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:113240",
+     "title": "El amor es la meta",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:4319",
+     "title": "ラブジェネレーション",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:85404",
+     "title": "Un lugar en tu corazón",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:154825",
+     "title": "Propuesta laboral",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:152511",
+     "title": "Las inclemencias del amor",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:92967",
+     "title": "El milagro",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "D-motor": [
+    {
+     "key": "tv:104877",
+     "title": "¿Será Que es Amor?",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:314939",
+     "title": "Un amor distinto al tuyo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:89844",
+     "title": "30 monedas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:131305",
+     "title": "Celebridad",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:85220",
+     "title": "El Amor Es Un Capitulo Aparte",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:95612",
+     "title": "Navidad en casa",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:85404",
+     "title": "Un lugar en tu corazón",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:89604",
+     "title": "Una noche de primavera",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:37636",
+     "title": "Jardin Secreto",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:280948",
+     "title": "Fiebre de primavera",
+     "grade": 2,
+     "rejected": false
+    }
+   ],
+   "E-motor-sin-recorte": [
+    {
+     "key": "tv:154825",
+     "title": "Propuesta laboral",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:229480",
+     "title": "El que no gana no ama",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:70813",
+     "title": "Luchando Por Mi Vida",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:314939",
+     "title": "Un amor distinto al tuyo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:89844",
+     "title": "30 monedas",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:95612",
+     "title": "Navidad en casa",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:89604",
+     "title": "Una noche de primavera",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:280948",
+     "title": "Fiebre de primavera",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:155231",
+     "title": "Conexión: Comer, amar, matar",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:64487",
+     "title": "리멤버 - 아들의 전쟁",
+     "grade": 0,
+     "rejected": false
+    }
+   ],
+   "D-sin-datos-narrativos": [
+    {
+     "key": "tv:64487",
+     "title": "리멤버 - 아들의 전쟁",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:281011",
+     "title": "Amor de mentira",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:65143",
+     "title": "Descendientes Del Sol",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:61611",
+     "title": "Pinocho: No te puedo mentir",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:138843",
+     "title": "El Conjuro",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:155231",
+     "title": "Conexión: Comer, amar, matar",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "movie:396535",
+     "title": "Estación Zombie: tren a Busan",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:135895",
+     "title": "El Beso del destino",
+     "grade": 2,
+     "rejected": false
+    },
+    {
+     "key": "tv:72549",
+     "title": "En el mundo de nuevo",
+     "grade": 0,
+     "rejected": false
+    },
+    {
+     "key": "tv:314939",
+     "title": "Un amor distinto al tuyo",
+     "grade": 0,
+     "rejected": false
+    }
+   ]
+  }
+ }
+}

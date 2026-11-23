@@ -99,7 +99,9 @@ describe('v3.3 · texto libre (reglas, no comprensión del lenguaje)', () => {
     expect(p.unparsed).toEqual(['lindo domingo onda']);
     const mixed = T('películas de terror con mucha atmósfera opresiva');
     expect(labels(mixed).inc).toEqual(['Tipo: película', 'Género: Terror']);
-    expect(mixed.unparsed.join(' ')).toMatch(/atmosfera opresiva/);
+    // v3.4: «atmósfera opresiva» ya no queda sin interpretar: es una PREFERENCIA (ordena, no filtra)
+    expect(mixed.prefs?.map((p) => p.id)).toEqual(['unsettling']);
+    expect(mixed.exclude).toEqual([]);
     // Categorías deshabilitadas, idioma y «asiático» se avisan; nunca se aplican en silencio
     expect(T('películas para mujeres').notes.join(' ')).toMatch(/deshabilitada/);
     expect(T('películas para mujeres').include).toEqual([{ k: 'type', v: 'movie' }]);
@@ -191,7 +193,10 @@ describe('v3.3 · público objetivo', () => {
     expect(classifyAudience(pixar).scores.family.status).toBe('yes');
     expect(ok(preschool, A(['family']))).toBe(true);
     expect(ok(preschool, A(['family'], ['kids']))).toBe(false); // familiar pero también infantil: se excluye
-    expect(ok(pixar, A(['family'], ['kids']))).toBe(true);
+    // público-1.1 (v3.4): animación con clasificación «todo público» pasa a Infantil (validado contra Wikipedia),
+    // así que «familiar sin infantil» ahora la excluye
+    expect(ok(pixar, A(['family'], ['kids']))).toBe(false);
+    expect(ok(pixar, A(['family']))).toBe(true);
     expect(ok(teenRom, A(['kids', 'teen']))).toBe(true);
     // masculino/femenino: deshabilitadas, no filtran nada
     expect(classifyAudience(teenRom).scores.female.status).toBe('disabled');
@@ -415,7 +420,7 @@ describe.skipIf(!haveReal)('v3.3 · diagnóstico de público con datos reales de
       rows.push(`| ${lab.title} | ${cells.join(' | ')} |`);
     }
     const sum = Object.entries(tally).map(([id, t]) => `- ${id}: aciertos sí ${t.tp}, falsos sí ${t.fp}, sí no detectados ${t.fn}, aciertos no ${t.tn}, inciertos ${t.unc}, discutibles ${t.skip}`).join('\n');
-    writeFileSync('docs/audience-agreement.md', `# Diagnóstico de público objetivo (${p0()})\n\nCompara las reglas ${'`'}público-1.0${'`'} (umbral 0,5) con etiquetas que asignó el desarrollador a 36 títulos conocidos.\n**No es una validación de precisión**: las etiquetas no vienen de usuarios ni de una fuente independiente, y la muestra es chica y elegida a mano.\n\n${sum}\n\n| Título | Adolescente | Infantil | Adulto |\n|---|---|---|---|\n${rows.join('\n')}\n`);
+    writeFileSync('docs/audience-agreement.md', `# Diagnóstico de público objetivo (${p0()})\n\nCompara las reglas ${'`'}público-1.1${'`'} (umbral 0,5) con etiquetas que asignó el desarrollador a 36 títulos conocidos.\n**No es una validación de precisión**: las etiquetas no vienen de usuarios ni de una fuente independiente, y la muestra es chica y elegida a mano.\n\n${sum}\n\n| Título | Adolescente | Infantil | Adulto |\n|---|---|---|---|\n${rows.join('\n')}\n`);
     console.log(sum);
     // Guardas mínimas (de comportamiento, no de precisión): ninguna obra para adultos marcada como infantil o juvenil
     expect(tally.kids.fp).toBe(0);

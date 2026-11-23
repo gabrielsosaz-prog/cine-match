@@ -17,7 +17,8 @@ export function TextFilterBox({ f, onChange }: { f: RankFilters; onChange: (f: R
   const warn = draft ? contradictions(f, draft) : [];
   const dropInc = (i: number) => draft && setDraft({ ...draft, include: draft.include.filter((_, j) => j !== i) });
   const dropExc = (i: number) => draft && setDraft({ ...draft, exclude: draft.exclude.filter((_, j) => j !== i) });
-  const empty = draft && !draft.include.length && !draft.exclude.length;
+  const dropPref = (i: number) => draft && setDraft({ ...draft, prefs: draft.prefs?.filter((_, j) => j !== i) });
+  const empty = draft && !draft.include.length && !draft.exclude.length && !draft.prefs?.some((p) => p.applied);
   return (
     <div className="space-y-2" data-testid="text-filter">
       <label className="block text-xs text-slate-300" htmlFor="text-filter-input">Describí qué querés ver o evitar</label>
@@ -35,11 +36,25 @@ export function TextFilterBox({ f, onChange }: { f: RankFilters; onChange: (f: R
             {draft.include.map((c, i) => <CondRow key={`i${i}`} label={incLabel(c)} onRemove={() => dropInc(i)} kind="inc" />)}
             {draft.exclude.map((g, i) => <CondRow key={`e${i}`} label={`Excluir: ${groupLabel(g)}${g.length > 1 ? ' (todo a la vez)' : ''}`} onRemove={() => dropExc(i)} kind="exc" />)}
           </ul>
+          {draft.prefs && draft.prefs.length > 0 && (
+            <div data-testid="text-prefs">
+              <p className="mt-1 font-semibold text-slate-200">Preferencias (ordenan, no quitan títulos):</p>
+              <ul className="space-y-1">
+                {draft.prefs.map((p, i) => (
+                  <li key={p.id} className={`rounded-lg px-2 py-1 ${p.applied ? 'bg-sky-500/10 text-sky-100' : 'bg-ink-900 text-slate-400'}`} data-testid="text-pref" data-applied={p.applied}>
+                    <div className="flex items-center justify-between gap-2"><span>{p.polarity < 0 ? 'Menos: ' : 'Más: '}{p.label} · {p.applied ? 'se aplica' : 'no se aplica'}</span>
+                      <button type="button" aria-label={`Quitar ${p.label}`} data-testid="text-pref-remove" onClick={() => dropPref(i)} className="px-1">✕</button></div>
+                    <span className="block text-[10px] opacity-80">{p.note}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {draft.unparsed.map((u) => <p key={u} className="text-amber-200" data-testid="text-unparsed">No interpretado: «{u}». No se aplica: reescribilo o quitalo del texto.</p>)}
           {draft.notes.map((n) => <p key={n} className="text-slate-400" data-testid="text-note">• {n}</p>)}
           {warn.map((w) => <p key={w} className="text-rose-200" data-testid="text-contradiction">⚠ {w}</p>)}
           {empty && <p className="text-amber-200" data-testid="text-nothing">No se reconoció ninguna condición. Probá con tipo, género, años, público, región, país o un tema (p. ej. «viajes en el tiempo»).</p>}
-          <p className="text-[10px] text-slate-500">Interpretación por reglas y vocabulario en español, no comprensión del lenguaje. Se combina con los demás filtros: deben cumplirse todos y una exclusión manda.</p>
+          <p className="text-[10px] text-slate-500">Interpretación por reglas y vocabulario en español, no comprensión del lenguaje. Se combina con los demás filtros: deben cumplirse todos y una exclusión manda. Las preferencias sólo cambian el orden cuando TMDB tiene evidencia explícita (palabras clave o género); sin datos, no suman ni restan.</p>
           <div className="flex gap-2 pt-1">
             <button type="button" data-testid="text-apply" disabled={empty} onClick={() => { onChange({ ...f, text: draft }); setDraft(undefined); }} className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink-950 disabled:opacity-40">Aplicar</button>
             <button type="button" data-testid="text-cancel" onClick={() => setDraft(undefined)} className="rounded-lg bg-ink-800 px-3 py-1.5 text-sm ring-1 ring-white/10">Cancelar</button>
@@ -50,6 +65,7 @@ export function TextFilterBox({ f, onChange }: { f: RankFilters; onChange: (f: R
         <ul className="space-y-0.5 text-[11px] text-slate-300" data-testid="text-applied">
           {f.text.include.map((c, i) => <li key={`i${i}`}>• {incLabel(c)}</li>)}
           {f.text.exclude.map((g, i) => <li key={`e${i}`}>• Excluir: {groupLabel(g)}</li>)}
+          {(f.text.prefs ?? []).map((p) => <li key={p.id} className={p.applied ? 'text-sky-200' : 'text-slate-500'}>• {p.polarity < 0 ? 'Menos' : 'Más'}: {p.label} ({p.applied ? 'ordena' : 'no se aplica'})</li>)}
           {f.text.unparsed.length > 0 && <li className="text-amber-200">• Sin aplicar: {f.text.unparsed.map((u) => `«${u}»`).join(', ')}</li>}
         </ul>
       )}
