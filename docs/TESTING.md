@@ -16,6 +16,9 @@ localmente y **no se sube** al repositorio (`scripts/eval/personal.ts`).
   semántico (bloqueado a propósito), sin desplazamiento horizontal. Con CPU 4 veces más lenta: 0,24-0,30 s para armar.
 - Producción con TMDB real: `tests/prod/v35.spec.ts` (versión 3.5.0 con motor 3.4.0, comparación real de 12 títulos,
   persistencia, exportación sin token). Las pruebas de producción anteriores esperan ahora la versión 3.5.0.
+  Run 45279410792 (Pixel 7 y Galaxy S5): **12/12 OK** al repetirla; comparación real de 12 títulos en 197-358 ms. En el
+  primer intento la prueba de tráileres de v3.2 (código sin cambios) superó el tiempo en Galaxy S5 esperando un
+  tráiler de YouTube; en Pixel 7 pasó en la misma corrida.
 - Calidad: `docs/eval-v3.5.md` (editorial) y latencia con `scripts/eval/latency35.ts`.
 
 # Resultados de pruebas (v3.4)
