@@ -49,3 +49,10 @@
 - **v3.4: similitud semántica no usada para preferencias.** Se midió con la misma vara (rasgos inferidos de sinopsis) y quedó por debajo del criterio; se usan palabras clave y géneros de TMDB.
 - **v3.4: «giros argumentales» e «historias complejas» no se aplican.** Para giros no hay una referencia independiente y las palabras clave de TMDB pueden revelar el final; para complejidad la evidencia no alcanzó la precisión mínima (0,15 en desarrollo, 0,03 en evaluación final).
 - **v3.4: sin LLM ni servicios pagos.** Todo corre con datos ya disponibles y APIs públicas gratuitas en GitHub Actions.
+- **v3.5: el motor personal no reemplaza a 3.4.0 sin evidencia.** Regla fijada antes de la evaluación final: cambiar el motor principal sólo con ≥ 20 % relativo de NDCG@10 sobre 3.4.0, sin pérdidas importantes y con ejemplos convincentes. Resultado: +6 % sin significancia. Queda como candidato en una comparación a ciegas para juntar evidencia real.
+- **v3.5: modelos lineales regularizados en vez de modelos grandes.** Con decenas de valoraciones, un ridge sobre rasgos interpretables y un logístico de interés fueron más estables que un proceso gaussiano, un ranking por pares con núcleo o vecinos semánticos (todos probados en desarrollo). Sin datos colaborativos ni modelos entrenados desde cero.
+- **v3.5: «visto», «valorado» y «descartado» son señales distintas.** El modelo de nota sólo usa notas; el de interés usa vistos frente a descartes; un título sin nota no es negativo.
+- **v3.5: comparación a ciegas por intercalado (team draft)** en vez de dos listas separadas: evita el sesgo de posición y de lista, y cada título se acredita al motor que lo eligió.
+- **v3.5: fichas narrativas con modelo de lenguaje, postergadas.** No hay un modelo local autorizado y no se envían datos a servicios externos; se usan los rasgos narrativos del catálogo como sustituto medible.
+- **v3.5: datos personales fuera del repositorio.** La exportación real se evalúa localmente; ni el archivo ni sus resultados se suben a GitHub ni al despliegue.
+

@@ -61,6 +61,13 @@ Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se 
 - **Filtros avanzados** combinables (tipo, géneros incluidos/excluidos, años, plataformas, vistos, duración, afinidad mínima), con indicador, «Limpiar filtros» y «Restablecer generales». Se aplican al conjunto de candidatos antes de ordenar; si no hay resultados se indica qué filtro restringe y se puede buscar más en TMDB con esos filtros.
 - **Porcentaje de aspectos completados** (aspectos / 7 × 100) en Valoraciones, con filtros, orden y acceso directo a los faltantes.
 
+### Novedades v3.5 (app 3.5.0; el motor principal sigue siendo `hybrid-narrative-3.4.0`)
+
+- **Motor candidato `hybrid-personal-3.5.0`** (`src/engine/personalEngine.ts`): combina el motor 3.4.0 con un modelo personal regularizado sobre rasgos interpretables (géneros, formato, calidad pública, época, idioma, 48 rasgos narrativos) y un modelo de interés que aprende de «No me interesa» sin tratarlo como nota negativa. Con menos de 8 notas se comporta igual que 3.4.0.
+- **No reemplaza al motor publicado**: en la evaluación final editorial mejoró NDCG@10 un 6 % (0,470 → 0,497, intervalo que incluye el cero), lejos del +20 % exigido. Sí supera a la línea base de géneros con significancia y reduce los rechazados en el top 10 (0,29 → 0,08), a costa de diversidad. Detalle en `docs/eval-v3.5.md`.
+- **Comparación a ciegas** (Ajustes → «Comparar motores a ciegas», ruta `#/comparar`, se carga sólo al abrirla): mezcla 12 títulos de ambos motores por intercalado «team draft», sin decir cuál es cuál. Respuestas: «Me interesa mucho», «Me interesa algo», «No me interesa», «Ya la vi» y «No puedo evaluarla» (las dos últimas no cuentan como rechazo). Sin títulos repetidos, sin repetir lo ya respondido, guardado sólo en el dispositivo y exportable en JSON. No modifica valoraciones ni el orden de «Para vos».
+- **Datos personales**: la evaluación con un historial real se hace con `scripts/eval/personal.ts` sobre un archivo local; `.gitignore` excluye `private/` y las exportaciones de la app (`cine-match-*.json`).
+
 ### Novedades v3.4 (motor `hybrid-narrative-3.4.0`: mismos canales, nuevo orden)
 
 - **Evaluación reproducible** (`npm run eval:v34`, informe `docs/eval-v3.4.md`): 8 perfiles sintéticos, catálogo real de 6.558 títulos, referencia editorial **independiente** del motor (categorías de Wikipedia y Wikidata, `eval/data/reference.json`), separación desarrollo/evaluación final por hash del título, 3 semillas, y comparación con tres líneas base (popularidad, géneros, contenido) bajo las mismas condiciones. Ninguna métrica de relevancia usa el puntaje del motor.

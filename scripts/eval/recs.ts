@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { NarrativeIndex, type CatalogMeta } from '../../src/engine/narrative';
 import { hybridEngine, ALGORITHM_VERSION } from '../../src/engine/recommender';
+import { personalEngine } from '../../src/engine/personalEngine';
 import type { Rating, TitleKey, TitleMeta } from '../../src/types';
 import { PROFILES, setLowVotes, type EvalProfile, type Ref } from './profiles';
 
@@ -63,7 +64,7 @@ function rng(seed: number) { return () => { seed |= 0; seed = (seed + 0x6d2b79f5
 const shuffle = <T>(xs: T[], r: () => number) => { const a = [...xs]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 // ───────── algoritmos ─────────
-export type AlgoId = 'A-popularidad' | 'B-generos' | 'C-contenido' | 'D-motor' | 'D-sin-datos-narrativos' | 'E-motor-sin-recorte' | 'F-sin-recorte-1-por-saga';
+export type AlgoId = 'A-popularidad' | 'B-generos' | 'C-contenido' | 'D-motor' | 'D-sin-datos-narrativos' | 'E-motor-sin-recorte' | 'F-sin-recorte-1-por-saga' | 'G-motor-3.5';
 interface AlgoIn { ratings: Rating[]; titles: Map<TitleKey, TitleMeta>; candidates: TitleKey[]; k: number }
 const meanOf = (rs: Rating[]) => { const v = rs.map((r) => r.overall!).filter((x) => x !== undefined); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 6.5; };
 const bayes = (t: TitleMeta) => ((t.voteAverage ?? 0) * (t.voteCount ?? 0) + 6.6 * 300) / ((t.voteCount ?? 0) + 300);
@@ -113,6 +114,11 @@ export const ALGOS: Record<AlgoId, (x: AlgoIn) => TitleKey[]> = {
   'F-sin-recorte-1-por-saga': ({ ratings, titles, candidates, k }) => {
     const profile = hybridEngine.buildProfile(ratings, titles);
     return hybridEngine.rank({ profile, ratings, titles, candidates, limit: k, seed: 7, narrative: idx, rankBy: 'uncapped', collectionCap: true }).map((i) => i.key);
+  },
+  /** G (v3.5): motor híbrido personal (v3.4 + modelo personal regularizado + interés por descartes). */
+  'G-motor-3.5': ({ ratings, titles, candidates, k }) => {
+    const profile = personalEngine.buildProfile(ratings, titles);
+    return personalEngine.rank({ profile, ratings, titles, candidates, limit: k, seed: 7, narrative: idx }).map((i) => i.key);
   },
   /** Ablación (metadatos incompletos): el mismo motor sin vectores ni rasgos del catálogo y sin palabras clave en la mitad de los candidatos. */
   'D-sin-datos-narrativos': ({ ratings, titles, candidates, k }) => {

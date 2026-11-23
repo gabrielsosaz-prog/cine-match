@@ -169,3 +169,8 @@ playwright-report
 *.pem
 *.key
 .dev.vars
+
+# Datos personales exportados de la app: nunca se suben
+private/
+cine-match-*.json
+*.cine-match-export.json

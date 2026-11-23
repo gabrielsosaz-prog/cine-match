@@ -80,6 +80,12 @@ export default function Settings() {
           Mostrar el cálculo de cada recomendación y permitir exportarlo</label>
         <p className="text-[11px] text-slate-500">No cambia el ranking ni tus datos. Distingue datos (TMDB, tus notas) de inferencias aproximadas (análisis semántico, textos).</p>
       </Card>
+      <Card className="space-y-2" data-testid="ab-card">
+        <h2 className="font-semibold">Comparar motores a ciegas (v3.5)</h2>
+        <p className="text-sm text-slate-300">Te mostramos títulos propuestos por el motor actual y por uno nuevo en prueba, mezclados y sin decir cuál es cuál. Tus respuestas ayudan a decidir si el nuevo recomienda mejor.</p>
+        <Link to="/comparar" data-testid="ab-link" className="text-sm text-accent underline">Abrir comparación</Link>
+        <p className="text-[11px] text-slate-500">Opcional. No cambia tus valoraciones ni el orden de «Para vos».</p>
+      </Card>
       <Card className="space-y-2">
         <h2 className="font-semibold">Gestión de datos</h2>
         <div className="flex flex-wrap gap-2">

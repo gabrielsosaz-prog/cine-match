@@ -1,3 +1,23 @@
+# Resultados de pruebas (v3.5)
+
+Mismos cuatro tipos de prueba que en v3.4 (abajo), más una evaluación con el historial real de una persona que se corre
+localmente y **no se sube** al repositorio (`scripts/eval/personal.ts`).
+
+## Resumen v3.5
+
+- Vitest: **243/243 OK**. 8 nuevas en `tests/unit/v35.test.ts`: con menos de 8 notas el candidato ordena igual que 3.4.0;
+  el modelo de interés sólo con ≥ 3 descartes; los descartes no cambian el modelo de nota; `orderScore` cambia el orden
+  pero no la nota mostrada; intercalado sin repetidos, equilibrado y respetando el orden de cada motor (29 semillas);
+  «Ya la vi» y «No puedo evaluarla» fuera del puntaje; integración con el proveedor simulado (12 títulos nuevos, nada
+  ya valorado ni ya respondido, exportación sin token ni notas, valoraciones intactas).
+- Playwright, Android Pixel 7 y Galaxy S5 (360 px): **68/68 OK**. Flujo nuevo (`tests/e2e/v35.spec.ts`): Ajustes →
+  comparación, sin nombres de motor mientras hay pendientes, respuestas, recarga y Atrás/Adelante conservan todo,
+  resumen al terminar, exportación, valoraciones idénticas en IndexedDB, Inicio sigue funcionando, sin catálogo
+  semántico (bloqueado a propósito), sin desplazamiento horizontal. Con CPU 4 veces más lenta: 0,24-0,30 s para armar.
+- Producción con TMDB real: `tests/prod/v35.spec.ts` (versión 3.5.0 con motor 3.4.0, comparación real de 12 títulos,
+  persistencia, exportación sin token). Las pruebas de producción anteriores esperan ahora la versión 3.5.0.
+- Calidad: `docs/eval-v3.5.md` (editorial) y latencia con `scripts/eval/latency35.ts`.
+
 # Resultados de pruebas (v3.4)
 
 Cuatro tipos de prueba, que no se mezclan:

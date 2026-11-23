@@ -53,6 +53,11 @@ export interface RankInput {
   rankBy?: 'capped' | 'uncapped';
   /** Como máximo 1 título por saga/colección de TMDB en el top 10. Predeterminado (3.4.0): sí. */
   collectionCap?: boolean;
+  /**
+   * v3.5: puntaje de orden externo (escala de nota) de un modelo personal. Si está, ordena con él en lugar de la
+   * suma de canales, y el puesto de exploración se elige por ese puntaje (personalizado) y no por la nota pública.
+   */
+  orderScore?: Map<TitleKey, number>;
 }
 
 /**
@@ -463,12 +468,16 @@ export function rank(input: RankInput): RecommendationItem[] {
   const info = describeFeatures([...input.titles.values()]);
   const rand = mulberry32(input.seed ?? 1);
 
-  const order = (s: Scored) => ((input.rankBy ?? 'uncapped') === 'uncapped' ? s.predRaw : s.pred);
+  const os = input.orderScore;
+  const order = (s: Scored) => (os?.has(s.key) ? os.get(s.key)! : (input.rankBy ?? 'uncapped') === 'uncapped' ? s.predRaw : s.pred);
   const pool = [...scored].sort((a, b) => order(b) - order(a) || (a.key < b.key ? -1 : 1));
-  const explorePool = scored
-    .filter((s) => s.novelty > 0.6 && s.quality >= PARAMS.minExplorationQuality)
-    .map((s) => ({ s, r: s.quality * (0.8 + 0.4 * rand()) }))
-    .sort((a, b) => b.r - a.r).map((x) => x.s);
+  const explorePool = os
+    // v3.5: exploración personalizada: entre lo poco parecido al historial, lo que el modelo personal ubica más alto
+    ? scored.filter((s) => s.novelty > 0.6 && s.quality >= PARAMS.minExplorationQuality && os.has(s.key)).sort((a, b) => order(b) - order(a))
+    : scored
+      .filter((s) => s.novelty > 0.6 && s.quality >= PARAMS.minExplorationQuality)
+      .map((s) => ({ s, r: s.quality * (0.8 + 0.4 * rand()) }))
+      .sort((a, b) => b.r - a.r).map((x) => x.s);
   const selected: { s: Scored; exploration: boolean }[] = [];
   const used = new Set<TitleKey>();
   // MMR incremental: la similitud máxima con lo ya elegido se actualiza al elegir (O(n²) en total, no O(n³))

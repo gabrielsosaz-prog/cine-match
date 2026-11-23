@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useApp } from './hooks/useApp';
 import Home from './pages/Home';
@@ -11,6 +12,7 @@ import Setup from './pages/Setup';
 import Pending from './pages/Pending';
 import Similar from './pages/Similar';
 import Person from './pages/Person';
+const Compare = lazy(() => import('./pages/Compare'));
 import { ScrollToTopOnPush } from './hooks/useScrollRestore';
 import ErrorBoundary from './ui/ErrorBoundary';
 import Notices from './ui/Notices';
@@ -47,6 +49,7 @@ export default function App() {
           <Route path="/persona/:id" element={<Person />} />
           <Route path="/gustos" element={<Taste />} />
           <Route path="/ajustes" element={<Settings />} />
+          <Route path="/comparar" element={<Suspense fallback={<p className="text-sm text-slate-400">Cargando…</p>}><Compare /></Suspense>} />
           <Route path="/bienvenida" element={<Onboarding />} />
           <Route path="/configurar" element={<Setup />} />
           <Route path="*" element={<Navigate to="/" replace />} />

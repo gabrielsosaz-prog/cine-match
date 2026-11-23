@@ -9,7 +9,7 @@ import { expect, test, type Page } from '@playwright/test';
  * No mide la calidad de las recomendaciones (eso es docs/eval-v3.4.md).
  */
 const log = (...a: unknown[]) => console.log('[prod v3.4]', ...a);
-export const EXPECTED = { version: '3.4.0', algorithm: 'hybrid-narrative-3.4.0' };
+export const EXPECTED = { version: '3.5.0', algorithm: 'hybrid-narrative-3.4.0' };
 
 async function start(page: Page) {
   await page.goto('/');
