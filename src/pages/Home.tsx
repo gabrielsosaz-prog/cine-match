@@ -350,7 +350,7 @@ export default function Home() {
         </section>
       )}
 
-      {shown && rows.length === 0 && !busy && !(advanced && (filterBusy || !filtered)) && (
+      {shown && rows.length === 0 && !busy && !(advanced && (filterBusy || !filtered || items.length > 0)) && (
         advanced ? (
           <Empty>
             <span data-testid="filters-empty">Ningún título cumple todos los filtros entre {filtered?.candidates ?? 0} candidatos evaluados.</span>

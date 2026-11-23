@@ -1,6 +1,6 @@
 import { TrailerButton } from '../ui/Trailer';
 import { audienceOf, countriesOf, countryName } from '../services/filters';
-import { AUDIENCES, loadAudienceData } from '../services/audience';
+import { AUDIENCES, audienceDataVersion, loadAudienceData } from '../services/audience';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -154,7 +154,7 @@ function AudienceInfo({ meta }: { meta: TitleMeta }) {
   void ready;
   const shown = AUDIENCES.filter((a) => a.enabled && ['yes', 'uncertain'].includes(p.scores[a.id].status));
   return (
-    <details className="text-[11px] text-slate-400" data-testid="title-audience">
+    <details className="text-[11px] text-slate-400" data-testid="title-audience" data-complete={meta.completeness === 'full'} data-signals={Boolean(audienceDataVersion())}>
       <summary className="cursor-pointer">
         Público objetivo (aprox.): {!p.hasData ? 'sin datos suficientes' : shown.length ? shown.map((a) => `${a.name}${p.scores[a.id].status === 'uncertain' ? ' (incierto)' : ''}`).join(' · ') : 'sin evidencia de un público específico'}
       </summary>

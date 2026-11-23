@@ -43,12 +43,16 @@ async function applyText(page: Page, text: string) {
   const prev = await panel.getByTestId('text-preview').innerText();
   log(`«${text}» →`, prev.replace(/\s+/g, ' ').slice(0, 300));
   await panel.getByTestId('text-apply').click();
+  await expect(page.getByTestId('active-filters')).toContainText(`Texto: «${text.slice(0, 20)}`);
   return prev;
 }
 async function audienceOnPage(page: Page, path: string) {
   await page.goto(`/#/t/${path}`);
   const box = page.getByTestId('title-audience');
   await expect(box).toBeVisible({ timeout: 60000 });
+  // esperar la ficha completa de TMDB (con su clasificación por edad) y el archivo de señales
+  await expect(box).toHaveAttribute('data-complete', 'true', { timeout: 90000 });
+  await expect(box).toHaveAttribute('data-signals', 'true', { timeout: 60000 });
   await box.locator('summary').click();
   const rows = await page.getByTestId('title-audience-row').evaluateAll((els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-audience'), e.getAttribute('data-status')])));
   log(path, (await box.locator('summary').innerText()).trim(), JSON.stringify(rows));
@@ -110,7 +114,9 @@ test('producción v3.3: texto libre, público objetivo y regiones con TMDB real'
     if (teenKw.length) log('se mantuvo con etiqueta juvenil:', f.title, teenKw, f.certUS);
     expect(teenKw.length && !adultRating, `${f.title}: ${teenKw}`).toBeFalsy();
   }
+  if (!keys.length) log('vacío al excluir adolescentes:', (await page.getByTestId('filters-empty').locator('..').innerText()).replace(/\s+/g, ' '));
   checked.noTeen = keys.length;
+  expect(keys.length).toBeGreaterThan(0);
 
   // 4. Regiones: Europa excepto España, posteriores a 2010 con buena valoración
   await page.getByTestId('text-clear').click();
