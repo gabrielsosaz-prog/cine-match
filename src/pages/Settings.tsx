@@ -4,20 +4,28 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { COUNTRIES, PLATFORMS } from '../constants';
 import { db } from '../db/db';
 import { createProfile, updateConfig, updateSettings } from '../db/repo';
-import { ALGORITHM_VERSION } from '../engine/recommender';
 import { useApp } from '../hooks/useApp';
 import { genreNames } from '../services/catalog';
 import { deleteAllData, exportData, importData } from '../services/dataPortability';
-import type { PlatformId } from '../types';
+import type { EngineChoice, PlatformId } from '../types';
+import { requestRecompute } from '../services/recompute';
+import { engineFor } from '../services/recommendations';
 import { Card, Chip } from '../ui/components';
 
 import { diagnosticOn, setDiagnostic } from '../services/diagnostics';
+
+const ENGINE_OPTIONS: { id: EngineChoice; label: string; help: string }[] = [
+  { id: 'v3.4', label: 'v3.4 — Estable (predeterminado)', help: 'Motor anterior, utilizado actualmente por defecto.' },
+  { id: 'v3.5', label: 'v3.5 — Personalizado (experimental)', help: 'Incorpora aprendizaje de preferencias a partir de valoraciones y descartes. Todavía no demostró ser superior en calidad general. Cambia el orden; la nota «Para vos» sigue siendo la de v3.4.' },
+];
 
 export default function Settings() {
   const { profileId, settings, config } = useApp();
   const profiles = useLiveQuery(() => db.profiles.toArray()) ?? [];
   const [genres, setGenres] = useState<[number, string][]>([]);
   const [msg, setMsg] = useState<string>();
+  const [engineSel, setEngineSel] = useState<EngineChoice>(settings.engine ?? 'v3.4');
+  useEffect(() => { setEngineSel(settings.engine ?? 'v3.4'); }, [settings.engine, profileId]);
   const [newProfile, setNewProfile] = useState('');
   useEffect(() => { if (config.tmdbToken || config.proxyUrl) genreNames(settings.language).then((m) => setGenres([...m].sort((a, b) => a[1].localeCompare(b[1])))); }, [settings.language, config.tmdbToken, config.proxyUrl]);
   const set = (patch: Parameters<typeof updateSettings>[1]) => updateSettings(profileId, patch);
@@ -74,6 +82,24 @@ export default function Settings() {
         <p className="text-sm text-slate-300">{config.proxyUrl ? 'Proxy propio configurado.' : config.tmdbToken ? 'Clave de TMDB guardada en este dispositivo.' : 'Sin configurar.'}</p>
         <Link to="/configurar" className="text-sm text-accent underline">Cambiar clave o proxy</Link>
       </Card>
+      <Card className="space-y-2" data-testid="engine-card">
+        <h2 className="font-semibold">Motor de recomendaciones</h2>
+        <div role="radiogroup" aria-label="Motor de recomendaciones" className="space-y-2">
+          {ENGINE_OPTIONS.map((o) => (
+            <label key={o.id} className="flex items-start gap-2 text-sm text-slate-300">
+              <input type="radio" name="engine" data-testid={`engine-${o.id}`} checked={engineSel === o.id} className="mt-1"
+                onChange={async () => {
+                  setEngineSel(o.id);
+                  await updateSettings(profileId, { engine: o.id, engineChangedAt: Date.now() });
+                  requestRecompute(profileId, { trigger: 'cambio de motor' }).catch(() => undefined);
+                  setMsg(`Motor ${o.label}. «Para vos» se recalcula con este motor; tus valoraciones no cambian.`);
+                }} />
+              <span><span className="font-medium text-slate-100">{o.label}</span><br /><span className="text-[11px] text-slate-400">{o.help}</span></span>
+            </label>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-500">Se guarda por perfil y se aplica a «Para vos» y a sus filtros. Podés volver a v3.4 cuando quieras sin perder datos.</p>
+      </Card>
       <Card className="space-y-2">
         <h2 className="font-semibold">Modo diagnóstico (desarrollo)</h2>
         <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" data-testid="diagnostic-toggle" defaultChecked={diagnosticOn()} onChange={(e) => { setDiagnostic(e.target.checked); setMsg(e.target.checked ? 'Modo diagnóstico activado: en Inicio, cada recomendación muestra su cálculo y se puede exportar.' : 'Modo diagnóstico desactivado.'); }} />
@@ -95,7 +121,7 @@ export default function Settings() {
         </div>
         <p className="text-[11px] text-slate-500">Tus datos se guardan sólo en este dispositivo. No hay cuentas ni servidores propios. La exportación no incluye tu clave.</p>
       </Card>
-      <p className="text-center text-[10px] text-slate-500">Cine Match AI · motor {ALGORITHM_VERSION}<br />Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB. Disponibilidad provista por JustWatch a través de TMDB.</p>
+      <p className="text-center text-[10px] text-slate-500">Cine Match AI · motor {engineFor(settings).version}<br />Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB. Disponibilidad provista por JustWatch a través de TMDB.</p>
     </div>
   );
 }

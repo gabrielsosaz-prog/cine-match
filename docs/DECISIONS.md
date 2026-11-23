@@ -55,4 +55,5 @@
 - **v3.5: comparación a ciegas por intercalado (team draft)** en vez de dos listas separadas: evita el sesgo de posición y de lista, y cada título se acredita al motor que lo eligió.
 - **v3.5: fichas narrativas con modelo de lenguaje, postergadas.** No hay un modelo local autorizado y no se envían datos a servicios externos; se usan los rasgos narrativos del catálogo como sustituto medible.
 - **v3.5: datos personales fuera del repositorio.** La exportación real se evalúa localmente; ni el archivo ni sus resultados se suben a GitHub ni al despliegue.
+- **v3.5: selector de motor por perfil, v3.4 por defecto.** La elección vive en `ProfileSettings.engine` (sin valor = v3.4), con `engineChangedAt` para invalidar rankings guardados. Sólo cambia el orden de «Para vos» (y sus filtros); la nota estimada es siempre la de v3.4, que es la que está calibrada en notas, por eso la ficha, Similares y Persona no cambian. El orden estricto «Para vos (estricto)» ordena por esa nota y queda igual con ambos motores.
 

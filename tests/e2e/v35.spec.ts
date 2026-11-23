@@ -88,3 +88,64 @@ test('v3.5: comparación a ciegas desde Ajustes, respuestas, persistencia y expo
   await expect(page.getByTestId('rec-item').first()).toBeVisible({ timeout: 20000 });
   expect(errors).toEqual([]);
 });
+
+const homeKeys = async (page: Page) => {
+  await expect(page.getByTestId('rec-item').first()).toBeVisible({ timeout: 30000 });
+  return page.getByTestId('rec-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')!).join(','));
+};
+async function pickEngine(page: Page, e: 'v3.4' | 'v3.5') {
+  await page.getByRole('link', { name: 'Ajustes' }).click();
+  await page.getByTestId(`engine-${e}`).check();
+  await expect(page.getByTestId(`engine-${e}`)).toBeChecked();
+  await page.getByRole('link', { name: 'Inicio' }).click();
+  await expect(page.getByTestId('engine-badge')).toHaveAttribute('data-engine', e, { timeout: 30000 });
+}
+
+test('v3.5: selector de motor en Ajustes, aplicado a «Para vos», persistente y sin mezclar rankings', async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await onboardQuick(page);
+  const ratingsBefore = await ratingsDump(page);
+  // instalación nueva/existente: v3.4
+  await expect(page.getByTestId('engine-badge')).toHaveAttribute('data-engine', 'v3.4');
+  await expect(page.getByTestId('engine-badge')).toHaveText('Motor: v3.4');
+  const k34 = await homeKeys(page);
+  await page.getByRole('link', { name: 'Ajustes' }).click();
+  await expect(page.getByTestId('engine-v3.4')).toBeChecked();
+  await expect(page.getByTestId('engine-card')).toContainText('Todavía no demostró ser superior');
+  await noHorizontalScroll(page);
+  // v3.5 con CPU 4 veces más lenta (gama media)
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  const t0 = Date.now();
+  await page.getByTestId('engine-v3.5').check();
+  await page.getByRole('link', { name: 'Inicio' }).click();
+  await expect(page.getByTestId('engine-badge')).toHaveAttribute('data-engine', 'v3.5', { timeout: 30000 });
+  console.log('[v3.5]', info.project.name, 'cambio a v3.5 y ranking visible con CPU ×4 (ms):', Date.now() - t0);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  await expect(page.getByTestId('engine-badge')).toContainText('la nota «Para vos» es la estimación de v3.4');
+  const k35 = await homeKeys(page);
+  expect(k35).not.toBe(k34);
+  await page.screenshot({ path: `test-results/${info.project.name}-v35-motor.png`, fullPage: true });
+  // persiste al cerrar y abrir
+  await page.reload();
+  await expect(page.getByTestId('engine-badge')).toHaveAttribute('data-engine', 'v3.5', { timeout: 30000 });
+  expect(await homeKeys(page)).toBe(k35);
+  // filtros con v3.5
+  await page.getByTestId('filters-toggle').click();
+  await page.getByTestId('watched-filter-all').click();
+  await expect(page.getByTestId('engine-badge')).toHaveAttribute('data-engine', 'v3.5');
+  await page.getByTestId('filters-toggle').click().catch(() => undefined);
+  // la comparación a ciegas sigue con ambos motores
+  await page.getByRole('link', { name: 'Ajustes' }).click();
+  await page.getByTestId('ab-link').click();
+  await page.getByTestId('ab-start').click();
+  await expect(page.getByTestId('ab-item')).toHaveCount(12, { timeout: 30000 });
+  await expect(page.getByTestId('compare-page')).not.toContainText('hybrid-');
+  // volver a v3.4 restaura el orden anterior
+  await page.goto('/#/');
+  await pickEngine(page, 'v3.4');
+  expect(await homeKeys(page)).toBe(k34);
+  expect(await ratingsDump(page)).toBe(ratingsBefore);
+  expect(errors).toEqual([]);
+});

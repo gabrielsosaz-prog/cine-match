@@ -3,11 +3,12 @@ import { db } from '../db/db';
 import { getSettings, listRatings } from '../db/repo';
 import { featureLabel, describeFeatures } from '../engine/features';
 import { hybridEngine, setDefaultNarrative, type RecommenderEngine } from '../engine/recommender';
+import { personalEngine } from '../engine/personalEngine';
 import { getNarrativeIndex, loadNarrativeIndex, metaFromCatalog } from './narrativeCatalog';
 import type { NarrativeIndex } from '../engine/narrative';
 import { friendlyError } from '../providers/errors';
 import { META_VERSION } from '../providers/tmdb';
-import type { MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
+import type { EngineChoice, MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
 import { peopleSets, type PeopleSets } from './peopleFilter';
 import { countriesOf, dataGaps, diagnose, keywordNames, matchesContent, matchesWatched, smartNeeds, type Candidate, type DataGaps, type RankFilters } from './filters';
 import { prefAdjust, reorderByPrefs } from './preferences';
@@ -17,10 +18,15 @@ import { matchesPlatforms } from './availability';
 import { discoverCandidates, ensureFullTitles, genreNames, getTitle, personFilmography, refreshAvailability } from './catalog';
 import type { UserProfile } from '../engine/profile';
 
-let engine: RecommenderEngine = hybridEngine;
-/** Permite sustituir el motor sin tocar el resto de la app */
-export function setEngine(e: RecommenderEngine) { engine = e; }
-export function getEngine() { return engine; }
+/** v3.5: motores que se pueden elegir en Ajustes («Motor de recomendaciones»). v3.4 es el predeterminado. */
+export const ENGINES: Record<EngineChoice, RecommenderEngine> = { 'v3.4': hybridEngine, 'v3.5': personalEngine };
+export const ENGINE_LABEL: Record<string, EngineChoice> = { [hybridEngine.version]: 'v3.4', [personalEngine.version]: 'v3.5' };
+let override: RecommenderEngine | undefined;
+/** Permite sustituir el motor en pruebas sin tocar el resto de la app (tiene prioridad sobre la elección del perfil) */
+export function setEngine(e: RecommenderEngine | undefined) { override = e; }
+/** Motor elegido por el perfil (v3.4 si no eligió). */
+export function engineFor(settings?: Partial<ProfileSettings>): RecommenderEngine { return override ?? ENGINES[settings?.engine ?? 'v3.4'] ?? hybridEngine; }
+export function getEngine() { return override ?? hybridEngine; }
 
 const providerIds = (s: ProfileSettings) => PLATFORMS.filter((p) => s.platforms.includes(p.id)).flatMap((p) => p.tmdbIds);
 
@@ -63,7 +69,7 @@ async function buildPool(ratings: Rating[], settings: ProfileSettings, titles: M
   const opts = { language: settings.language, country: settings.country };
   const pool = new Set<TitleKey>();
   let warning: string | undefined;
-  const profile = engine.buildProfile(ratings, titles, settings);
+  const profile = engineFor(settings).buildProfile(ratings, titles, settings);
   const liked = profile.signals.filter((s) => s.value >= profile.mean + 0.5).sort((a, b) => b.value - a.value).slice(0, 15);
   for (const s of liked) for (const k of titles.get(s.key)?.related ?? []) pool.add(k);
 
@@ -161,6 +167,8 @@ export async function narrativeReady(ms = 6000): Promise<NarrativeIndex | undefi
 export async function refreshRecommendations(profileId: string, o: RefreshOptions): Promise<RecommendationRun> {
   const nidx = await narrativeReady();
   const settings = await getSettings(profileId);
+  // v3.5: el motor elegido en Ajustes (v3.4 por defecto); el ranking queda marcado con su versión
+  const engine = engineFor(settings);
   const opts = { language: settings.language, country: settings.country };
   const ratings = await listRatings(profileId);
   const last = await latestRun(profileId);
@@ -213,9 +221,11 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   const availOk = new Set(keysForAvail.filter((_, i) => matchesPlatforms(snaps[i], settings.platforms, settings.includeUnconfirmed)));
 
   const profile2 = engine.buildProfile(ratings, all, settings);
+  await yieldToUi(); // v3.5 es más pesado: deja pintar la interfaz antes de cada ranking largo
   const seed = Math.floor(Date.now() / 86400000) + profileId.length;
   // v3.0: se guarda un ranking largo (se muestra de a 10 con «Ver más»), no sólo los primeros 60
   const unwatched = engine.rank({ profile: profile2, ratings, titles: all, candidates: [...availOk], settings, limit: 200, seed });
+  await yieldToUi();
   const watchedSet = new Set(watchedKeys);
   const watchedRanked = engine.rank({ profile: profile2, ratings, titles: all, candidates: watchedKeys.filter((k) => availOk.has(k)), settings, limit: 80, seed, includeWatched: true })
     .filter((i) => watchedSet.has(i.key)).map((i) => ({ ...i, exploration: false }));
@@ -230,7 +240,7 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   // Mantener sólo los últimos 5 cálculos (cada uno guarda el conjunto de candidatos); se borran por clave
   const ids = await db.runs.where('profileId').equals(profileId).primaryKeys();
   if (ids.length > 5) await db.runs.bulkDelete(ids.slice(0, ids.length - 5));
-  await recordSnapshot(profileId, profile2, all);
+  await recordSnapshot(profileId, profile2, all, engine.version);
   await db.logs.add({ profileId, at: Date.now(), type: 'recs_updated', algorithmVersion: engine.version, detail: `${o.trigger}: ${items.length} recomendaciones` });
   return run;
 }
@@ -239,13 +249,24 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
 export async function latestRun(profileId: string): Promise<RecommendationRun | undefined> {
   return db.runs.where('profileId').equals(profileId).last();
 }
+/**
+ * v3.5: último ranking calculado con el motor elegido y después del último cambio de motor. Así un ranking de un
+ * motor nunca se muestra como si fuera del otro, y al volver a un motor se recalcula (caché invalidada).
+ */
+export async function currentRun(profileId: string, settings?: Partial<ProfileSettings>): Promise<RecommendationRun | undefined> {
+  const s = settings ?? await getSettings(profileId);
+  const version = engineFor(s).version, since = s.engineChangedAt ?? 0;
+  const runs = await db.runs.where('profileId').equals(profileId).reverse().toArray();
+  return runs.find((r) => r.algorithmVersion === version && r.createdAt >= since);
+}
+const yieldToUi = () => new Promise<void>((r) => setTimeout(r, 0));
 
-async function recordSnapshot(profileId: string, profile: ReturnType<RecommenderEngine['buildProfile']>, titles: Map<TitleKey, TitleMeta>) {
+async function recordSnapshot(profileId: string, profile: ReturnType<RecommenderEngine['buildProfile']>, titles: Map<TitleKey, TitleMeta>, version: string) {
   const info = describeFeatures([...titles.values()]);
   const top = [...profile.features].filter(([f, a]) => (f.startsWith('g:') || f.startsWith('k:')) && a.count >= 2)
     .sort((a, b) => Math.abs(b[1].affinity) - Math.abs(a[1].affinity)).slice(0, 16)
     .map(([feature, a]) => ({ feature, label: featureLabel(feature, info), affinity: Math.round(a.affinity * 100) / 100 }));
-  await db.snapshots.add({ profileId, at: Date.now(), algorithmVersion: engine.version, ratingsCount: profile.ratedCount, mean: profile.mean, topFeatures: top });
+  await db.snapshots.add({ profileId, at: Date.now(), algorithmVersion: version, ratingsCount: profile.ratedCount, mean: profile.mean, topFeatures: top });
 }
 
 /** Ficha + títulos similares (TMDB relacionados, ordenados con el modelo de rasgos propio). */
@@ -291,6 +312,7 @@ export interface FilteredResult {
 export async function rankWithFilters(profileId: string, run: RecommendationRun, f: RankFilters, opts: { discover?: boolean; anyPlatform?: boolean } = {}): Promise<FilteredResult> {
   loadWestern(profileId);
   const settings = await getSettings(profileId);
+  const engine = engineFor(settings);
   const ratings = await listRatings(profileId);
   const byKey = new Map(ratings.map((r) => [r.key, r]));
   let warning: string | undefined;
@@ -396,6 +418,8 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
  */
 export async function predictFor(profileId: string, keys: TitleKey[], o: { holdOut?: boolean } = {}): Promise<Map<TitleKey, RecommendationItem>> {
   const settings = await getSettings(profileId);
+  // La estimación puntual es la nota de v3.4 con cualquier motor (v3.5 sólo cambia el orden de «Para vos»)
+  const engine = getEngine();
   const ratings = await listRatings(profileId);
   const target = new Set(keys);
   const train = o.holdOut ? ratings.filter((r) => !target.has(r.key)) : ratings;

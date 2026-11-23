@@ -20,6 +20,11 @@ localmente y **no se sube** al repositorio (`scripts/eval/personal.ts`).
   primer intento la prueba de tráileres de v3.2 (código sin cambios) superó el tiempo en Galaxy S5 esperando un
   tráiler de YouTube; en Pixel 7 pasó en la misma corrida.
 - Calidad: `docs/eval-v3.5.md` (editorial) y latencia con `scripts/eval/latency35.ts`.
+- Selector de motor: Vitest **247/247 OK** (4 nuevas: sin elección arranca con v3.4; elegir v3.5 cambia el orden de
+  «Para vos» con las mismas notas; volver a v3.4 restaura el mismo orden; caché invalidada en ambos cambios; persiste
+  al reabrir; por perfil; filtros con ambos motores; comparación a ciegas independiente; valoraciones intactas).
+  Playwright **70/70 OK** (flujo nuevo en Android: indicador «Motor», cambio y vuelta, recarga, comparación a ciegas,
+  CPU ×4: 0,45-0,56 s hasta ver el ranking de v3.5). Producción: segundo caso en `tests/prod/v35.spec.ts`.
 
 # Resultados de pruebas (v3.4)
 

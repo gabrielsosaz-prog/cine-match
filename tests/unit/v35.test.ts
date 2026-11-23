@@ -7,7 +7,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db, useTestDb } from '../../src/db/db';
-import { ensureBootstrap, listRatings, updateConfig, updateSettings } from '../../src/db/repo';
+import { createProfile, ensureBootstrap, getSettings, listRatings, updateConfig, updateSettings } from '../../src/db/repo';
 import { buildProfile } from '../../src/engine/profile';
 import { ALGORITHM_VERSION, rank, scoreCandidates } from '../../src/engine/recommender';
 import { PERSONAL_ENGINE_VERSION, PERSONAL_PARAMS, personalEngine, personalScores } from '../../src/engine/personalEngine';
@@ -16,7 +16,8 @@ import { setFetch } from '../../src/services/catalog';
 import { rateAndLearn } from '../../src/services/ratings';
 import { resetRatingsStore } from '../../src/services/ratingsStore';
 import { resetRecompute } from '../../src/services/recompute';
-import { refreshRecommendations } from '../../src/services/recommendations';
+import { currentRun, engineFor, rankWithFilters, refreshRecommendations } from '../../src/services/recommendations';
+import { DEFAULT_FILTERS } from '../../src/services/filters';
 import type { Rating, TitleKey } from '../../src/types';
 import { buildCatalog, fakeFetch, type FakeTitle } from '../fixtures/fakeTmdb';
 import { simulateHistory, syntheticMetas, USERS } from '../fixtures/synthetic';
@@ -131,5 +132,78 @@ describe('v3.5 · comparación a ciegas en la app (proveedor simulado)', () => {
     expect(ex).not.toContain('"overall"');
     expect(JSON.stringify((await listRatings(P)).map((r) => [r.key, r.overall, r.watched, r.notInterested, r.updatedAt]))).toBe(before);
     expect(await db.ratings.count()).toBe(10);
+  });
+});
+
+describe('v3.5 · selector de motor en Ajustes (proveedor simulado)', () => {
+  const catalog = buildCatalog(12);
+  const keyOf = (t: FakeTitle) => `${t.type}:${t.id}` as TitleKey;
+  const order = (r: { items: { key: TitleKey }[] }) => r.items.slice(0, 30).map((i) => i.key).join(',');
+  const dump = async () => JSON.stringify((await db.ratings.toArray()).map((r) => [r.key, r.overall, r.watched, r.notInterested, r.list, r.dimensions, r.updatedAt]));
+  beforeEach(async () => {
+    localStorage.clear(); resetRecompute(); resetRatingsStore();
+    useTestDb(`v35s-${Math.random().toString(36).slice(2)}`);
+    setFetch(fakeFetch(catalog));
+    await ensureBootstrap();
+    await updateConfig({ tmdbToken: 'eyJtest' });
+    await updateSettings(P, { platforms: ['netflix', 'prime', 'disney', 'max'], country: 'AR' });
+    const th = catalog.filter((x) => x.cluster === 'thriller'), sf = catalog.filter((x) => x.cluster === 'scifi');
+    for (const [i, t] of [...th.slice(0, 6), ...sf.slice(0, 4)].entries()) await rateAndLearn(P, keyOf(t), { watched: true, overall: [9, 8, 6, 9, 4, 7, 8, 5, 9, 3][i], dimensions: {} });
+    for (const t of catalog.filter((x) => x.cluster === 'animation').slice(0, 3)) await rateAndLearn(P, keyOf(t), { notInterested: true, dimensions: {} });
+  });
+  const choose = (engine: 'v3.4' | 'v3.5') => updateSettings(P, { engine, engineChangedAt: Date.now() });
+
+  it('instalación existente: sin elección usa v3.4; elegir v3.5 cambia el orden y volver a v3.4 lo restaura', async () => {
+    expect((await getSettings(P)).engine).toBeUndefined();
+    const r34 = await refreshRecommendations(P, { trigger: 'apertura', rebuildPool: true });
+    expect(r34.algorithmVersion).toBe(ALGORITHM_VERSION);
+    const before = await dump();
+    await choose('v3.5');
+    expect(await currentRun(P)).toBeUndefined(); // caché invalidada: el ranking de v3.4 no se muestra como de v3.5
+    const r35 = await refreshRecommendations(P, { trigger: 'cambio de motor' });
+    expect(r35.algorithmVersion).toBe(PERSONAL_ENGINE_VERSION);
+    expect((await currentRun(P))?.id).toBe(r35.id);
+    expect(order(r35)).not.toBe(order(r34)); // ejecuta otro algoritmo, no sólo otra etiqueta
+    // misma nota mostrada: v3.5 sólo reordena
+    const s34 = new Map(r34.items.map((i) => [i.key, i.score]));
+    for (const it of r35.items) if (s34.has(it.key)) expect(it.score).toBe(s34.get(it.key));
+    await new Promise((r) => setTimeout(r, 2));
+    await choose('v3.4');
+    expect(await currentRun(P)).toBeUndefined(); // el ranking viejo de v3.4 (anterior al cambio) tampoco
+    const back = await refreshRecommendations(P, { trigger: 'cambio de motor' });
+    expect(back.algorithmVersion).toBe(ALGORITHM_VERSION);
+    expect(order(back)).toBe(order(r34));
+    expect(await dump()).toBe(before);
+  });
+  it('la elección persiste al reabrir y es por perfil', async () => {
+    await choose('v3.5');
+    resetRecompute(); resetRatingsStore(); // como cerrar y abrir la app: se vuelve a leer de IndexedDB
+    expect((await getSettings(P)).engine).toBe('v3.5');
+    expect(engineFor(await getSettings(P)).version).toBe(PERSONAL_ENGINE_VERSION);
+    const other = await createProfile('Otra persona');
+    expect((await getSettings(other.id)).engine).toBeUndefined();
+    expect(engineFor(await getSettings(other.id)).version).toBe(ALGORITHM_VERSION);
+    expect((await getSettings(P)).engine).toBe('v3.5');
+  });
+  it('los filtros funcionan igual con ambos motores; el orden estricto por nota no cambia', async () => {
+    const f = { ...DEFAULT_FILTERS, watched: 'all' as const, includeGenres: [53] };
+    const res: Record<string, TitleKey[]> = {};
+    for (const e of ['v3.4', 'v3.5'] as const) {
+      await choose(e);
+      const run = await refreshRecommendations(P, { trigger: 'cambio de motor', rebuildPool: true });
+      const r = await rankWithFilters(P, run, f, { discover: false });
+      expect(r.items.length).toBeGreaterThan(0);
+      for (const it of r.items) expect(catalog.find((x) => keyOf(x) === it.key)!.genres).toContain(53);
+      res[e] = r.items.map((i) => i.key);
+      await new Promise((x) => setTimeout(x, 2));
+    }
+    expect([...res['v3.4']].sort()).toEqual([...res['v3.5']].sort()); // mismos títulos: el filtro no depende del motor
+  });
+  it('la comparación a ciegas sigue usando ambos motores con cualquier elección', async () => {
+    await choose('v3.5');
+    await refreshRecommendations(P, { trigger: 'cambio de motor', rebuildPool: true });
+    const s = await newSession(P, 7) as AbSession;
+    expect(Object.values(s.engines).sort()).toEqual([ALGORITHM_VERSION, PERSONAL_ENGINE_VERSION].sort());
+    expect(new Set(s.items.map((i) => i.key)).size).toBe(s.items.length);
   });
 });

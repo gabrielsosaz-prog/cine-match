@@ -181,7 +181,12 @@ export interface ProfileSettings {
   /** Multiplicadores ajustables por dimensión (0 a 2, 1 = neutro) */
   dimensionWeights: Partial<Record<DimensionId, number>>;
   onboarded: boolean;
+  /** v3.5: motor elegido en Ajustes para «Para vos». Sin valor = 'v3.4' (instalaciones existentes). */
+  engine?: EngineChoice;
+  /** Momento del último cambio de motor: los rankings anteriores no se muestran (caché invalidada). */
+  engineChangedAt?: number;
 }
+export type EngineChoice = 'v3.4' | 'v3.5';
 
 export interface AppConfig {
   id: 'app';

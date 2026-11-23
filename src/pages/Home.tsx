@@ -7,7 +7,7 @@ import { useRatings } from '../hooks/useRatings';
 import { useApp } from '../hooks/useApp';
 import { useRecommendations } from '../hooks/useRecs';
 import { useScrollRestore } from '../hooks/useScrollRestore';
-import { hintsFromFilters, rankWithFilters } from '../services/recommendations';
+import { ENGINE_LABEL, engineFor, hintsFromFilters, rankWithFilters } from '../services/recommendations';
 import { TrailerButton } from '../ui/Trailer';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
 import { activeFilters, filterLabel, includedPeople, loadFilters, saveFilters, without, type RankFilters, type WatchedFilter } from '../services/filters';
@@ -203,8 +203,8 @@ export default function Home() {
     setShown(r); setTouched(new Set()); setApplyTick((t) => t + 1);
   };
   useEffect(() => {
-    if (!latest) return;
-    if (!shown) { apply(latest); return; }
+    if (!latest) { if (shown && shown.algorithmVersion !== engineFor(settings).version) setShown(undefined); return; }
+    if (!shown || shown.algorithmVersion !== latest.algorithmVersion) { apply(latest); return; } // v3.5: otro motor, nunca mezclado
     if (latest.id === shown.id) return;
     if (applyNext && !saving) { setApplyNext(false); apply(latest); setNotice(`Ranking actualizado con tus valoraciones (${latest.algorithmVersion}).`); return; }
     // Recálculo que no viene de una interacción tuya (p. ej. al abrir): se aplica si no estás editando
@@ -283,6 +283,12 @@ export default function Home() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">Para vos</h1>
           <p className="text-xs text-slate-400">{shown ? `Orden de ${relTime(shown.createdAt)} · ${shown.ratingsCount} valoraciones` : 'Calculando tu ranking…'}</p>
+          {shown && (
+            <p className="text-[11px] text-slate-500" data-testid="engine-badge" data-engine={ENGINE_LABEL[shown.algorithmVersion] ?? shown.algorithmVersion}>
+              Motor: {ENGINE_LABEL[shown.algorithmVersion] ?? shown.algorithmVersion}
+              {ENGINE_LABEL[shown.algorithmVersion] === 'v3.5' && ' (experimental) · ordena v3.5; la nota «Para vos» es la estimación de v3.4'}
+            </p>
+          )}
         </div>
         <button onClick={onApplyRanking} disabled={busy && !pending} data-testid="apply-ranking" aria-label="Actualizar ranking"
           className={`shrink-0 rounded-full px-3 py-2 text-sm font-semibold ring-1 disabled:opacity-50 ${pending ? 'bg-accent text-ink-950 ring-accent' : 'bg-ink-800 ring-white/10'}`}>
