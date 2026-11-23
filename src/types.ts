@@ -46,6 +46,8 @@ export interface TitleMeta {
   originCountry?: string[];
   /** Películas: países de producción (pueden ser varios en coproducciones). v3.1 */
   productionCountries?: string[];
+  /** v3.3: clasificación por edad oficial por país (US, AR, MX, ES); undefined = no se consultó */
+  certifications?: Record<string, string>;
   voteAverage?: number;
   voteCount?: number;
   popularity?: number;

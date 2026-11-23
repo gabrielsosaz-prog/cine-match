@@ -34,3 +34,10 @@
 - **v3.2: la exclusión manda** en personas y países, para que una lista de exclusión sea confiable.
 - **v3.2: subtítulos sólo si el título del vídeo lo dice.** `iso_639_1` de TMDB es el idioma del vídeo, no el de sus subtítulos, y la API de YouTube que lista pistas requiere una clave que no se activa sin autorización. Cuando no hay nada verificable se ofrece una búsqueda, no un vídeo elegido a ciegas.
 - **v3.2: el motor no cambia.** Filtros, búsqueda y tráileres son capas alrededor de `hybrid-narrative-3.1.0`; las preferencias guardadas (filtro de actor de v3.1) se migran al leerlas, de forma idempotente.
+- **v3.3: texto libre por reglas, no LLM.** Un LLM entendería más frases, pero requiere un servicio con credenciales/costo y enviar el texto a terceros; no se activa sin autorización. El analizador por reglas es local, gratuito y verificable, muestra lo que entendió y dice lo que no; no se presenta como comprensión del lenguaje.
+- **v3.3: público objetivo con evidencia, no con una etiqueta única.** TMDB no tiene un campo de público objetivo. Se combinan señales documentadas (O ruidoso) con pesos fijos y se muestran todas; la clasificación por edad es auxiliar porque indica la edad mínima recomendada, no a quién va dirigida (Euphoria es TV-MA con protagonistas adolescentes).
+- **v3.3: similitud semántica descartada como señal de público.** Con 36 títulos conocidos dio Bluey z 0,6 y Padre de familia z 3,0 para «infantil». Se muestra como evidencia, con peso 0.
+- **v3.3: masculino/femenino deshabilitados.** No hay datos editoriales ni demográficos verificables en las fuentes disponibles; inferirlo del reparto o del género cinematográfico sería un estereotipo.
+- **v3.3: exclusión sólo con evidencia suficiente.** Un título sin datos o incierto se mantiene en una exclusión (salvo que se elija contar los inciertos) y no pasa una inclusión. Se informa cuántos quedaron sin evaluar.
+- **v3.3: M49 como base de regiones**, con Irán movido a Medio Oriente y «Occidental» como lista editable, porque no tiene definición geográfica.
+- **v3.3: el motor no cambia** y las versiones del catálogo y de los datos guardados (META_VERSION) tampoco.

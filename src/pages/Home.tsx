@@ -359,6 +359,13 @@ export default function Home() {
                 {filtered.diagnostics.slice(0, 3).map((d) => <li key={d.id}>• Sin «{filterLabel(d.id as any, filters, genreName, platformName)}» habría {d.count} {d.count === 1 ? 'resultado' : 'resultados'}.</li>)}
               </ul>
             ) : null}
+            {filtered?.dataGaps && (filtered.dataGaps.noAudience || filtered.dataGaps.noCountries || filtered.dataGaps.noKeywords) ? (
+              <ul className="mt-2 space-y-0.5 text-left text-xs text-amber-200" data-testid="data-gaps">
+                {filtered.dataGaps.noAudience > 0 && <li>• {filtered.dataGaps.noAudience} de {filtered.dataGaps.total} candidatos no tienen datos para clasificar el público: no es que no coincidan, no se pueden evaluar.</li>}
+                {filtered.dataGaps.noCountries > 0 && <li>• {filtered.dataGaps.noCountries} de {filtered.dataGaps.total} no tienen país informado por TMDB.</li>}
+                {filtered.dataGaps.noKeywords > 0 && <li>• {filtered.dataGaps.noKeywords} de {filtered.dataGaps.total} no tienen palabras clave para evaluar temas.</li>}
+              </ul>
+            ) : null}
             <div className="mt-2 flex flex-wrap justify-center gap-2">
               <button type="button" onClick={onSearchMore} className="text-accent underline">Buscar más títulos con estos filtros</button>
               <button type="button" onClick={() => setFilters({ ...filters, types: [], includeGenres: [], excludeGenres: [], yearMin: undefined, yearMax: undefined, platforms: [], runtimeMin: undefined, runtimeMax: undefined, minScore: undefined })} className="underline">Limpiar filtros</button>

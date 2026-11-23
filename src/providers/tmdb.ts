@@ -181,7 +181,8 @@ export class TmdbClient {
    */
   async details(type: MediaType, id: number, language: string, country: string): Promise<{ meta: TitleMeta; availability: AvailabilitySnapshot; related: SearchResult[] }> {
     // Series: aggregate_credits informa en cuántos episodios participó cada actor (participación real)
-    const append = ['keywords', type === 'tv' ? 'aggregate_credits' : 'credits', 'recommendations', 'similar', 'watch/providers'].join(',');
+    // v3.3: clasificación por edad (release_dates / content_ratings) como señal auxiliar de público
+    const append = ['keywords', type === 'tv' ? 'aggregate_credits' : 'credits', 'recommendations', 'similar', 'watch/providers', type === 'tv' ? 'content_ratings' : 'release_dates'].join(',');
     const d = await this.get<any>(`/${type}/${id}`, { language, append_to_response: append });
     if (!d || typeof d.id !== 'number') throw new ProviderError('bad_response', 'Ficha sin id');
     const meta = mapDetails(d, type, language);
@@ -294,6 +295,20 @@ export function metaFromSearch(r: SearchResult, genreNames: Map<number, string>)
 /** Versión del mapeo de fichas: las guardadas con una versión menor se vuelven a pedir. */
 export const META_VERSION = 3;
 
+/** v3.3: clasificación por edad oficial por país (US, AR, MX, ES). Es la edad recomendada por contenido, no el público. */
+export function mapCertifications(d: any, type: MediaType): Record<string, string> | undefined {
+  const REG = ['US', 'AR', 'MX', 'ES'];
+  const out: Record<string, string> = {};
+  if (type === 'movie') {
+    const order = [3, 4, 2, 1, 5, 6];
+    for (const x of Array.isArray(d?.release_dates?.results) ? d.release_dates.results : []) if (REG.includes(x?.iso_3166_1)) {
+      const rel = (Array.isArray(x.release_dates) ? x.release_dates : []).filter((y: any) => y?.certification).sort((a: any, b: any) => order.indexOf(a.type) - order.indexOf(b.type));
+      if (rel[0]) out[x.iso_3166_1] = String(rel[0].certification).trim();
+    }
+  } else for (const x of Array.isArray(d?.content_ratings?.results) ? d.content_ratings.results : []) if (REG.includes(x?.iso_3166_1) && x.rating) out[x.iso_3166_1] = String(x.rating).trim();
+  return d?.release_dates || d?.content_ratings ? out : undefined;
+}
+
 export function mapDetails(d: any, type: MediaType, language: string): TitleMeta {
   const missing: string[] = [];
   const genres: Named[] = Array.isArray(d.genres) ? d.genres.filter((g: any) => g?.id) : [];
@@ -353,7 +368,7 @@ export function mapDetails(d: any, type: MediaType, language: string): TitleMeta
     year: yearOf(releaseDate), releaseDate: releaseDate || undefined,
     overview, overviewLang: overview ? language.slice(0, 2) : undefined,
     posterPath: d.poster_path ?? null, backdropPath: d.backdrop_path ?? null,
-    genres, keywords, cast, directors, writers: writers.slice(0, 6), runtime,
+    genres, keywords, cast, directors, writers: writers.slice(0, 6), runtime, certifications: mapCertifications(d, type),
     seasons: type === 'tv' && Array.isArray(d.seasons)
       ? d.seasons.filter((s: any) => s.season_number > 0).map((s: any) => ({ number: s.season_number, name: s.name, episodes: s.episode_count, airDate: s.air_date || undefined }))
       : undefined,

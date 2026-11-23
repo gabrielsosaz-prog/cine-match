@@ -1,3 +1,13 @@
+# Resultados de pruebas (v3.3)
+
+## Resumen v3.3
+
+- Vitest: **213/213 OK**. 20 nuevas en `tests/unit/v33.test.ts` (funcionales, con fichas armadas a mano y el proveedor simulado): 1 instrucciones simples, 2 negaciones, 3 condiciones combinadas, 4 texto no interpretable, 5 contradicciones, 6 incluir público adolescente, 7 excluirlo, 8 protagonistas adolescentes en obras para adultos, 9 clasificaciones inciertas y umbral, 10 públicos superpuestos, 11 regiones incluidas y «Occidental» editable, 12 regiones excluidas, 13 países con regiones, 14 coproducciones, 15 países desconocidos, 16 persistencia y limpieza por grupo, integración con el ranking y 18 conservación de valoraciones y ajustes.
+- Diagnóstico con datos reales del catálogo (`docs/audience-agreement.md`): reglas contra **etiquetas propias del desarrollador** en 36 títulos. No es una validación de precisión. Adolescente: 8 sí correctos, 0 falsos sí, 3 inciertos; Infantil: 0 falsos sí, 4 de 5 obras infantiles quedan «inciertas» (Toy Story, Frozen, Nemo, Harry Potter 1: TMDB no las etiqueta como infantiles, sí como familiares); Adulto: 1 falso sí (El club de los cinco, clasificada R en EE. UU.).
+- Playwright, Android Pixel 7 y Galaxy S5 (360 px): **62/62 OK**. 3 flujos nuevos (`tests/e2e/v33.spec.ts`): texto con vista previa, texto no interpretable, corrección antes de aplicar, resultados verificados, persistencia al navegar y recargar, limpiar sólo el texto; contradicción visible; público tri-estado con umbral e inciertos, regiones incluidas/excluidas, edición de «Occidental», limpieza por grupo y grupo plegable. Sin desplazamiento horizontal. Rendimiento (caso 17, simulado): texto aplicado y resultados en 0,4-1,0 s.
+- Corregido al probar: «no quiero series» se interpretaba como incluir series (la palabra «quiero» anulaba la negación).
+- Producción con TMDB real (caso 19): `tests/prod/v33.spec.ts`. Resultados en el informe de la versión.
+
 # Resultados de pruebas (v3.2)
 
 ## Resumen v3.2

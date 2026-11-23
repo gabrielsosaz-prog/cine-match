@@ -21,7 +21,7 @@ test('producción v3.1: Similares narrativo (White Lotus), tráiler, persona, pa
   page.on('pageerror', (e) => errors.push(e.message));
   const v = await (await page.request.get('/version.json')).json();
   log(info.project.name, JSON.stringify(v));
-  expect(v.version).toBe('3.2.0');
+  expect(v.version).toBe('3.3.0');
   const man = await (await page.request.get('/catalog/manifest.json')).json();
   log('catálogo', JSON.stringify(man));
   await start(page);

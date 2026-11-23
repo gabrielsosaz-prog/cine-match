@@ -1,5 +1,6 @@
 import { TrailerButton } from '../ui/Trailer';
-import { countriesOf, countryName } from '../services/filters';
+import { audienceOf, countriesOf, countryName } from '../services/filters';
+import { AUDIENCES, loadAudienceData } from '../services/audience';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -68,6 +69,7 @@ export default function TitlePage() {
           {countriesOf(meta).length > 0 && <div className="mt-0.5 text-[11px] text-slate-500" data-testid="title-countries">{meta.type === 'tv' ? 'País de origen' : 'Países de origen y producción'}: {countriesOf(meta).map(countryName).join(', ')}</div>}
         </div>
       </div>
+      <AudienceInfo meta={meta} />
       <div className="flex flex-wrap items-center gap-2"><TrailerButton key={meta.key} k={meta.key} originalLanguage={meta.originalLanguage} country={settings.country} title={meta.title} year={meta.year} /></div>
       <Card className="space-y-2" data-testid="title-scores">
         <div className="flex items-center gap-3">
@@ -141,5 +143,30 @@ export default function TitlePage() {
       )}
       <p className="text-center text-[10px] text-slate-500">Metadatos: TMDB. Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB. Disponibilidad: JustWatch.</p>
     </article>
+  );
+}
+
+/** v3.3: público objetivo aproximado, con su evidencia (fuente, método, confianza y versión). */
+function AudienceInfo({ meta }: { meta: TitleMeta }) {
+  const [ready, setReady] = useState(0);
+  useEffect(() => { loadAudienceData().then(() => setReady((x) => x + 1)); }, []);
+  const p = audienceOf(meta);
+  void ready;
+  const shown = AUDIENCES.filter((a) => a.enabled && ['yes', 'uncertain'].includes(p.scores[a.id].status));
+  return (
+    <details className="text-[11px] text-slate-400" data-testid="title-audience">
+      <summary className="cursor-pointer">
+        Público objetivo (aprox.): {!p.hasData ? 'sin datos suficientes' : shown.length ? shown.map((a) => `${a.name}${p.scores[a.id].status === 'uncertain' ? ' (incierto)' : ''}`).join(' · ') : 'sin evidencia de un público específico'}
+      </summary>
+      <ul className="mt-1 space-y-1 pl-2">
+        {AUDIENCES.map((a) => { const s = p.scores[a.id]; return (
+          <li key={a.id} data-testid="title-audience-row" data-audience={a.id} data-status={s.status}>
+            <span className="font-semibold text-slate-300">{a.name}</span>: {s.status === 'disabled' ? 'deshabilitada (sin evidencia verificable)' : s.status === 'unknown' ? 'sin datos' : `${s.status === 'yes' ? 'sí' : s.status === 'uncertain' ? 'incierto' : 'sin evidencia'} · confianza ${Math.round(s.confidence * 100)} %${s.explicit ? ' · con etiqueta explícita' : ' · inferida'}`}
+            {s.status !== 'disabled' && s.evidence.length > 0 && <span className="block text-slate-500">{s.evidence.map((e) => `${e.method}: ${e.detail} (${e.source})`).join(' · ')}</span>}
+          </li>
+        ); })}
+      </ul>
+      <p className="mt-1 text-[10px] text-slate-500">Reglas {p.version}. La confianza mide cuánta evidencia hay, no es una probabilidad medida.</p>
+    </details>
   );
 }

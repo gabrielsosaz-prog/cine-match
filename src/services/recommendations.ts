@@ -9,7 +9,9 @@ import { friendlyError } from '../providers/errors';
 import { META_VERSION } from '../providers/tmdb';
 import type { MediaType, PlatformId, ProfileSettings, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
 import { peopleSets, type PeopleSets } from './peopleFilter';
-import { countriesOf, diagnose, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
+import { countriesOf, dataGaps, diagnose, matchesContent, matchesWatched, smartNeeds, type Candidate, type DataGaps, type RankFilters } from './filters';
+import { loadAudienceData } from './audience';
+import { loadWestern } from './regions';
 import { matchesPlatforms } from './availability';
 import { discoverCandidates, ensureFullTitles, genreNames, getTitle, personFilmography, refreshAvailability } from './catalog';
 import type { UserProfile } from '../engine/profile';
@@ -268,6 +270,8 @@ export interface FilteredResult {
   diagnostics: { id: string; count: number }[];
   /** títulos sumados por búsqueda automática en TMDB para estos filtros */
   discovered: number;
+  /** v3.3: candidatos sin el dato que pide un filtro (para no confundir «sin datos» con «no coincide») */
+  dataGaps?: DataGaps;
   /** títulos de la persona elegida que no están en tus plataformas (no se muestran) */
   outsidePlatforms?: number;
   warning?: string;
@@ -284,6 +288,7 @@ export interface FilteredResult {
  * No guarda nada ni cambia lo aprendido: es una vista temporal.
  */
 export async function rankWithFilters(profileId: string, run: RecommendationRun, f: RankFilters, opts: { discover?: boolean; anyPlatform?: boolean } = {}): Promise<FilteredResult> {
+  loadWestern(profileId);
   const settings = await getSettings(profileId);
   const ratings = await listRatings(profileId);
   const byKey = new Map(ratings.map((r) => [r.key, r]));
@@ -313,13 +318,18 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
   // Filtro por país: las listas de TMDB (descubrir, tendencias) no traen el país de las películas. Antes de filtrar
   // se completa con el catálogo narrativo y, si falta, con la ficha completa (hasta 60 por vez). Lo que siga sin
   // datos se trata según la regla explícita (no pasa «incluir», sí pasa «excluir»).
+  const needs = smartNeeds(f);
+  if (needs.audience) await loadAudienceData();
   const fillCountries = async (keys: TitleKey[]) => {
-    if (!f.includeCountries?.length && !f.excludeCountries?.length) return;
+    if (!needs.countries && !needs.keywords) return;
     const idx = getNarrativeIndex() ?? (await narrativeReady(5000));
     const missing: TitleKey[] = [];
     for (const k of keys) {
       const m = all.get(k);
-      if (!m || countriesOf(m).length) continue;
+      if (!m) continue;
+      // v3.3: público y temas necesitan palabras clave (de la ficha o del catálogo); si no hay, ficha completa
+      if (needs.keywords && !m.keywords.length && m.completeness !== 'full' && !idx?.get(k)?.kw.length) { missing.push(k); continue; }
+      if (!needs.countries || countriesOf(m).length) continue;
       const c = idx?.get(k)?.countries;
       if (c?.length) all.set(k, { ...m, productionCountries: c });
       else missing.push(k);
@@ -371,7 +381,7 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
     const scores = new Map(engine.rank({ profile, ratings, titles: all, candidates: cands.map((c) => c.meta.key), settings, limit: 400, includeWatched: true }).map((i) => [i.key, i.score]));
     diagnostics = diagnose(cands.map((c) => ({ ...c, score: scores.get(c.meta.key) })), f);
   }
-  return { items, candidates: pass.length, diagnostics, discovered, outsidePlatforms, warning, perPerson: people?.perPerson, peopleTotal: people?.allow?.size };
+  return { items, candidates: pass.length, diagnostics, discovered, outsidePlatforms, warning, perPerson: people?.perPerson, peopleTotal: people?.allow?.size, dataGaps: dataGaps(cands, f) };
 }
 
 /**

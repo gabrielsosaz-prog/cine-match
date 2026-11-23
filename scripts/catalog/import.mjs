@@ -10,7 +10,11 @@ for (const d of existsSync('public/catalog') ? readdirSync('public/catalog') : [
 mkdirSync(dir, { recursive: true });
 cpSync(join(src, 'catalog-meta.json'), join(dir, 'meta.json'));
 cpSync(join(src, 'catalog-emb.bin'), join(dir, 'emb.bin'));
-writeFileSync('public/catalog/manifest.json', JSON.stringify({ version: meta.version, meta: `${v}/meta.json`, emb: `${v}/emb.bin`, titles: meta.n, embedded: meta.embedded, model: meta.model }, null, 1));
+// v3.3: conservar el archivo de señales de público si corresponde a la misma versión del catálogo
+let prev = {};
+try { prev = JSON.parse(readFileSync('public/catalog/manifest.json', 'utf8')); } catch { /* primera importación */ }
+const audience = typeof prev.audience === 'string' && prev.audience.startsWith(`${v}/`) ? prev.audience : undefined;
+writeFileSync('public/catalog/manifest.json', JSON.stringify({ version: meta.version, meta: `${v}/meta.json`, emb: `${v}/emb.bin`, titles: meta.n, embedded: meta.embedded, model: meta.model, ...(audience ? { audience } : {}) }, null, 1));
 if (existsSync(join(src, 'eval-texts.json'))) { mkdirSync('eval/data', { recursive: true }); cpSync(join(src, 'eval-texts.json'), 'eval/data/texts.json'); }
 if (existsSync(join(src, 'report.md'))) cpSync(join(src, 'report.md'), 'docs/catalog-report.md');
 console.log('Catálogo', meta.version, meta.n, 'títulos,', meta.embedded, 'con vector →', dir);

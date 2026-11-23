@@ -1,7 +1,10 @@
 import { allCountries, countryName } from '../services/filters';
 import { useEffect, useMemo, useState } from 'react';
 import { PLATFORMS } from '../constants';
-import { DEFAULT_FILTERS, activeCount, includedPeople, type CountryField, type PersonRef, type RankFilters } from '../services/filters';
+import { DEFAULT_FILTERS, FILTER_GROUPS, activeCount, activeFilters, includedPeople, withoutGroup, type CountryField, type PersonRef, type RankFilters } from '../services/filters';
+import { useApp } from '../hooks/useApp';
+import { AudiencePicker, RegionPicker, TextFilterBox } from './SmartFilters';
+import type { ReactNode } from 'react';
 import { searchPeople, type PersonHit } from '../services/catalog';
 import type { RankedPerson } from '../services/peopleSearch';
 import { friendlyError } from '../providers/errors';
@@ -25,6 +28,7 @@ export default function FilterPanel({ value, onChange, genres, userPlatforms, on
   onSearchMore?: () => void; searching?: boolean; language?: string; hideScore?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const { profileId } = useApp();
   const f = value;
   const n = activeCount(f);
   const toggle = <T,>(xs: T[], x: T) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
@@ -44,58 +48,69 @@ export default function FilterPanel({ value, onChange, genres, userPlatforms, on
       </div>
       {open && (
         <div className="space-y-3 rounded-2xl bg-ink-900 p-3 ring-1 ring-white/10" data-testid="filters-panel">
-          <section>
-            <h3 className="mb-1 text-xs font-semibold text-slate-400">Tipo</h3>
-            <div className="flex gap-2">
-              <Chip active={f.types.length !== 1} onClick={() => setType('all')}>Todo</Chip>
-              <Chip active={f.types[0] === 'movie' && f.types.length === 1} onClick={() => setType('movie')} testId="panel-movie">Películas</Chip>
-              <Chip active={f.types[0] === 'tv' && f.types.length === 1} onClick={() => setType('tv')} testId="panel-tv">Series</Chip>
-            </div>
-          </section>
-          <section>
-            <h3 className="mb-1 text-xs font-semibold text-slate-400">Géneros: tocá una vez para incluir, dos para excluir</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {sortedGenres.map((g) => {
-                const inc = f.includeGenres.includes(g.id), exc = f.excludeGenres.includes(g.id);
-                return (
-                  <button key={g.id} type="button" data-testid={`genre-${g.id}`} data-state={inc ? 'include' : exc ? 'exclude' : 'none'} aria-label={`${g.name}: ${inc ? 'incluido' : exc ? 'excluido' : 'sin filtrar'}`}
-                    onClick={() => onChange(inc ? { ...f, includeGenres: f.includeGenres.filter((x) => x !== g.id), excludeGenres: [...f.excludeGenres, g.id] }
-                      : exc ? { ...f, excludeGenres: f.excludeGenres.filter((x) => x !== g.id) } : { ...f, includeGenres: [...f.includeGenres, g.id] })}
-                    className={`rounded-full px-2.5 py-1 text-xs ${inc ? 'bg-emerald-500 text-ink-950' : exc ? 'bg-red-500/80 text-white line-through' : 'bg-ink-800 text-slate-300 ring-1 ring-white/10'}`}>
-                    {inc ? '+ ' : exc ? '− ' : ''}{g.name}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-          <section className="grid grid-cols-2 gap-2">
-            <YearInput label="Año mínimo" placeholder="Ej. 2010" value={f.yearMin} testId="filter-year-min" onCommit={(v) => onChange({ ...f, yearMin: v })} />
-            <YearInput label="Año máximo" placeholder="Ej. 2024" value={f.yearMax} testId="filter-year-max" onCommit={(v) => onChange({ ...f, yearMax: v })} />
-          </section>
-          <section>
-            <h3 className="mb-1 text-xs font-semibold text-slate-400">Plataformas</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {PLATFORMS.filter((p) => userPlatforms.includes(p.id)).map((p) => (
-                <Chip key={p.id} testId={`panel-platform-${p.id}`} active={f.platforms.includes(p.id)} onClick={() => onChange({ ...f, platforms: toggle(f.platforms, p.id) })}>{p.label}</Chip>
-              ))}
-            </div>
-          </section>
-          <section>
-            <h3 className="mb-1 text-xs font-semibold text-slate-400">Duración (cuando hay datos; en series, por episodio)</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {RUNTIMES.map((r) => <Chip key={r.id} testId={`runtime-${r.id}`} active={runtime.id === r.id} onClick={() => onChange({ ...f, runtimeMin: r.min, runtimeMax: r.max })}>{r.label}</Chip>)}
-            </div>
-          </section>
-          <PeoplePicker include={includedPeople(f)} exclude={f.excludePeople ?? []} mode={f.peopleMode ?? 'any'} language={language}
-            onChange={(includePeople, excludePeople, peopleMode) => onChange({ ...f, person: undefined, includePeople, excludePeople, peopleMode })} />
-          <CountryPicker include={f.includeCountries ?? []} exclude={f.excludeCountries ?? []} field={f.countryField ?? 'both'}
-            onChange={(includeCountries, excludeCountries, countryField) => onChange({ ...f, includeCountries, excludeCountries, countryField })} />
+          <Group n={1} id="text" title="Texto libre" f={f} onChange={onChange}>
+            <TextFilterBox f={f} onChange={onChange} />
+          </Group>
+          <Group n={2} id="audience" title="Público objetivo" f={f} onChange={onChange}>
+            <AudiencePicker value={f.audience} onChange={(audience) => onChange({ ...f, audience })} />
+          </Group>
+          <Group n={3} id="places" title="Países y regiones" f={f} onChange={onChange}>
+            <RegionPicker profileId={profileId} include={f.includeRegions ?? []} exclude={f.excludeRegions ?? []} onChange={(includeRegions, excludeRegions) => onChange({ ...f, includeRegions, excludeRegions })} />
+            <CountryPicker include={f.includeCountries ?? []} exclude={f.excludeCountries ?? []} field={f.countryField ?? 'both'}
+              onChange={(includeCountries, excludeCountries, countryField) => onChange({ ...f, includeCountries, excludeCountries, countryField })} />
+          </Group>
+          <Group n={4} id="other" title="Otros filtros" f={f} onChange={onChange}>
+            <section>
+              <h3 className="mb-1 text-xs font-semibold text-slate-400">Tipo</h3>
+              <div className="flex gap-2">
+                <Chip active={f.types.length !== 1} onClick={() => setType('all')}>Todo</Chip>
+                <Chip active={f.types[0] === 'movie' && f.types.length === 1} onClick={() => setType('movie')} testId="panel-movie">Películas</Chip>
+                <Chip active={f.types[0] === 'tv' && f.types.length === 1} onClick={() => setType('tv')} testId="panel-tv">Series</Chip>
+              </div>
+            </section>
+            <section>
+              <h3 className="mb-1 text-xs font-semibold text-slate-400">Géneros: tocá una vez para incluir, dos para excluir</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {sortedGenres.map((g) => {
+                  const inc = f.includeGenres.includes(g.id), exc = f.excludeGenres.includes(g.id);
+                  return (
+                    <button key={g.id} type="button" data-testid={`genre-${g.id}`} data-state={inc ? 'include' : exc ? 'exclude' : 'none'} aria-label={`${g.name}: ${inc ? 'incluido' : exc ? 'excluido' : 'sin filtrar'}`}
+                      onClick={() => onChange(inc ? { ...f, includeGenres: f.includeGenres.filter((x) => x !== g.id), excludeGenres: [...f.excludeGenres, g.id] }
+                        : exc ? { ...f, excludeGenres: f.excludeGenres.filter((x) => x !== g.id) } : { ...f, includeGenres: [...f.includeGenres, g.id] })}
+                      className={`rounded-full px-2.5 py-1 text-xs ${inc ? 'bg-emerald-500 text-ink-950' : exc ? 'bg-red-500/80 text-white line-through' : 'bg-ink-800 text-slate-300 ring-1 ring-white/10'}`}>
+                      {inc ? '+ ' : exc ? '− ' : ''}{g.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+            <section className="grid grid-cols-2 gap-2">
+              <YearInput label="Año mínimo" placeholder="Ej. 2010" value={f.yearMin} testId="filter-year-min" onCommit={(v) => onChange({ ...f, yearMin: v })} />
+              <YearInput label="Año máximo" placeholder="Ej. 2024" value={f.yearMax} testId="filter-year-max" onCommit={(v) => onChange({ ...f, yearMax: v })} />
+            </section>
+            <section>
+              <h3 className="mb-1 text-xs font-semibold text-slate-400">Plataformas</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {PLATFORMS.filter((p) => userPlatforms.includes(p.id)).map((p) => (
+                  <Chip key={p.id} testId={`panel-platform-${p.id}`} active={f.platforms.includes(p.id)} onClick={() => onChange({ ...f, platforms: toggle(f.platforms, p.id) })}>{p.label}</Chip>
+                ))}
+              </div>
+            </section>
+            <section>
+              <h3 className="mb-1 text-xs font-semibold text-slate-400">Duración (cuando hay datos; en series, por episodio)</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {RUNTIMES.map((r) => <Chip key={r.id} testId={`runtime-${r.id}`} active={runtime.id === r.id} onClick={() => onChange({ ...f, runtimeMin: r.min, runtimeMax: r.max })}>{r.label}</Chip>)}
+              </div>
+            </section>
+            <PeoplePicker include={includedPeople(f)} exclude={f.excludePeople ?? []} mode={f.peopleMode ?? 'any'} language={language}
+              onChange={(includePeople, excludePeople, peopleMode) => onChange({ ...f, person: undefined, includePeople, excludePeople, peopleMode })} />
           {!hideScore && <section>
             <h3 className="mb-1 text-xs font-semibold text-slate-400">«Para vos» mínimo</h3>
             <div className="flex gap-1.5">
               {SCORES.map((s) => <Chip key={s} testId={`min-score-${s}`} active={(f.minScore ?? 0) === s} onClick={() => onChange({ ...f, minScore: s || undefined })}>{s ? `≥ ${s}` : 'Sin mínimo'}</Chip>)}
             </div>
           </section>}
+          </Group>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button type="button" data-testid="clear-filters" onClick={() => onChange({ ...DEFAULT_FILTERS, watched: f.watched })} className="rounded-lg bg-ink-800 px-3 py-1.5 text-sm ring-1 ring-white/10">Limpiar filtros</button>
             {onSearchMore && <button type="button" data-testid="search-more" disabled={searching} onClick={onSearchMore} className="rounded-lg bg-ink-800 px-3 py-1.5 text-sm text-accent ring-1 ring-white/10 disabled:opacity-50">{searching ? 'Buscando…' : 'Buscar más títulos con estos filtros'}</button>}
@@ -104,6 +119,24 @@ export default function FilterPanel({ value, onChange, genres, userPlatforms, on
         </div>
       )}
     </div>
+  );
+}
+
+/** Grupo del panel (v3.3): plegable, con su cantidad de filtros activos y su propio «Limpiar». */
+function Group({ n, id, title, f, onChange, children }: { n: number; id: keyof typeof FILTER_GROUPS; title: string; f: RankFilters; onChange: (f: RankFilters) => void; children: ReactNode }) {
+  const k = `cine-match:filter-group:${id}`;
+  const [open, setOpen] = useState(() => { try { return sessionStorage.getItem(k) !== '0'; } catch { return true; } });
+  const count = activeFilters(f).filter((x) => FILTER_GROUPS[id].includes(x)).length;
+  return (
+    <section className="rounded-xl bg-ink-950/40 ring-1 ring-white/5" data-testid={`filter-group-${id}`}>
+      <div className="flex items-center gap-2 px-2.5 py-2">
+        <button type="button" aria-expanded={open} data-testid={`filter-group-${id}-toggle`} onClick={() => { setOpen(!open); try { sessionStorage.setItem(k, open ? '0' : '1'); } catch { /* */ } }} className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-semibold text-slate-200">
+          <span aria-hidden>{open ? '▾' : '▸'}</span>{n}. {title}{count > 0 && <span className="rounded-full bg-accent px-1.5 text-[10px] text-ink-950">{count}</span>}
+        </button>
+        {count > 0 && <button type="button" data-testid={`filter-group-${id}-clear`} onClick={() => onChange(withoutGroup(f, id))} className="shrink-0 text-[11px] text-accent underline">Limpiar</button>}
+      </div>
+      {open && <div className="space-y-3 px-2.5 pb-2.5">{children}</div>}
+    </section>
   );
 }
 

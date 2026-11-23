@@ -10,7 +10,9 @@ import { friendlyError } from '../providers/errors';
 import type { RecommendationItem, TitleKey, TitleMeta } from '../types';
 import { matchesPlatforms } from './availability';
 import { discoverCandidates, ensureFullTitles, genreNames, getTitle } from './catalog';
-import { countriesOf, matchesContent, matchesWatched, type Candidate, type RankFilters } from './filters';
+import { countriesOf, matchesContent, matchesWatched, smartNeeds, type Candidate, type RankFilters } from './filters';
+import { loadAudienceData } from './audience';
+import { loadWestern } from './regions';
 import { loadNarrativeIndex, metaFromCatalog, narrativeCatalogError } from './narrativeCatalog';
 import { latestRun, predictFor } from './recommendations';
 import { peopleSets } from './peopleFilter';
@@ -76,6 +78,7 @@ const normTitle = (s: string) => s.toLowerCase().normalize('NFD').replace(/[Ì€-Í
 
 export async function findSimilar(profileId: string, refKeys: TitleKey[], f: RankFilters, o: { onlyMyPlatforms?: boolean; mode?: SimilarMode; weights?: Partial<Record<TitleKey, RefWeight>> } = {}): Promise<SimilarResponse> {
   const t0 = Date.now();
+  loadWestern(profileId);
   const mode = o.mode ?? 'common';
   const refsIn = [...new Set(refKeys)].slice(0, MAX_REFS);
   const settings = await getSettings(profileId);
@@ -168,6 +171,7 @@ export async function findSimilar(profileId: string, refKeys: TitleKey[], f: Ran
   const snapOf = new Map(keys.map((k, i) => [k, snaps[i]]));
   let people: Awaited<ReturnType<typeof peopleSets>>;
   try { people = await peopleSets(f, settings.language); } catch (e) { warning ??= friendlyError(e); }
+  if (smartNeeds(f).audience) await loadAudienceData();
   const passing = scored.filter((x) => {
     if (people && (people.deny.has(x.key) || (people.allow && !people.allow.has(x.key)))) return false;
     let meta = metas.get(x.key)!;
