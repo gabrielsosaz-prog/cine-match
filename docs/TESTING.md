@@ -24,7 +24,10 @@ localmente y **no se sube** al repositorio (`scripts/eval/personal.ts`).
   «Para vos» con las mismas notas; volver a v3.4 restaura el mismo orden; caché invalidada en ambos cambios; persiste
   al reabrir; por perfil; filtros con ambos motores; comparación a ciegas independiente; valoraciones intactas).
   Playwright **70/70 OK** (flujo nuevo en Android: indicador «Motor», cambio y vuelta, recarga, comparación a ciegas,
-  CPU ×4: 0,45-0,56 s hasta ver el ranking de v3.5). Producción: segundo caso en `tests/prod/v35.spec.ts`.
+  CPU ×4: 0,44-0,56 s hasta ver el ranking de v3.5). Producción, run 45295061631 (Pixel 7 y Galaxy S5): **14/14 OK**.
+  Con 10 valoraciones reales, v3.5 cambia el top 10 de «Para vos» (6 títulos en común, otro orden) y se ve en 0,9-1,5 s.
+  La primera vuelta a v3.4 repite 9 de sus 10 títulos (el primer cálculo se hizo con menos fichas completas en caché);
+  la segunda vuelta v3.5 → v3.4 da exactamente el mismo orden.
 
 # Resultados de pruebas (v3.4)
 
