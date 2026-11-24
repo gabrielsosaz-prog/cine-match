@@ -207,7 +207,10 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   let all = await titleMap([...histKeys, ...pool]);
   const profile = engine.buildProfile(ratings, all, settings);
   // v3.0: preselección más amplia (120) para que los filtros tengan dónde elegir sin perder títulos
-  const pre = engine.rank({ profile, ratings, titles: all, candidates: pool.filter((k) => all.has(k)), settings, limit: 120 });
+  // v3.5: la preselección (qué fichas completar y qué disponibilidad consultar) es la misma con cualquier motor elegido:
+  // une los 120 mejores de cada motor. Así cambiar de motor no cambia el conjunto de candidatos, sólo el orden.
+  const preIn = { profile, ratings, titles: all, candidates: pool.filter((k) => all.has(k)), settings, limit: 120 };
+  const pre = override ? override.rank(preIn) : [...new Map([...hybridEngine.rank(preIn), ...personalEngine.rank(preIn)].map((p) => [p.key, p])).values()];
   const unknown = pool.filter((k) => !all.has(k)).slice(0, 25);
   const notFull = (k: TitleKey) => all.get(k)?.completeness !== 'full' || (all.get(k)?.metaVersion ?? 1) < META_VERSION;
   const toFetch = [...new Set([...priority.filter(notFull).slice(0, 16), ...hinted.filter(notFull).slice(0, 20), ...pre.map((p) => p.key).filter(notFull), ...unknown])].slice(0, 80);

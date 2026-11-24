@@ -76,7 +76,15 @@ test('producción v3.5: selector de motor con TMDB real (persistente, aplicado a
   await expect(badge).toHaveAttribute('data-engine', 'v3.5', { timeout: 240000 });
   await pick('v3.4');
   const back = await keys();
-  log('al volver a v3.4, mismos primeros 10:', back.split(',').slice(0, 10).join() === k34.split(',').slice(0, 10).join());
+  const top = (k: string) => k.split(',').slice(0, 10).join(' ');
+  log('al volver a v3.4:', top(back), '| igual al primero:', top(back) === top(k34));
+  // segunda vuelta, ya con las fichas en caché: v3.5 → v3.4 da exactamente el mismo orden
+  await pick('v3.5');
+  expect(await keys()).not.toBe(back);
+  await pick('v3.4');
+  const back2 = await keys();
+  log('segunda vuelta a v3.4 igual a la primera vuelta:', top(back2) === top(back));
+  expect(top(back2)).toBe(top(back));
   await page.screenshot({ path: `test-results/prod-${info.project.name}-v35-motor.png`, fullPage: true });
   expect(errors).toEqual([]);
 });
