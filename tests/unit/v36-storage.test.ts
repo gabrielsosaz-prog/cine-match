@@ -17,7 +17,7 @@ import {
   BACKUP_POLICY, createLocalBackup, externalBackupDue, getLocalBackup, listLocalBackups, localBackupInfo, useTestBackupDb,
 } from '../../src/services/backups';
 import {
-  LEDGER_KEY, acceptCurrentState, checkIntegrity, patchLedger, readLedger, recordLedger, requestPersistence,
+  LEDGER_KEY, acceptCurrentState, activitySummary, checkIntegrity, patchLedger, readLedger, recordLedger, requestPersistence,
 } from '../../src/services/storageSafety';
 import { AppProvider } from '../../src/hooks/useApp';
 import type { TitleKey } from '../../src/types';
@@ -325,5 +325,31 @@ describe('v3.6 · la app nunca muestra un perfil nuevo ante una pérdida o un er
     await updateConfig({ proxyUrl: 'https://proxy.example/3' });
     mount();
     await waitFor(() => expect(screen.getByTestId('app-content')).toBeTruthy());
+  });
+});
+
+describe('v3.6 · historial para el diagnóstico (sólo lectura)', () => {
+  it('cuenta eventos, muestra la caída en los cálculos y lista los títulos que faltan', async () => {
+    await ensureBootstrap();
+    const t0 = Date.now();
+    await db.logs.bulkAdd([
+      { profileId: P, at: t0 - 3000, type: 'rating_saved', key: 'movie:1' as TitleKey },
+      { profileId: P, at: t0 - 2000, type: 'rating_saved', key: 'movie:2' as TitleKey },
+      { profileId: P, at: t0 - 1500, type: 'rating_deleted', key: 'movie:2' as TitleKey },
+      { profileId: P, at: t0 - 1000, type: 'rating_saved', key: 'tv:3' as TitleKey },
+    ]);
+    await db.runs.bulkAdd([
+      { profileId: P, algorithmVersion: 'x', createdAt: t0 - 2500, trigger: 'valoración', ratingsCount: 40, country: 'AR', items: [], pool: [] },
+      { profileId: P, algorithmVersion: 'x', createdAt: t0 - 500, trigger: 'valoración', ratingsCount: 0, country: 'AR', items: [], pool: [] },
+    ]);
+    await db.titles.put({ key: 'movie:1', type: 'movie', tmdbId: 1, title: 'Película Uno' } as any);
+    await saveRating(P, 'tv:3' as TitleKey, { overall: 7 });
+    const before = await db.ratings.count();
+    const a = await activitySummary(P);
+    expect(a.byType).toMatchObject({ rating_saved: 3, rating_deleted: 1 });
+    expect(a.runs.map((r) => r.ratingsCount)).toEqual([40, 0]);
+    // movie:2 se borró a propósito y tv:3 existe: sólo falta movie:1
+    expect(a.missingKeys).toEqual([{ key: 'movie:1', title: 'Película Uno', lastSavedAt: t0 - 3000 }]);
+    expect(await db.ratings.count()).toBe(before);
   });
 });

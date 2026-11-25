@@ -5,8 +5,8 @@ import {
 } from '../services/backups';
 import { mergeImport, planImport, type ImportPlan } from '../services/dataPortability';
 import {
-  acceptCurrentState, checkIntegrity, getPersistenceStatus, listIndexedDbNames, readLedger, requestPersistence,
-  type IntegrityReport, type PersistenceStatus,
+  acceptCurrentState, activitySummary, checkIntegrity, getPersistenceStatus, listIndexedDbNames, readLedger, requestPersistence,
+  type ActivitySummary, type IntegrityReport, type PersistenceStatus,
 } from '../services/storageSafety';
 import { Card } from '../ui/components';
 
@@ -29,6 +29,7 @@ export default function Recovery({ initial, onDone }: { initial?: IntegrityRepor
   const [pending, setPending] = useState<Pending>();
   const [msg, setMsg] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [activity, setActivity] = useState<ActivitySummary>();
   const ledger = readLedger();
 
   const refresh = async () => {
@@ -36,6 +37,7 @@ export default function Recovery({ initial, onDone }: { initial?: IntegrityRepor
     setBackups(await listLocalBackups().catch(() => []));
     setDbs(await listIndexedDbNames());
     setPersist(await requestPersistence());
+    setActivity(await activitySummary().catch(() => undefined));
   };
   useEffect(() => { refresh(); }, []);
 
@@ -133,6 +135,27 @@ export default function Recovery({ initial, onDone }: { initial?: IntegrityRepor
         <p className="text-[11px] text-slate-500">Última copia fuera del dispositivo: {fmt(ledger?.lastExternalBackupAt)}{ledger?.lastExternalBackupTotal !== undefined ? ` (${ledger.lastExternalBackupTotal} valoraciones)` : ''}</p>
         <button onClick={exportNow} className="rounded-lg bg-ink-700 px-3 py-2 text-sm">Guardar una copia de lo que hay ahora</button>
       </Card>
+
+      {activity && (
+        <Card className="space-y-2" data-testid="recovery-activity">
+          <h2 className="font-semibold">Historial registrado</h2>
+          <p className="text-sm text-slate-300">
+            Guardados: <b>{activity.byType.rating_saved ?? 0}</b> · borrados uno a uno: <b>{activity.byType.rating_deleted ?? 0}</b> · importaciones: <b>{activity.byType.import ?? 0}</b>
+            {activity.lastSavedAt ? <> · último guardado: {fmt(activity.lastSavedAt)}</> : null}
+          </p>
+          {activity.runs.length > 0 && (
+            <details className="text-xs text-slate-400"><summary>Valoraciones en cada cálculo de recomendaciones ({activity.runs.length})</summary>
+              <ul data-testid="recovery-runs">{activity.runs.slice(-20).reverse().map((r, i) => <li key={i}>{fmt(r.at)} · {r.ratingsCount} valoraciones · {r.trigger}</li>)}</ul>
+            </details>
+          )}
+          {activity.missingKeys.length > 0 && (
+            <details className="text-xs text-slate-400"><summary data-testid="recovery-missing">{activity.missingKeys.length} títulos valorados según el historial que hoy no tienen valoración</summary>
+              <ul>{activity.missingKeys.map((m) => <li key={m.key}><a className="text-accent underline" href={`#/t/${m.key.replace(':', '/')}`}>{m.title ?? m.key}</a> · {fmt(m.lastSavedAt)}</li>)}</ul>
+            </details>
+          )}
+          <p className="text-[11px] text-slate-500">El historial no guarda las notas, sólo qué títulos y cuándo. Sirve para ver cuándo se perdieron y qué falta.</p>
+        </Card>
+      )}
 
       <Card className="space-y-2">
         <h2 className="font-semibold">Copias locales automáticas</h2>

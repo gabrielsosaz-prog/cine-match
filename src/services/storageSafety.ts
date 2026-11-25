@@ -190,3 +190,45 @@ export async function listIndexedDbNames(): Promise<string[] | undefined> {
     return (await f.call(globalThis.indexedDB)).map((d) => d.name ?? '').filter(Boolean);
   } catch { return undefined; }
 }
+
+// ── Historial (sólo lectura) ──────────────────────────────────────────────────────────────────────────────────────
+
+export interface ActivitySummary {
+  byType: Record<string, number>;
+  firstSavedAt?: number;
+  lastSavedAt?: number;
+  /** Últimos eventos, del más nuevo al más viejo */
+  recent: { at: number; type: string; key?: string; detail?: string }[];
+  /** Cálculos de recomendaciones: cuántas valoraciones había en cada momento (muestra cuándo cayó el número) */
+  runs: { at: number; ratingsCount: number; trigger: string }[];
+  /** Títulos que el historial dice que valoraste y que hoy no tienen valoración (para revalorar si no hay respaldo) */
+  missingKeys: { key: string; title?: string; lastSavedAt: number }[];
+}
+
+/**
+ * Lee el registro de actividad, los cálculos guardados y la caché de fichas para reconstruir qué pasó y cuándo.
+ * No contiene notas (el registro sólo guarda qué título y qué campos cambiaron), pero dice cuándo bajó el número de
+ * valoraciones y qué títulos faltan. Sólo lectura.
+ */
+export async function activitySummary(profileId?: string): Promise<ActivitySummary> {
+  const logs = await db.logs.orderBy('at').toArray();
+  const byType: Record<string, number> = {};
+  const lastByKey = new Map<string, { at: number; deleted: boolean }>();
+  let firstSavedAt: number | undefined; let lastSavedAt: number | undefined;
+  for (const l of logs) {
+    if (profileId && l.profileId !== profileId && l.profileId !== '*') continue;
+    byType[l.type] = (byType[l.type] ?? 0) + 1;
+    if (l.type === 'rating_saved') { firstSavedAt ??= l.at; lastSavedAt = l.at; }
+    if (l.key && (l.type === 'rating_saved' || l.type === 'rating_deleted')) lastByKey.set(l.key, { at: l.at, deleted: l.type === 'rating_deleted' });
+  }
+  const recent = logs.filter((l) => !profileId || l.profileId === profileId || l.profileId === '*').slice(-15).reverse()
+    .map((l) => ({ at: l.at, type: l.type, key: l.key, detail: l.detail }));
+  const runs = (await db.runs.orderBy('createdAt').toArray())
+    .filter((r) => !profileId || r.profileId === profileId)
+    .map((r) => ({ at: r.createdAt, ratingsCount: r.ratingsCount, trigger: r.trigger }));
+  const present = new Set((await db.ratings.toArray()).map((r) => r.key as string));
+  const candidates = [...lastByKey].filter(([k, v]) => !v.deleted && !present.has(k));
+  const metas = await db.titles.bulkGet(candidates.map(([k]) => k));
+  const missingKeys = candidates.map(([key, v], i) => ({ key, title: metas[i]?.title, lastSavedAt: v.at })).sort((a, b) => b.lastSavedAt - a.lastSavedAt);
+  return { byType, firstSavedAt, lastSavedAt, recent, runs, missingKeys };
+}
