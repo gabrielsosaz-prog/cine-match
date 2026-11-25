@@ -1,3 +1,19 @@
+# Resultados de pruebas (v3.6, incidente de persistencia)
+
+- Vitest: **275/275 OK**. 28 nuevas en `tests/unit/v36-storage.test.ts`: instalación nueva sin escrituras; error al abrir
+  o al leer → «read-error» y ningún perfil creado; borrado de IndexedDB con registro intacto → «suspected-loss»; base
+  perdida sin registro pero con copias locales; pérdida parcial grande vs. pequeña; caída con la app abierta que no baja
+  el registro; borrar de a una no es pérdida; «Borrar todo» no dispara recuperación; registro corrupto; perfil vacío
+  activo con valoraciones en otro; perfil sin nombre o repetido; importación de un archivo viejo que no pisa lo más
+  nuevo y agrega lo que falta; vista previa sin escrituras; ajustes y nombres de perfiles intactos; copias locales
+  (sin vacías, espaciadas, el recorte conserva la mayor); flujo pérdida → restauración → estado sano sin duplicados;
+  el respaldo del 23/11 nunca se importa solo; historial de actividad (sólo lectura) con la caída y los títulos faltantes; recordatorio de copia externa; almacenamiento persistente denegado; y
+  montaje real de la app: ante pérdida o error muestra Recuperación, nunca la app vacía.
+- Playwright, Android Pixel 7 y Galaxy S5 (360 px): **76/76 OK**. Nuevos (`tests/e2e/v36.spec.ts`): base con 3 de 40
+  valoraciones abre Recuperación (no la bienvenida), vista previa de un respaldo (37 agregadas, 3 conservadas), fusión
+  que respeta la valoración más nueva; perfil sin nombre bloqueado y la bienvenida ofrece volver al perfil con datos;
+  estado de protección y copia externa sin token en Ajustes.
+
 # Resultados de pruebas (v3.5)
 
 Mismos cuatro tipos de prueba que en v3.4 (abajo), más una evaluación con el historial real de una persona que se corre

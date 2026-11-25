@@ -6,7 +6,9 @@ import { db } from '../db/db';
 import { createProfile, updateConfig, updateSettings } from '../db/repo';
 import { useApp } from '../hooks/useApp';
 import { genreNames } from '../services/catalog';
-import { deleteAllData, exportData, importData } from '../services/dataPortability';
+import { deleteAllData } from '../services/dataPortability';
+import { clearLocalBackups, saveExternalBackup } from '../services/backups';
+import { getPersistenceStatus, readLedger, requestPersistence, type PersistenceStatus } from '../services/storageSafety';
 import type { EngineChoice, PlatformId } from '../types';
 import { requestRecompute } from '../services/recompute';
 import { engineFor } from '../services/recommendations';
@@ -31,15 +33,31 @@ export default function Settings() {
   const set = (patch: Parameters<typeof updateSettings>[1]) => updateSettings(profileId, patch);
   const togglePlatform = (p: PlatformId) => set({ platforms: settings.platforms.includes(p) ? settings.platforms.filter((x) => x !== p) : [...settings.platforms, p] });
   const doExport = async () => {
-    const data = await exportData();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = `cine-match-${new Date().toISOString().slice(0, 10)}.json`; a.click();
-    setMsg(`Exportadas ${data.ratings.length} valoraciones.`);
+    try {
+      const r = await saveExternalBackup();
+      if (r.method !== 'cancelled') { setMsg(`Copia de ${r.total} valoraciones ${r.method === 'share' ? 'compartida' : 'descargada'}. Guardala fuera del teléfono (Drive, correo…).`); setLedger(readLedger()); }
+    } catch (e) { setMsg(`No se pudo crear la copia: ${(e as Error).message}`); }
   };
-  const doImport = async (f?: File) => {
-    if (!f) return;
-    try { const r = await importData(JSON.parse(await f.text())); setMsg(`Importadas ${r.ratings} valoraciones.`); } catch (e) { setMsg((e as Error).message); }
+  const [persist, setPersist] = useState<PersistenceStatus>(getPersistenceStatus());
+  const [ledger, setLedger] = useState(readLedger());
+  useEffect(() => { requestPersistence().then(setPersist).catch(() => undefined); }, []);
+  const counts = useLiveQuery(async () => {
+    const c: Record<string, number> = {};
+    await db.ratings.each((r) => { c[r.profileId] = (c[r.profileId] ?? 0) + 1; });
+    return c;
+  }) ?? {};
+  const [confirmDelete, setConfirmDelete] = useState('');
+  const doCreateProfile = async () => {
+    try {
+      const p = await createProfile(newProfile);
+      if (!confirm(`Se creó el perfil «${p.name}», sin valoraciones. ¿Cambiar a ese perfil ahora? Tus valoraciones quedan en el perfil actual.`)) { setNewProfile(''); return; }
+      setNewProfile(''); await updateConfig({ activeProfileId: p.id });
+    } catch (e) { setMsg((e as Error).message); }
+  };
+  const switchProfile = async (id: string, name: string) => {
+    if (id === profileId) return;
+    if (!confirm(`¿Cambiar al perfil «${name}» (${counts[id] ?? 0} valoraciones)? Las valoraciones de cada perfil se guardan por separado.`)) return;
+    await updateConfig({ activeProfileId: id });
   };
   return (
     <div className="space-y-4">
@@ -71,10 +89,11 @@ export default function Settings() {
       </Card>
       <Card className="space-y-2">
         <h2 className="font-semibold">Perfiles</h2>
-        <div className="flex flex-wrap gap-2">{profiles.map((p) => <Chip key={p.id} active={p.id === profileId} onClick={() => updateConfig({ activeProfileId: p.id })}>{p.name}</Chip>)}</div>
+        <p className="text-sm text-slate-300" data-testid="active-profile">Perfil activo: <b>{profiles.find((p) => p.id === profileId)?.name ?? profileId}</b> · {counts[profileId] ?? 0} valoraciones</p>
+        <div className="flex flex-wrap gap-2">{profiles.map((p) => <Chip key={p.id} active={p.id === profileId} onClick={() => switchProfile(p.id, p.name)}>{p.name} ({counts[p.id] ?? 0})</Chip>)}</div>
         <div className="flex gap-2">
           <input value={newProfile} onChange={(e) => setNewProfile(e.target.value)} placeholder="Nombre del nuevo perfil" className="min-w-0 flex-1 rounded-lg bg-ink-800 p-2 text-sm ring-1 ring-white/10" />
-          <button onClick={async () => { const p = await createProfile(newProfile); setNewProfile(''); await updateConfig({ activeProfileId: p.id }); }} className="rounded-lg bg-ink-700 px-3 text-sm">Crear</button>
+          <button disabled={!newProfile.trim()} onClick={doCreateProfile} className="rounded-lg bg-ink-700 px-3 text-sm disabled:opacity-40">Crear</button>
         </div>
       </Card>
       <Card className="space-y-2">
@@ -112,14 +131,27 @@ export default function Settings() {
         <Link to="/comparar" data-testid="ab-link" className="text-sm text-accent underline">Abrir comparación</Link>
         <p className="text-[11px] text-slate-500">Opcional. No cambia tus valoraciones ni el orden de «Para vos».</p>
       </Card>
-      <Card className="space-y-2">
-        <h2 className="font-semibold">Gestión de datos</h2>
+      <Card className="space-y-2" data-testid="backup-card">
+        <h2 className="font-semibold">Copias de seguridad</h2>
+        <p className="text-sm text-slate-300">Tus valoraciones viven en este navegador. Si el sistema o el navegador borran los datos del sitio, sólo una copia fuera del teléfono las salva.</p>
+        <ul className="text-xs text-slate-400">
+          <li data-testid="persist-status">Protección contra borrado automático: {persist.supported ? (persist.persisted ? 'activada' : 'no concedida por el navegador (instalá la app en la pantalla de inicio y usala seguido)') : 'no disponible en este navegador'}</li>
+          <li data-testid="last-backup">Última copia fuera del teléfono: {ledger?.lastExternalBackupAt ? new Date(ledger.lastExternalBackupAt).toLocaleDateString('es-AR') + ` (${ledger.lastExternalBackupTotal ?? 0} valoraciones)` : 'nunca'}</li>
+          <li>Copias locales automáticas: se guardan solas después de valorar (sirven si falla la app, no si se borra el navegador).</li>
+        </ul>
         <div className="flex flex-wrap gap-2">
-          <button onClick={doExport} className="rounded-lg bg-ink-700 px-3 py-2 text-sm">Exportar historial</button>
-          <label className="cursor-pointer rounded-lg bg-ink-700 px-3 py-2 text-sm">Importar<input type="file" accept="application/json" className="hidden" onChange={(e) => doImport(e.target.files?.[0])} /></label>
-          <button onClick={async () => { if (confirm('¿Borrar todos tus datos de este dispositivo? No se puede deshacer.')) { await deleteAllData(); location.reload(); } }} className="rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-200">Borrar todos mis datos</button>
+          <button onClick={doExport} data-testid="backup-now" className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-ink-950">Guardar copia fuera del teléfono</button>
+          <Link to="/recuperar" data-testid="recovery-link" className="rounded-lg bg-ink-700 px-3 py-2 text-sm">Importar o recuperar</Link>
         </div>
-        <p className="text-[11px] text-slate-500">Tus datos se guardan sólo en este dispositivo. No hay cuentas ni servidores propios. La exportación no incluye tu clave.</p>
+        <p className="text-[11px] text-slate-500">La copia es un archivo JSON con todos los perfiles; no incluye tu clave. Importar nunca pisa valoraciones más nuevas y siempre muestra antes qué va a cambiar.</p>
+      </Card>
+      <Card className="space-y-2">
+        <h2 className="font-semibold">Borrar datos</h2>
+        <p className="text-sm text-slate-300">Borra valoraciones, perfiles, ajustes y copias locales de este dispositivo. No se puede deshacer. Escribí <b>BORRAR</b> para habilitarlo.</p>
+        <div className="flex gap-2">
+          <input value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} aria-label="Confirmación de borrado" className="min-w-0 flex-1 rounded-lg bg-ink-800 p-2 text-sm ring-1 ring-white/10" />
+          <button disabled={confirmDelete.trim() !== 'BORRAR'} onClick={async () => { await deleteAllData(); await clearLocalBackups().catch(() => undefined); location.reload(); }} className="rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-200 disabled:opacity-40">Borrar todo</button>
+        </div>
       </Card>
       <p className="text-center text-[10px] text-slate-500">Cine Match AI · motor {engineFor(settings).version}<br />Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB. Disponibilidad provista por JustWatch a través de TMDB.</p>
     </div>
