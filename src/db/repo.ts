@@ -57,7 +57,12 @@ export async function updateSettings(profileId: string, patch: Partial<ProfileSe
 }
 
 export async function createProfile(name: string): Promise<Profile> {
-  const p: Profile = { id: `p-${Date.now().toString(36)}`, name: name.trim() || 'Perfil', createdAt: Date.now() };
+  // v3.6: un toque accidental en «Crear» con el nombre vacío creaba un perfil «Perfil», lo activaba y la app mostraba
+  // la bienvenida como si se hubieran perdido las valoraciones. Ahora el nombre es obligatorio y no se repite.
+  const clean = name.trim();
+  if (!clean) throw new Error('Escribí un nombre para el perfil nuevo.');
+  if ((await db.profiles.toArray()).some((p) => p.name.trim().toLowerCase() === clean.toLowerCase())) throw new Error(`Ya existe un perfil «${clean}».`);
+  const p: Profile = { id: `p-${Date.now().toString(36)}`, name: clean, createdAt: Date.now() };
   await db.profiles.put(p);
   await db.settings.put(defaultSettings(p.id));
   return p;

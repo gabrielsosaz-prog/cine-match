@@ -2,6 +2,8 @@ import { db } from '../db/db';
 import { deleteRating, saveRating, type RatingPatch } from '../db/repo';
 import { getEngine } from './recommendations';
 import { requestRecompute } from './recompute';
+import { recordLedgerSoon } from './storageSafety';
+import { scheduleLocalBackup } from './backups';
 import type { Rating, RecommendationRun, TitleKey } from '../types';
 
 /** ¿El cambio afecta lo que el motor aprende? Marcar «vista» no: no es una señal de gusto. */
@@ -48,6 +50,9 @@ export async function rateAndLearn(profileId: string, key: TitleKey, patch: Rati
   // de la misma transacción atómica de lectura-modificación-escritura)
   const confirmed = rating ? Boolean(stored && stored.updatedAt >= rating.updatedAt) : !stored || stored.updatedAt > Date.now() - 60000;
   if (!confirmed) throw new SaveError('No se pudo confirmar el guardado. Probá de nuevo.');
+  // Registro de control fuera de IndexedDB + copia local automática (v3.6): permiten detectar y revertir una pérdida
+  recordLedgerSoon(profileId);
+  scheduleLocalBackup();
   db.logs.add({ profileId, at: Date.now(), type: 'rating_saved', key, algorithmVersion: getEngine().version, detail: JSON.stringify(Object.keys(patch)) }).catch(() => undefined);
   const res: SaveResult = { rating, confirmed };
   if (affectsLearning(patch)) {
@@ -69,6 +74,7 @@ export async function setNotInterested(profileId: string, key: TitleKey, value: 
 
 export async function removeAndLearn(profileId: string, key: TitleKey) {
   await deleteRating(profileId, key);
+  recordLedgerSoon(profileId);
   await db.logs.add({ profileId, at: Date.now(), type: 'rating_deleted', key, algorithmVersion: getEngine().version });
   return requestRecompute(profileId, { trigger: 'valoración eliminada' }, 600);
 }

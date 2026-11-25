@@ -4,11 +4,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useRatings } from '../hooks/useRatings';
 import { COUNTRIES, PLATFORMS } from '../constants';
 import { db } from '../db/db';
-import { saveRating, updateSettings } from '../db/repo';
+import { saveRating, updateConfig, updateSettings } from '../db/repo';
 import { useApp } from '../hooks/useApp';
 import { friendlyError } from '../providers/errors';
 import { discoverCandidates } from '../services/catalog';
 import { requestRecompute } from '../services/recompute';
+import { recordLedgerSoon } from '../services/storageSafety';
+import { scheduleLocalBackup } from '../services/backups';
 import type { PlatformId, TitleKey } from '../types';
 import type { RatingPatch } from '../db/repo';
 import { migrateRating } from '../db/migrations';
@@ -37,7 +39,7 @@ export function diversePicks(lists: SearchResult[][], n = 24): SearchResult[] {
 function QuickRate({ r, profileId, onDone }: { r: SearchResult; profileId: string; onDone: () => void }) {
   const existing = useLiveQuery(() => db.ratings.get(`${profileId}|${r.key}`).then((x) => (x ? migrateRating(x) : undefined)), [r.key]);
   // En este paso se puntúa lo que ya viste: la nota rápida marca «vista» de forma explícita (se puede cambiar luego)
-  const set = async (patch: RatingPatch) => { await saveRating(profileId, r.key as TitleKey, patch); onDone(); };
+  const set = async (patch: RatingPatch) => { await saveRating(profileId, r.key as TitleKey, patch); recordLedgerSoon(profileId); scheduleLocalBackup(); onDone(); };
   return (
     <div className="rounded-2xl bg-ink-900 p-2.5 ring-1 ring-white/5" data-testid="quick-card">
       <div className="flex gap-2.5">
@@ -72,6 +74,21 @@ export default function Onboarding() {
   const [busy, setBusy] = useState(false);
   const { hits } = useSearch(q, settings.language, settings.country);
   const count = useRatings(profileId).ratings.length;
+  // v3.6: si llegaste acá por cambiar a un perfil vacío, tus valoraciones están en otro perfil: se ofrece volver
+  const other = useLiveQuery(async () => {
+    const counts: Record<string, number> = {};
+    await db.ratings.each((r) => { if (r.profileId !== profileId) counts[r.profileId] = (counts[r.profileId] ?? 0) + 1; });
+    const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    if (!best) return undefined;
+    const p = await db.profiles.get(best[0]);
+    return { id: best[0], name: p?.name ?? best[0], count: best[1] };
+  }, [profileId]);
+  const otherNote = other && (
+    <div data-testid="ob-other-profile" className="rounded-xl bg-amber-500/10 p-3 text-sm text-amber-100 ring-1 ring-amber-400/30">
+      Este perfil está vacío. Tus {other.count} valoraciones están en el perfil «{other.name}».
+      <button onClick={async () => { await updateConfig({ activeProfileId: other.id }); location.hash = '#/'; location.reload(); }} data-testid="ob-other-switch" className="ml-1 font-semibold text-accent underline">Volver a «{other.name}»</button>
+    </div>
+  );
   useEffect(() => {
     if (step !== 2 || picks.length) return;
     const base = { language: settings.language, country: settings.country, providerIds: [] as number[], sort: 'vote_count.desc', minVotes: 2000 };
@@ -89,6 +106,7 @@ export default function Onboarding() {
   if (step === 1) return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Bienvenido a Cine Match <span className="text-accent">AI</span></h1>
+      {otherNote}
       <p className="text-slate-300">Paso 1 de 3 · ¿Qué plataformas usás?</p>
       <div className="flex flex-wrap gap-2">{PLATFORMS.map((p) => <Chip key={p.id} testId={`ob-${p.id}`} active={settings.platforms.includes(p.id)} onClick={() => updateSettings(profileId, { platforms: settings.platforms.includes(p.id) ? settings.platforms.filter((x) => x !== p.id) : [...settings.platforms, p.id as PlatformId] })}>{p.label}</Chip>)}</div>
       <label className="block text-sm">País
@@ -99,6 +117,7 @@ export default function Onboarding() {
   );
   return (
     <div className="space-y-4">
+      {otherNote}
       <p className="text-slate-300">Paso 2 de 3 · Puntuá rápido lo que ya viste (nota general del 1 al 10; queda marcada como vista). Podés saltear los que no viste. Más adelante podés puntuar cada aspecto.</p>
       <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar una película o serie que conozcas…" className="w-full rounded-xl bg-ink-800 px-4 py-3 ring-1 ring-white/10" data-testid="ob-search" />
       {q.trim().length >= 2 ? <SearchResults hits={hits} country={settings.country} profileId={profileId} /> : (

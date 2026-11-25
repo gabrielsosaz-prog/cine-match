@@ -33,8 +33,8 @@ onDbEvent((e) => pushNotice({
   action: { label: 'Recargar', run: () => location.reload() },
 }));
 
-// Pedir almacenamiento persistente: reduce el riesgo de que el sistema borre la base por falta de espacio
-navigator.storage?.persist?.().catch(() => undefined);
+// El pedido de almacenamiento persistente se hace en AppProvider (storageSafety.requestPersistence), que además
+// registra si se concedió para mostrarlo en Ajustes.
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

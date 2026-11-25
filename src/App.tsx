@@ -12,6 +12,7 @@ import Setup from './pages/Setup';
 import Pending from './pages/Pending';
 import Similar from './pages/Similar';
 import Person from './pages/Person';
+import Recovery from './pages/Recovery';
 const Compare = lazy(() => import('./pages/Compare'));
 import { ScrollToTopOnPush } from './hooks/useScrollRestore';
 import ErrorBoundary from './ui/ErrorBoundary';
@@ -30,7 +31,7 @@ export default function App() {
   const { config, settings } = useApp();
   const loc = useLocation();
   const hasSource = Boolean(config.tmdbToken || config.proxyUrl);
-  const free = ['/ajustes', '/configurar'].some((p) => loc.pathname.startsWith(p));
+  const free = ['/ajustes', '/configurar', '/recuperar'].some((p) => loc.pathname.startsWith(p));
   if (!hasSource && !free) return <Navigate to="/configurar" replace />;
   if (hasSource && !settings.onboarded && !free && loc.pathname !== '/bienvenida') return <Navigate to="/bienvenida" replace />;
   const showNav = !['/bienvenida', '/configurar'].includes(loc.pathname);
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/comparar" element={<Suspense fallback={<p className="text-sm text-slate-400">Cargando…</p>}><Compare /></Suspense>} />
           <Route path="/bienvenida" element={<Onboarding />} />
           <Route path="/configurar" element={<Setup />} />
+          <Route path="/recuperar" element={<Recovery />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </ErrorBoundary>
