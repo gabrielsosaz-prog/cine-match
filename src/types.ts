@@ -186,7 +186,54 @@ export interface ProfileSettings {
   /** Momento del último cambio de motor: los rankings anteriores no se muestran (caché invalidada). */
   engineChangedAt?: number;
 }
-export type EngineChoice = 'v3.4' | 'v3.5';
+export type EngineChoice = 'v3.4' | 'v3.5' | 'v4.0';
+
+/** v4.0 · Nivel de una preferencia del perfil de gustos: no se aplica, flexible (suma/resta) o exclusión estricta. */
+export type TasteLevel = 'off' | 'on' | 'strict';
+/** v4.0 · «Mi perfil de gustos» (editable en Ajustes). Se guarda sólo en el dispositivo y viaja en la exportación. */
+export interface TasteProfile {
+  profileId: string;
+  version: 1;
+  /** Preferencias por id (ver engine/attraction PREFS). Ausente = 'off'. */
+  prefs: Partial<Record<string, TasteLevel>>;
+  /** Títulos de referencia que te atraen (premisas elegidas en el cuestionario, editables) */
+  anchors: TitleKey[];
+  /** Notas libres del cuestionario (referencia; el motor no las usa) */
+  notes: { q: string; a: string }[];
+  /** Origen de los datos (p. ej. «cuestionario 26/11 + catas») */
+  source?: string;
+  updatedAt: number;
+}
+/** v4.0 · Respuesta de interés ANTES de ver (no es una valoración). */
+export type InterestAnswer = 'no' | 'quiza' | 'si' | 'mucho' | 'visto';
+export interface InterestRecord {
+  id: string; // `${profileId}|${key}|${at}`
+  profileId: string;
+  key: TitleKey;
+  answer: InterestAnswer;
+  /** Nota opcional si respondió «Ya la vi» */
+  seenRating?: number;
+  at: number;
+  /** Motor y versión que mostró el título (para evaluar motores) */
+  engine?: string;
+  /** Puesto en el ranking cuando se respondió */
+  rank?: number;
+  /** Origen: 'app' (Para vos), 'cata-1', 'cata-2', 'importado' */
+  source?: string;
+}
+/** v4.0 · Registro de una recomendación mostrada (motor, versión, puesto), para vincularla con lo que pase después. */
+export interface ShownRecord {
+  id: string; // `${profileId}|${key}|${engine}`
+  profileId: string;
+  key: TitleKey;
+  engine: string;
+  firstAt: number;
+  lastAt: number;
+  bestRank: number;
+  /** Puntajes del primer registro (para comparar con la nota posterior) */
+  attraction?: number;
+  satisfaction?: number;
+}
 
 export interface AppConfig {
   id: 'app';
@@ -220,6 +267,20 @@ export interface RecommendationItem {
   prefs?: { delta: number; matches: { id: string; label: string; polarity: 1 | -1; evidence: string[] }[]; unknown: string[] };
   /** v3.4: posición que tenía según el motor antes de aplicar preferencias */
   engineRank?: number;
+  /** v4.0: puntajes del motor de atractivo (separados de la nota «Para vos») */
+  attraction?: {
+    /** Puntaje relativo de atractivo (no es probabilidad) */
+    value: number;
+    /** Posición relativa entre los candidatos de la tanda (0-1) */
+    percentile: number;
+    level: 'muy alta' | 'alta' | 'media' | 'baja';
+    /** Satisfacción estimada (escala 1-10), fiabilidad baja hasta tener notas posteriores */
+    satisfaction: number;
+    satisfactionReliable: boolean;
+    pros: string[];
+    cons: string[];
+    similar: string[];
+  };
 }
 
 export type ChannelId = 'theme' | 'comments' | 'aspects' | 'actors' | 'crew' | 'narrative' | 'similar' | 'genre' | 'format' | 'rejection' | 'quality';

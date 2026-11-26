@@ -67,7 +67,7 @@ describe('Migración de datos de la v1', () => {
     const all = await listRatings(P);
     expect(all.find((x) => x.key === 'movie:9')).toMatchObject({ watched: true, overall: 8 });
     const out = await exportData();
-    expect(out.format).toBe('cine-match-export/3');
+    expect(out.format).toBe('cine-match-export/4') // v4.0: formato actual;
     expect(out.ratings.every((x: Rating) => x.schema === 3)).toBe(true);
   });
 
@@ -215,9 +215,9 @@ describe('Aprendizaje con puntuaciones por aspecto', () => {
   });
 });
 
-it('la base nueva abre vacía sin errores (versión 3)', async () => {
+it('la base nueva abre vacía sin errores (versión 4 desde Cine Match 4.0)', async () => {
   const d = new CineDB(`fresh-${Date.now()}`);
   await d.open();
-  expect(d.verno).toBe(3);
+  expect(d.verno).toBe(4);
   d.close();
 });

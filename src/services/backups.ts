@@ -67,7 +67,8 @@ export async function createLocalBackup(reason: LocalBackup['reason'] = 'auto'):
   if (!total) return undefined;
   if (reason === 'auto') {
     const last = await bdb.backups.orderBy('at').last();
-    if (last && Date.now() - last.at < BACKUP_POLICY.autoIntervalMs && last.total === total) return undefined;
+    const extra = (x: typeof data) => (x.interests?.length ?? 0) + (x.taste?.reduce((m, t) => Math.max(m, t.updatedAt ?? 0), 0) ?? 0);
+    if (last && Date.now() - last.at < BACKUP_POLICY.autoIntervalMs && last.total === total && extra(last.data) === extra(data)) return undefined;
   }
   const counts: Record<string, number> = {};
   for (const r of data.ratings) counts[r.profileId] = (counts[r.profileId] ?? 0) + 1;

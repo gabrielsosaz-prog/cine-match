@@ -12,11 +12,13 @@ import { ENGINE_LABEL, engineFor, hintsFromFilters, rankWithFilters } from '../s
 import { TrailerButton } from '../ui/Trailer';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
 import { activeFilters, filterLabel, includedPeople, loadFilters, saveFilters, without, type RankFilters, type WatchedFilter } from '../services/filters';
-import type { AvailabilitySnapshot, MediaType, Named, PlatformId, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
+import type { AvailabilitySnapshot, InterestAnswer, MediaType, Named, PlatformId, Rating, RecommendationItem, RecommendationRun, TitleKey, TitleMeta } from '../types';
 import { AvailabilityLine, ChannelBars, Chip, Empty, ErrorNote, Poster, personalState, publicScore, ScorePair, Spinner, TitleLink, TypeBadge, PlatformPill } from '../ui/components';
 import { safely } from '../services/notices';
 import { oneOf, usePersistentState } from '../hooks/usePersistentState';
 import FilterPanel from '../ui/FilterPanel';
+import { AttractionScores, AttractionWhy, InterestButtons } from '../ui/AttractionParts';
+import { interestMap, recordInterest } from '../services/taste';
 import RatingEditor, { readDraft } from '../ui/RatingEditor';
 import { num, relTime } from '../ui/format';
 
@@ -47,7 +49,7 @@ interface CardProps {
   editing?: Editing; onEdit: (e?: Editing) => void; onSave: (p: Promise<unknown>) => void; onTouch: (k: TitleKey) => void;
 }
 
-function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, onSave, onTouch, strictScore, diag }: CardProps & { strictScore?: boolean; diag?: Diagnostic }) {
+function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, onSave, onTouch, strictScore, diag, interest, engineVersion }: CardProps & { strictScore?: boolean; diag?: Diagnostic; interest?: InterestAnswer; engineVersion?: string }) {
   const [open, setOpen] = useState(false);
   const watched = rating?.watched ?? false;
   const dismissed = Boolean(rating?.notInterested);
@@ -69,28 +71,32 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             <span className="text-sm font-bold text-slate-500">#{item.rank}</span>
             <TitleLink k={item.key} className="min-w-0 flex-1"><h3 className="line-clamp-2 font-semibold leading-tight">{meta.title}</h3></TitleLink>
           </div>
-          <div className="mt-1"><ScorePair item={shownItem} meta={meta} userScore={rating?.overall} compact /></div>
+          {shownItem.attraction
+            ? <div className="mt-1"><AttractionScores a={shownItem.attraction} meta={meta} /></div>
+            : <div className="mt-1"><ScorePair item={shownItem} meta={meta} userScore={rating?.overall} compact /></div>}
           {newer !== undefined && <p className="text-[10px] text-slate-500" data-testid="newer-estimate">Nueva estimación: {num(newer)} (se reordena al tocar «Actualizar ranking»)</p>}
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
             <TypeBadge type={meta.type} />{meta.year && <span>{meta.year}</span>}
-            <span className={`rounded px-1.5 py-0.5 text-[10px] ${shownItem.confidenceLabel === 'alta' ? 'bg-emerald-500/15 text-emerald-300' : shownItem.confidenceLabel === 'media' ? 'bg-sky-500/15 text-sky-300' : 'bg-slate-500/15 text-slate-300'}`}>confianza {shownItem.confidenceLabel}</span>
+            {!shownItem.attraction && <span className={`rounded px-1.5 py-0.5 text-[10px] ${shownItem.confidenceLabel === 'alta' ? 'bg-emerald-500/15 text-emerald-300' : shownItem.confidenceLabel === 'media' ? 'bg-sky-500/15 text-sky-300' : 'bg-slate-500/15 text-slate-300'}`}>confianza {shownItem.confidenceLabel}</span>}
+            {rating?.overall !== undefined && shownItem.attraction && <span className="text-[10px] text-emerald-300">tu nota {num(rating.overall)}</span>}
             {item.exploration && <span className="rounded bg-fuchsia-500/15 px-1.5 py-0.5 text-[10px] text-fuchsia-300">exploración</span>}
-            {rating?.overall !== undefined && <span className="text-[10px]" data-testid="estimate-separate">estimación para vos {num(shownItem.score)} (aparte de tu nota)</span>}
+            {rating?.overall !== undefined && !shownItem.attraction && <span className="text-[10px]" data-testid="estimate-separate">estimación para vos {num(shownItem.score)} (aparte de tu nota)</span>}
             {shownItem.lowEvidence && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200" data-testid="low-evidence">provisional: pocos datos</span>}
             {hasDraft && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300">borrador</span>}
           </div>
           <div className="mt-1.5"><AvailabilityLine snap={snap} compact /></div>
-          <button type="button" onClick={() => setOpen(!open)} className="mt-1.5 text-left text-xs text-slate-300" data-testid="rec-explanation">
+          {shownItem.attraction && <AttractionWhy a={shownItem.attraction} />}
+          {!shownItem.attraction && <button type="button" onClick={() => setOpen(!open)} className="mt-1.5 text-left text-xs text-slate-300" data-testid="rec-explanation">
             {open ? shownItem.explanation.map((l, i) => <p key={i} className="mb-0.5">• {l}</p>) : <span className="line-clamp-2">{shownItem.explanation[0]}</span>}
             {open && dims.length > 0 && <p className="mt-1 text-[11px] text-slate-400">Estimado para vos: {dims.map(([d, v]) => `${DIMENSIONS.find((x) => x.id === d)!.short} ${num(v)}★`).join(' · ')}</p>}
-          </button>
+          </button>}
           {item.prefs && item.prefs.matches.length > 0 && (
             <p className="mt-1 text-[11px] text-sky-200" data-testid="rec-prefs">
               {item.prefs.matches.map((m) => `${m.polarity < 0 ? 'Baja por' : 'Sube por'} «${m.label}» (TMDB: ${m.evidence.join(', ')})`).join(' · ')}
             </p>
           )}
           {diag && <DiagnosticPanel d={diag} />}
-          {open && (
+          {open && !shownItem.attraction && (
             <div className="mt-2 rounded-lg bg-ink-950/60 p-2">
               {shownItem.lowEvidence && <p className="mb-1 text-[11px] text-amber-200">Este título se sumó con una búsqueda en TMDB para tus filtros y tu historial casi no tiene información sobre algo parecido: la estimación es de baja confianza y se apoya en datos públicos.</p>}
               <ChannelBars channels={shownItem.channels} base={shownItem.base} score={shownItem.score} />
@@ -123,6 +129,10 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
             ✕ No me interesa
           </button>
         </div>
+      )}
+      {shownItem.attraction && !dismissed && (
+        <InterestButtons value={interest} title={meta.title}
+          onPick={(a) => { onTouch(item.key); onSave(safely(() => recordInterest(profileId, item.key, a, { engine: engineVersion, rank: item.rank }), 'tu respuesta')); }} />
       )}
       {quickOpen && !dismissed && (
         <div className="mt-2" data-testid="quick-score-row">
@@ -242,6 +252,7 @@ export default function Home() {
   }, [eligibleMetas]);
   const rs = useRatings(profileId);
   const ratings = rs.byKey;
+  const interests = useLiveQuery(() => interestMap(profileId), [profileId]);
   const liveItems = useMemo(() => new Map((latest?.items ?? []).map((i) => [i.key, i])), [latest?.id]);
   const pendingCount = [...ratings.values()].filter((r) => r.list === 'want' || r.list === 'watching').length;
   const events = useLiveQuery(() => db.availabilityEvents.where('country').equals(settings.country).reverse().sortBy('detectedAt').then((e) => e.slice(0, 6)), [settings.country]);
@@ -289,6 +300,7 @@ export default function Home() {
             <p className="text-[11px] text-slate-500" data-testid="engine-badge" data-engine={ENGINE_LABEL[shown.algorithmVersion] ?? shown.algorithmVersion}>
               Motor: {ENGINE_LABEL[shown.algorithmVersion] ?? shown.algorithmVersion}
               {ENGINE_LABEL[shown.algorithmVersion] === 'v3.5' && ' (experimental) · ordena v3.5; la nota «Para vos» es la estimación de v3.4'}
+              {ENGINE_LABEL[shown.algorithmVersion] === 'v4.0' && ' (experimental) · ordena por atractivo para vos; la compatibilidad es relativa, no una probabilidad'}
             </p>
           )}
         </div>
@@ -386,7 +398,7 @@ export default function Home() {
               <Poster path={meta!.backdropPath ?? meta!.posterPath} size="w780" title={meta!.title} className="aspect-video w-full" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
               <div className="absolute bottom-0 p-3">
-                <div className="text-xs font-semibold text-accent">#{item.rank} · Para vos {num(item.score)}{publicScore(meta) !== undefined ? ` · TMDB ${num(publicScore(meta))}` : ''}</div>
+                <div className="text-xs font-semibold text-accent">#{item.rank} · {item.attraction ? `Compatibilidad ${item.attraction.level}` : `Para vos ${num(item.score)}`}{publicScore(meta) !== undefined ? ` · TMDB ${num(publicScore(meta))}` : ''}</div>
                 <div className="text-lg font-bold leading-tight">{meta!.title}</div>
               </div>
             </TitleLink>
@@ -421,7 +433,7 @@ export default function Home() {
       )}
       <ol className="space-y-3" aria-label="Ranking personalizado">
         {pageRows.map((r) => (
-          <RecCard key={r.key} diag={diagOn ? diagnose(r.item, r.meta!, filters, { genre: genreName, platform: platformName as never }) : undefined} strictScore={sort === 'affinity'} item={r.item} live={liveItems.get(r.key)} meta={r.meta!} snap={r.snap} rating={ratings.get(r.key)} profileId={profileId}
+          <RecCard key={r.key} diag={diagOn ? diagnose(r.item, r.meta!, filters, { genre: genreName, platform: platformName as never }) : undefined} strictScore={sort === 'affinity'} interest={interests?.get(r.key)?.answer} engineVersion={shown?.algorithmVersion} item={r.item} live={liveItems.get(r.key)} meta={r.meta!} snap={r.snap} rating={ratings.get(r.key)} profileId={profileId}
             editing={editing?.key === r.key ? editing : undefined}
             onEdit={setEditing} onSave={trackSave}
             onTouch={(k) => setTouched((s) => (s.has(k) ? s : new Set(s).add(k)))} />

@@ -5,5 +5,6 @@
  "titles": 6558,
  "embedded": 6551,
  "model": "Xenova/bge-small-en-v1.5",
- "audience": "v2026-11-22/audience-2026-11-23.json"
+ "audience": "v2026-11-22/audience-2026-11-23.json",
+ "attractionFlags": "v2026-11-22/attraction-flags.json"
 }

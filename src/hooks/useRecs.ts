@@ -32,7 +32,7 @@ export function useRecommendations(profileId: string) {
     // reconstruye sólo si no hay ninguno o el último es de una versión desconocida del motor.
     Promise.all([currentRun(profileId, settings), latestRun(profileId)]).then(([r, any]) => {
       const stale = !r || Date.now() - r.createdAt > 12 * 3600 * 1000;
-      const known = any && [engineFor({ engine: 'v3.4' }).version, engineFor({ engine: 'v3.5' }).version].includes(any.algorithmVersion);
+      const known = any && [engineFor({ engine: 'v3.4' }).version, engineFor({ engine: 'v3.5' }).version, engineFor({ engine: 'v4.0' }).version].includes(any.algorithmVersion);
       if (stale) refresh({ trigger: 'apertura', rebuild: !any || !known });
     }).catch(() => undefined);
   }, [profileId, refresh, engineKey]);
