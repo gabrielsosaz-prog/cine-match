@@ -1,8 +1,8 @@
 import Dexie, { type Table } from 'dexie';
 import { migrateRating } from './migrations';
 import type {
-  ActivityLog, AppConfig, AvailabilityEvent, AvailabilitySnapshot, Profile, ProfileSettings,
-  ProfileSnapshot, Rating, RecommendationRun, TitleMeta,
+  ActivityLog, AppConfig, AvailabilityEvent, AvailabilitySnapshot, InterestRecord, Profile, ProfileSettings,
+  ProfileSnapshot, Rating, RecommendationRun, ShownRecord, TasteProfile, TitleMeta,
 } from '../types';
 
 /**
@@ -21,6 +21,10 @@ export class CineDB extends Dexie {
   runs!: Table<RecommendationRun, number>;
   snapshots!: Table<ProfileSnapshot, number>;
   logs!: Table<ActivityLog, number>;
+  /** v4.0: perfil de gustos, respuestas de interés y recomendaciones mostradas por motor */
+  taste!: Table<TasteProfile, string>;
+  interests!: Table<InterestRecord, string>;
+  shown!: Table<ShownRecord, string>;
 
   constructor(name = 'cine-match') {
     super(name);
@@ -45,6 +49,12 @@ export class CineDB extends Dexie {
     this.version(3)
       .stores({ ratings: 'id, profileId, key, updatedAt, [profileId+list]' })
       .upgrade((tx) => tx.table('ratings').toCollection().modify((r: any, ref: { value: unknown }) => { ref.value = migrateRating(r); }));
+    // v4 (Cine Match 4.0 experimental): tablas NUEVAS; las existentes no cambian (sin migración de datos).
+    this.version(4).stores({
+      taste: 'profileId',
+      interests: 'id, profileId, key, at, [profileId+key]',
+      shown: 'id, profileId, key, engine',
+    });
     // Otra instancia de la app (p. ej. tras actualizarse la PWA) necesita una versión nueva de la base:
     // se avisa para recargar en vez de quedar con una conexión cerrada a mitad de un guardado.
     this.on('versionchange', () => { emitDbEvent('versionchange'); });

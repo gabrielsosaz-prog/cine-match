@@ -4,7 +4,10 @@ import { getSettings, listRatings } from '../db/repo';
 import { featureLabel, describeFeatures } from '../engine/features';
 import { hybridEngine, setDefaultNarrative, type RecommenderEngine } from '../engine/recommender';
 import { personalEngine } from '../engine/personalEngine';
-import { getNarrativeIndex, loadNarrativeIndex, metaFromCatalog } from './narrativeCatalog';
+import { attractionEngine } from '../engine/attractionEngine';
+import { catalogCandidates, type AttractionContext } from '../engine/attraction';
+import { getNarrativeIndex, loadAttractionFlags, loadNarrativeIndex, metaFromCatalog } from './narrativeCatalog';
+import { getTaste, listInterests, recordShown } from './taste';
 import type { NarrativeIndex } from '../engine/narrative';
 import { friendlyError } from '../providers/errors';
 import { META_VERSION } from '../providers/tmdb';
@@ -19,8 +22,17 @@ import { discoverCandidates, ensureFullTitles, genreNames, getTitle, personFilmo
 import type { UserProfile } from '../engine/profile';
 
 /** v3.5: motores que se pueden elegir en Ajustes («Motor de recomendaciones»). v3.4 es el predeterminado. */
-export const ENGINES: Record<EngineChoice, RecommenderEngine> = { 'v3.4': hybridEngine, 'v3.5': personalEngine };
-export const ENGINE_LABEL: Record<string, EngineChoice> = { [hybridEngine.version]: 'v3.4', [personalEngine.version]: 'v3.5' };
+export const ENGINES: Record<EngineChoice, RecommenderEngine> = { 'v3.4': hybridEngine, 'v3.5': personalEngine, 'v4.0': attractionEngine };
+export const ENGINE_LABEL: Record<string, EngineChoice> = { [hybridEngine.version]: 'v3.4', [personalEngine.version]: 'v3.5', [attractionEngine.version]: 'v4.0' };
+export const isAttraction = (e: RecommenderEngine) => e.version === attractionEngine.version;
+
+/** v4.0: contexto del motor de atractivo (perfil de gustos, respuestas, marcas del catálogo). */
+export async function attractionContext(profileId: string, ratings: Rating[], idx?: NarrativeIndex): Promise<AttractionContext | undefined> {
+  const nidx = idx ?? getNarrativeIndex() ?? (await narrativeReady(8000));
+  if (!nidx) return undefined;
+  const [taste, interests, flags] = await Promise.all([getTaste(profileId), listInterests(profileId), loadAttractionFlags()]);
+  return { idx: nidx, flags, ratings, interests, taste };
+}
 let override: RecommenderEngine | undefined;
 /** Permite sustituir el motor en pruebas sin tocar el resto de la app (tiene prioridad sobre la elección del perfil) */
 export function setEngine(e: RecommenderEngine | undefined) { override = e; }
@@ -169,6 +181,7 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
   const settings = await getSettings(profileId);
   // v3.5: el motor elegido en Ajustes (v3.4 por defecto); el ranking queda marcado con su versión
   const engine = engineFor(settings);
+  if (isAttraction(engine)) return refreshAttraction(profileId, settings, o, nidx);
   const opts = { language: settings.language, country: settings.country };
   const ratings = await listRatings(profileId);
   const last = await latestRun(profileId);
@@ -240,11 +253,62 @@ export async function refreshRecommendations(profileId: string, o: RefreshOption
     eligible: [...availOk].filter((k) => !blocked.has(k)),
   };
   run.id = await db.runs.add(run);
+  await recordShown(profileId, engine.version, unwatched).catch(() => undefined);
   // Mantener sólo los últimos 5 cálculos (cada uno guarda el conjunto de candidatos); se borran por clave
   const ids = await db.runs.where('profileId').equals(profileId).primaryKeys();
   if (ids.length > 5) await db.runs.bulkDelete(ids.slice(0, ids.length - 5));
   await recordSnapshot(profileId, profile2, all, engine.version);
   await db.logs.add({ profileId, at: Date.now(), type: 'recs_updated', algorithmVersion: engine.version, detail: `${o.trigger}: ${items.length} recomendaciones` });
+  return run;
+}
+
+/**
+ * v4.0 · Cálculo con el motor de atractivo, con los MISMOS candidatos que el prototipo ganador: títulos del catálogo
+ * narrativo en tus plataformas (según el catálogo) con ≥ 80 votos y sin registro tuyo. Se puntúan todos (local,
+ * rápido); para los mejores se confirma la disponibilidad real con TMDB y se completa la ficha.
+ */
+async function refreshAttraction(profileId: string, settings: ProfileSettings, o: RefreshOptions, nidx?: NarrativeIndex): Promise<RecommendationRun> {
+  const engine = attractionEngine;
+  const opts = { language: settings.language, country: settings.country };
+  const ratings = await listRatings(profileId);
+  const ctx = await attractionContext(profileId, ratings, nidx);
+  if (!ctx) throw new Error('El motor v4.0 necesita el catálogo narrativo y no se pudo cargar. Revisá la conexión y probá de nuevo.');
+  let warning: string | undefined;
+  const pool = catalogCandidates(ctx.idx, providerIds(settings), ratings, ctx.interests);
+  // Fichas básicas desde el catálogo para todo el historial y los candidatos (sin pedir nada a TMDB)
+  const histKeys = ratings.map((r) => r.key);
+  let all = await titleMap([...histKeys, ...pool]);
+  const names = await genreNames(settings.language).catch(() => new Map<number, string>());
+  const add = pool.filter((k) => !all.has(k)).map((k) => metaFromCatalog(ctx.idx, k, names)).filter((m): m is TitleMeta => Boolean(m));
+  if (add.length) { await db.titles.bulkPut(add).catch(() => undefined); all = await titleMap([...histKeys, ...pool]); }
+  const profile = engine.buildProfile(ratings, all, settings);
+  await yieldToUi();
+  const pre = engine.rank({ profile, ratings, titles: all, candidates: pool, settings, limit: 400, attraction: ctx });
+  // Disponibilidad real (TMDB) para los mejores, en tandas, hasta tener suficientes confirmados
+  const order = pre.map((p) => p.key);
+  const okAvail = new Set<TitleKey>();
+  for (let i = 0; i < order.length && okAvail.size < 60 && i < 300; i += 150) {
+    const batch = order.slice(i, i + 150);
+    try { await refreshAvailability(batch, settings.country, 150); } catch (e) { warning ??= friendlyError(e); }
+    const snaps = await db.availability.bulkGet(batch.map((k) => `${k}|${settings.country}`));
+    batch.forEach((k, j) => { if (matchesPlatforms(snaps[j], settings.platforms, settings.includeUnconfirmed)) okAvail.add(k); });
+  }
+  const eligible = order.filter((k) => okAvail.has(k));
+  // Ficha completa (reparto, sinopsis) para los primeros que se muestran
+  const notFull = (k: TitleKey) => all.get(k)?.completeness !== 'full' || (all.get(k)?.metaVersion ?? 1) < META_VERSION;
+  const toFetch = eligible.filter(notFull).slice(0, 40);
+  if (toFetch.length) { try { await ensureFullTitles(toFetch, opts, 40); } catch (e) { warning ??= friendlyError(e); } all = await titleMap([...histKeys, ...pool]); }
+  await yieldToUi();
+  const items = engine.rank({ profile, ratings, titles: all, candidates: eligible, settings, limit: 200, attraction: ctx });
+  const run: RecommendationRun = {
+    profileId, algorithmVersion: engine.version, createdAt: Date.now(), trigger: o.trigger,
+    ratingsCount: profile.ratedCount, country: settings.country, items, pool: order.slice(0, 400), warning, eligible,
+  };
+  run.id = await db.runs.add(run);
+  await recordShown(profileId, engine.version, items).catch(() => undefined);
+  const ids = await db.runs.where('profileId').equals(profileId).primaryKeys();
+  if (ids.length > 5) await db.runs.bulkDelete(ids.slice(0, ids.length - 5));
+  await db.logs.add({ profileId, at: Date.now(), type: 'recs_updated', algorithmVersion: engine.version, detail: `${o.trigger}: ${items.length} recomendaciones (atractivo, ${pool.length} candidatos del catálogo)` });
   return run;
 }
 
@@ -399,7 +463,9 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
   }
   const profile = engine.buildProfile(ratings, all, settings);
   const seed = Math.floor(Date.now() / 86400000) + profileId.length;
-  let items = engine.rank({ profile, ratings, titles: all, candidates: pass.map((c) => c.meta.key), settings, limit: pass.length, seed, includeWatched: f.watched !== 'unwatched', lowEvidence });
+  // v4.0: el motor de atractivo necesita su contexto; con otros motores queda sin definir
+  const attraction = isAttraction(engine) ? await attractionContext(profileId, ratings) : undefined;
+  let items = engine.rank({ profile, ratings, titles: all, candidates: pass.map((c) => c.meta.key), settings, limit: pass.length, seed, includeWatched: f.watched !== 'unwatched', lowEvidence, attraction });
   if (f.minScore) items = items.filter((i) => i.score >= f.minScore!);
   // v3.4: preferencias flexibles del texto: reordenan con evidencia explícita, nunca quitan títulos
   const prefs = f.text?.prefs?.filter((p) => p.applied);
@@ -409,7 +475,7 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
   items = items.map((it, i) => ({ ...it, rank: i + 1 }));
   let diagnostics: { id: string; count: number }[] = [];
   if (!items.length) {
-    const scores = new Map(engine.rank({ profile, ratings, titles: all, candidates: cands.map((c) => c.meta.key), settings, limit: 400, includeWatched: true }).map((i) => [i.key, i.score]));
+    const scores = new Map(engine.rank({ profile, ratings, titles: all, candidates: cands.map((c) => c.meta.key), settings, limit: 400, includeWatched: true, attraction }).map((i) => [i.key, i.score]));
     diagnostics = diagnose(cands.map((c) => ({ ...c, score: scores.get(c.meta.key) })), f);
   }
   return { items, candidates: pass.length, diagnostics, discovered, outsidePlatforms, warning, perPerson: people?.perPerson, peopleTotal: people?.allow?.size, dataGaps: dataGaps(cands, f) };

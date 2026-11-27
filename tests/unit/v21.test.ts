@@ -86,7 +86,7 @@ describe('2. Migración a la v2.1 sin pérdida de datos', () => {
 
     const db3 = useTestDb(name);
     await ensureBootstrap();
-    expect(db3.verno).toBe(3);
+    expect(db3.verno).toBe(4) // v4.0 suma tablas nuevas; las valoraciones se conservan igual;
     const rs = new Map((await listRatings(P)).map((r) => [r.key, r]));
     expect(rs.size).toBe(6); // no se borró ninguna
     const m1 = rs.get('movie:1')!;
@@ -113,7 +113,7 @@ describe('2. Migración a la v2.1 sin pérdida de datos', () => {
     const [r] = await listRatings(P);
     expect(r).toMatchObject({ overall: 9, dimensions: { suspense: 4 }, legacy: { dimensions10: { suspense: 8, originality: 9 } } });
     const out = await exportData();
-    expect(out.format).toBe('cine-match-export/3');
+    expect(out.format).toBe('cine-match-export/4');
     // Reimportar el export v3 no vuelve a convertir (idempotente)
     useTestDb(`imp21b-${Date.now()}`); await ensureBootstrap();
     await importData(JSON.parse(JSON.stringify(out)));

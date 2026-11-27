@@ -53,7 +53,7 @@ export default function Recovery({ initial, onDone }: { initial?: IntegrityRepor
     try {
       await createLocalBackup('antes de restaurar').catch(() => undefined);
       const r = await mergeImport(pending.json);
-      setMsg(`Listo: ${r.added} agregadas, ${r.updated} actualizadas, ${r.keptNewer} conservadas porque lo del dispositivo era igual o más nuevo.`);
+      setMsg(`Listo: ${r.added} agregadas, ${r.updated} actualizadas, ${r.keptNewer} conservadas porque lo del dispositivo era igual o más nuevo.${r.interestsAdded ? ` ${r.interestsAdded} respuestas de interés.` : ''}${r.tasteUpdated ? ' Perfil de gustos importado.' : ''}`);
       setPending(undefined);
       await refresh();
     } catch (e) { setMsg(`No se pudo restaurar: ${(e as Error).message}. No se cambió nada.`); } finally { setBusy(false); }
@@ -106,6 +106,8 @@ export default function Recovery({ initial, onDone }: { initial?: IntegrityRepor
             <li>Se agregarían <b data-testid="plan-added">{pending.plan.added}</b> valoraciones que faltan.</li>
             <li>Se actualizarían <b data-testid="plan-updated">{pending.plan.updated}</b> porque la copia es más nueva.</li>
             <li>Se conservarían sin cambios <b data-testid="plan-kept">{pending.plan.keptNewer}</b> porque lo del dispositivo es igual o más nuevo.</li>
+            {(pending.plan.interestsAdded ?? 0) > 0 && <li>Respuestas de interés nuevas: <b data-testid="plan-interests">{pending.plan.interestsAdded}</b>.</li>}
+            {(pending.plan.tasteUpdated ?? 0) > 0 && <li data-testid="plan-taste">Perfil de gustos: se agrega o se actualiza (el archivo es más nuevo).</li>}
             {pending.plan.newProfiles.length > 0 && <li>Perfiles nuevos: {pending.plan.newProfiles.join(', ')}.</li>}
             {pending.plan.invalid > 0 && <li>{pending.plan.invalid} registros inválidos se ignoran.</li>}
           </ul>

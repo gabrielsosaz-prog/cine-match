@@ -17,8 +17,9 @@ import { Card, Chip } from '../ui/components';
 import { diagnosticOn, setDiagnostic } from '../services/diagnostics';
 
 const ENGINE_OPTIONS: { id: EngineChoice; label: string; help: string }[] = [
-  { id: 'v3.4', label: 'v3.4 — Estable (predeterminado)', help: 'Motor anterior, utilizado actualmente por defecto.' },
-  { id: 'v3.5', label: 'v3.5 — Personalizado (experimental)', help: 'Incorpora aprendizaje de preferencias a partir de valoraciones y descartes. Todavía no demostró ser superior en calidad general. Cambia el orden; la nota «Para vos» sigue siendo la de v3.4.' },
+  { id: 'v3.4', label: 'v3.4 — Estable', help: 'Motor anterior, el predeterminado. Ordena por nota estimada para vos.' },
+  { id: 'v3.5', label: 'v3.5 — Personalizado', help: 'Suma aprendizaje de preferencias a partir de valoraciones y descartes. Todavía no demostró ser superior en calidad general. Cambia el orden; la nota «Para vos» sigue siendo la de v3.4.' },
+  { id: 'v4.0', label: 'v4.0 — Atractivo personalizado (experimental)', help: 'Ordena por cuánto puede atraerte cada título, según tu perfil de gustos y tus respuestas de interés (el método que ganó la segunda cata a ciegas). Muestra por separado compatibilidad, satisfacción estimada y nota pública.' },
 ];
 
 export default function Settings() {
@@ -117,7 +118,15 @@ export default function Settings() {
             </label>
           ))}
         </div>
-        <p className="text-[11px] text-slate-500">Se guarda por perfil y se aplica a «Para vos» y a sus filtros. Podés volver a v3.4 cuando quieras sin perder datos.</p>
+        <p className="text-[11px] text-slate-500">Se guarda por perfil y se aplica a «Para vos» y a sus filtros. Podés cambiar de motor cuando quieras sin perder datos.</p>
+      </Card>
+      <Card className="space-y-2" data-testid="taste-card">
+        <h2 className="font-semibold">Mi perfil de gustos</h2>
+        <p className="text-sm text-slate-300">Preferencias flexibles y exclusiones estrictas que usa v4.0. Se editan de a una, sin repetir el cuestionario.</p>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <Link to="/mi-perfil" data-testid="taste-link" className="text-accent underline">Editar mi perfil de gustos</Link>
+          <Link to="/estadisticas" data-testid="stats-link" className="text-accent underline">Estadísticas de motores</Link>
+        </div>
       </Card>
       <Card className="space-y-2">
         <h2 className="font-semibold">Modo diagnóstico (desarrollo)</h2>

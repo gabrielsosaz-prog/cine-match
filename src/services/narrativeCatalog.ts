@@ -10,7 +10,7 @@ let current: NarrativeIndex | undefined;
 let loading: Promise<NarrativeIndex | undefined> | undefined;
 let lastError: string | undefined;
 
-export interface CatalogManifest { version: string; meta: string; emb: string; titles: number; embedded: number; model: string }
+export interface CatalogManifest { version: string; meta: string; emb: string; titles: number; embedded: number; model: string; attractionFlags?: string }
 
 async function fetchCatalog(): Promise<NarrativeIndex | undefined> {
   if (typeof fetch === 'undefined' || typeof location === 'undefined') return undefined;
@@ -53,3 +53,26 @@ export function metaFromCatalog(idx: NarrativeIndex, key: TitleKey, names: Map<n
   };
 }
 
+
+// ── v4.0: marcas de categorías (Wikipedia) que usa el motor de atractivo ──
+let flags: Map<TitleKey, Set<string>> | undefined;
+let flagsLoading: Promise<Map<TitleKey, Set<string>>> | undefined;
+/** Carga attraction-flags.json una vez. Sin conexión o sin archivo: mapa vacío (las reglas usan sólo palabras clave). */
+export function loadAttractionFlags(): Promise<Map<TitleKey, Set<string>>> {
+  if (flags) return Promise.resolve(flags);
+  flagsLoading ??= (async () => {
+    try {
+      if (typeof fetch === 'undefined' || typeof location === 'undefined') return new Map();
+      const man = (await (await fetch('catalog/manifest.json', { cache: 'no-cache' })).json()) as CatalogManifest;
+      if (!man.attractionFlags) return new Map();
+      const r = await fetch(`catalog/${man.attractionFlags}`);
+      if (!r.ok) throw new Error(`marcas ${r.status}`);
+      const d = (await r.json()) as { flags: Record<string, string[]> };
+      flags = new Map(Object.entries(d.flags).map(([k, v]) => [k as TitleKey, new Set(v)]));
+      return flags;
+    } catch { flagsLoading = undefined; return new Map(); }
+  })();
+  return flagsLoading;
+}
+/** Pruebas: inyectar marcas. */
+export function setAttractionFlags(f: Map<TitleKey, Set<string>> | undefined) { flags = f; flagsLoading = undefined; }

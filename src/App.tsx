@@ -6,6 +6,8 @@ import Search from './pages/Search';
 import TitlePage from './pages/TitlePage';
 import Ratings from './pages/Ratings';
 import Taste from './pages/Taste';
+import TasteProfilePage from './pages/TasteProfile';
+import EngineStats from './pages/EngineStats';
 import Settings from './pages/Settings';
 import Onboarding from './pages/Onboarding';
 import Setup from './pages/Setup';
@@ -49,6 +51,8 @@ export default function App() {
           <Route path="/similares" element={<Similar />} />
           <Route path="/persona/:id" element={<Person />} />
           <Route path="/gustos" element={<Taste />} />
+          <Route path="/mi-perfil" element={<TasteProfilePage />} />
+          <Route path="/estadisticas" element={<EngineStats />} />
           <Route path="/ajustes" element={<Settings />} />
           <Route path="/comparar" element={<Suspense fallback={<p className="text-sm text-slate-400">Cargando…</p>}><Compare /></Suspense>} />
           <Route path="/bienvenida" element={<Onboarding />} />

@@ -1,19 +1,21 @@
 import { db } from '../db/db';
 import { migrateRating } from '../db/migrations';
-import type { Rating } from '../types';
+import type { InterestRecord, Rating, ShownRecord, TasteProfile } from '../types';
 import { clearLedger, recordLedger } from './storageSafety';
 
-export const EXPORT_FORMAT = 'cine-match-export/3';
+export const EXPORT_FORMAT = 'cine-match-export/4';
 /** Formatos que se pueden importar (las exportaciones v1 se migran al importar) */
-export const IMPORT_FORMATS = ['cine-match-export/1', 'cine-match-export/2', 'cine-match-export/3'];
+export const IMPORT_FORMATS = ['cine-match-export/1', 'cine-match-export/2', 'cine-match-export/3', 'cine-match-export/4'];
 
 /** Exporta datos personales de TODOS los perfiles (no incluye la clave de TMDB). */
 export async function exportData() {
-  const [profiles, settings, ratings, snapshots, logs] = await Promise.all([
+  const [profiles, settings, ratings, snapshots, logs, taste, interests, shown] = await Promise.all([
     db.profiles.toArray(), db.settings.toArray(), db.ratings.toArray().then((rs) => rs.map(migrateRating)), db.snapshots.toArray(), db.logs.toArray(),
+    db.taste.toArray(), db.interests.toArray(), db.shown.toArray(),
   ]);
-  const titles = await db.titles.bulkGet([...new Set(ratings.map((r) => r.key))]);
-  return { format: EXPORT_FORMAT, exportedAt: new Date().toISOString(), profiles, settings, ratings, snapshots, logs, titles: titles.filter(Boolean) };
+  const titles = await db.titles.bulkGet([...new Set([...ratings.map((r) => r.key), ...interests.map((i) => i.key)])]);
+  // v4 (formato 4): perfil de gustos, respuestas de interés y recomendaciones mostradas por motor
+  return { format: EXPORT_FORMAT, exportedAt: new Date().toISOString(), profiles, settings, ratings, snapshots, logs, taste, interests, shown, titles: titles.filter(Boolean) };
 }
 
 export interface ImportPlan {
@@ -29,6 +31,9 @@ export interface ImportPlan {
   newProfiles: string[];
   exportedAt?: string;
   total: number;
+  /** v4: respuestas de interés nuevas y perfiles de gustos que entrarían (nuevos o más recientes) */
+  interestsAdded?: number;
+  tasteUpdated?: number;
 }
 
 function parse(json: unknown) {
@@ -65,7 +70,21 @@ export async function mergeImport(json: unknown, opts: { dryRun?: boolean } = {}
     const missingRef = (await db.profiles.bulkGet(referenced)).map((p, i) => (p ? undefined : referenced[i])).filter(Boolean) as string[];
     const newProfiles = [...profiles.filter((p: any) => !haveProfiles.has(p.id)), ...missingRef.map((id) => ({ id, name: id === 'p-principal' ? 'Principal' : 'Recuperado', createdAt: Date.now() }))];
     plan.newProfiles = newProfiles.map((p: any) => p.name ?? p.id);
+    // v4: respuestas de interés (historial: sólo se agregan las que faltan) y perfil de gustos (sólo si es más nuevo)
+    const interests: InterestRecord[] = Array.isArray(d.interests) ? d.interests.filter((i: any) => i && typeof i.id === 'string' && typeof i.profileId === 'string' && /^(movie|tv):\d+$/.test(i.key) && ['no', 'quiza', 'si', 'mucho', 'visto'].includes(i.answer) && typeof i.at === 'number') : [];
+    const haveI = await db.interests.bulkGet(interests.map((i) => i.id));
+    const newInterests = interests.filter((_, i) => !haveI[i]);
+    const tastes: TasteProfile[] = Array.isArray(d.taste) ? d.taste.filter((t: any) => t && typeof t.profileId === 'string' && t.prefs && typeof t.prefs === 'object' && Array.isArray(t.anchors)) : [];
+    const haveT = await db.taste.bulkGet(tastes.map((t) => t.profileId));
+    const newTastes = tastes.filter((t, i) => !haveT[i] || (t.updatedAt ?? 0) > (haveT[i]!.updatedAt ?? 0));
+    const shown: ShownRecord[] = Array.isArray(d.shown) ? d.shown.filter((x: any) => x && typeof x.id === 'string' && typeof x.engine === 'string') : [];
+    const haveS = await db.shown.bulkGet(shown.map((x) => x.id));
+    const newShown = shown.filter((_, i) => !haveS[i]);
+    plan.interestsAdded = newInterests.length; plan.tasteUpdated = newTastes.length;
     if (opts.dryRun) return;
+    if (newInterests.length) await db.interests.bulkAdd(newInterests);
+    if (newTastes.length) await db.taste.bulkPut(newTastes);
+    if (newShown.length) await db.shown.bulkAdd(newShown);
     const settings = Array.isArray(d.settings) ? d.settings.filter((s: any) => s && typeof s.profileId === 'string') : [];
     const haveSettings = new Set((await db.settings.bulkGet(settings.map((s: any) => s.profileId))).filter(Boolean).map((s) => s!.profileId));
     if (newProfiles.length) await db.profiles.bulkAdd(newProfiles);
@@ -80,10 +99,10 @@ export async function mergeImport(json: unknown, opts: { dryRun?: boolean } = {}
     }
     if (toPut.length) await db.ratings.bulkPut(toPut);
   };
-  if (opts.dryRun) await db.transaction('r', [db.ratings, db.profiles], run);
-  else await db.transaction('rw', [db.profiles, db.settings, db.ratings, db.titles], run);
+  if (opts.dryRun) await db.transaction('r', [db.ratings, db.profiles, db.interests, db.taste, db.shown], run);
+  else await db.transaction('rw', [db.profiles, db.settings, db.ratings, db.titles, db.interests, db.taste, db.shown], run);
   if (!opts.dryRun) {
-    await db.logs.add({ profileId: '*', at: Date.now(), type: 'import', detail: JSON.stringify({ added: plan.added, updated: plan.updated, keptNewer: plan.keptNewer }) }).catch(() => undefined);
+    await db.logs.add({ profileId: '*', at: Date.now(), type: 'import', detail: JSON.stringify({ added: plan.added, updated: plan.updated, keptNewer: plan.keptNewer, interests: plan.interestsAdded, taste: plan.tasteUpdated }) }).catch(() => undefined);
     await recordLedger(undefined, { force: true }).catch(() => undefined);
   }
   return plan;

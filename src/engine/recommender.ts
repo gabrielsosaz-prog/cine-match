@@ -58,6 +58,8 @@ export interface RankInput {
    * suma de canales, y el puesto de exploración se elige por ese puntaje (personalizado) y no por la nota pública.
    */
   orderScore?: Map<TitleKey, number>;
+  /** v4.0: contexto del motor de atractivo (perfil de gustos, respuestas de interés, catálogo). Otros motores lo ignoran. */
+  attraction?: import('./attraction').AttractionContext;
 }
 
 /**
