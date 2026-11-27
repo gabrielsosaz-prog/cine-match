@@ -107,10 +107,11 @@ test('v4.0: perfil importado, ranking por atractivo con tres puntuaciones, inter
   const k1 = keys[0], k2 = keys[1];
   await page.locator(`[data-testid="rec-item"][data-key="${k1}"]`).getByTestId('interest-mucho').click();
   await expect(page.locator(`[data-testid="rec-item"][data-key="${k1}"]`).getByTestId('interest-mucho')).toHaveAttribute('aria-checked', 'true');
+  const tNo = await page.evaluate(() => Date.now());
   await page.locator(`[data-testid="rec-item"][data-key="${k2}"]`).getByTestId('interest-no').click();
   await expect(page.locator(`[data-testid="rec-item"][data-key="${k2}"]`)).toHaveAttribute('data-dismissed', 'true');
   // el recálculo en segundo plano (como al descartar con el botón de siempre) termina antes de cerrar la app
-  await expect.poll(async () => (await dump(page, 'runs') as { trigger: string; algorithmVersion: string }[]).some((x) => x.trigger === 'interés' && x.algorithmVersion === 'attraction-4.0.0'), { timeout: 30000 }).toBe(true);
+  await expect.poll(async () => (await dump(page, 'runs') as { trigger: string; algorithmVersion: string; createdAt: number }[]).some((x) => x.trigger === 'interés' && x.algorithmVersion === 'attraction-4.0.0' && x.createdAt > tNo), { timeout: 30000 }).toBe(true);
   const ints = await dump(page, 'interests') as { key: string; answer: string; engine?: string; rank?: number }[];
   expect(ints.find((i) => i.key === k1)).toMatchObject({ answer: 'mucho', engine: 'attraction-4.0.0', rank: 1 });
   expect(ints.find((i) => i.key === k2)?.answer).toBe('no');

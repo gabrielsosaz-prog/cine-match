@@ -161,7 +161,9 @@ function RecCard({ item, live, meta, snap, rating, profileId, editing, onEdit, o
 
 export function filterByWatched<T extends { key: TitleKey }>(rows: T[], ratings: Map<TitleKey, Rating>, filter: WatchedFilter, sticky: Set<TitleKey> = new Set()): T[] {
   if (filter === 'all') return rows;
-  return rows.filter((r) => sticky.has(r.key) || (filter === 'watched') === Boolean(ratings.get(r.key)?.watched));
+  // Un descartado no vuelve a «No vistos» aunque el ranking guardado sea anterior al descarte (p. ej. si la app se
+  // cerró antes de terminar el recálculo); sigue visible mientras lo estás tocando, para poder deshacer.
+  return rows.filter((r) => sticky.has(r.key) || (filter === 'watched' ? Boolean(ratings.get(r.key)?.watched) : !ratings.get(r.key)?.watched && !ratings.get(r.key)?.notInterested));
 }
 
 export type HomeSort = 'recommended' | 'affinity' | 'public' | 'year' | 'title';
