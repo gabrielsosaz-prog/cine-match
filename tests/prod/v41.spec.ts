@@ -83,7 +83,7 @@ test('producción v4.1: tarjeta común con TMDB real en las tres pantallas y los
 
   // Barra de 7 accesos
   const nav = page.getByRole('navigation', { name: 'Navegación principal' });
-  expect(await nav.getByRole('link').allInnerTexts()).toEqual(['Inicio', 'Buscar', 'Similares', 'Quiero ver', 'Notas', 'Mis gustos', 'Ajustes']);
+  expect(await nav.getByRole('link').allInnerTexts()).toEqual(['Inicio', 'Buscar', 'Similares', 'Quiero ver', 'Recibidas', 'Notas', 'Ajustes']);
   for (const l of await nav.getByRole('link').all()) { const b = (await l.boundingBox())!; expect(b.width).toBeGreaterThanOrEqual(44); expect(b.height).toBeGreaterThanOrEqual(44); }
   await noHorizontalScroll(page);
 
