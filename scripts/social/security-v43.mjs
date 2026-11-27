@@ -79,7 +79,7 @@ try {
   for (let i = 0; i < 20 && !got.some((e) => e.kind === 'match'); i++) await wait(500);
   const rt = got.find((e) => e.kind === 'match');
   ok(rt && rt.title === 'La llegada', `tiempo real: A recibe la coincidencia en vivo (${rt ? 'sí' : 'no'})`);
-  ok(rt && rt.pushed_at === undefined, 'tiempo real: columnas internas no viajan');
+  ok(rt && rt.pushed_at === undefined && rt.user_id === A.id, 'tiempo real: sólo viaja el evento propio, sin control interno');
   ok(!spy.length, 'tiempo real: C no recibe eventos de A');
   const n1 = await B.c.functions.invoke('notify', { body: { event_ids: r7.events } });
   ok(!n1.error && n1.data?.sent === 0 && n1.data?.reasons?.includes('muted'), `aviso push: respeta que A no activó avisos de coincidencias (${JSON.stringify(n1.data ?? n1.error?.message)})`);

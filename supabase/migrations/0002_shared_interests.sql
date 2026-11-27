@@ -66,17 +66,29 @@ create table if not exists public.social_events (
   media_type text check (media_type in ('movie', 'tv')),
   tmdb_id integer,
   title text,
-  created_at timestamptz not null default now(),
-  pushed_at timestamptz
+  created_at timestamptz not null default now()
 );
+-- Control interno de avisos push, en tabla aparte: el tiempo real envía filas completas y exige poder leer todas las
+-- columnas (incluida user_id para el filtro), así que en social_events no puede haber columnas internas.
+create table if not exists public.social_pushes (
+  event_id bigint primary key references public.social_events (id) on delete cascade,
+  pushed_at timestamptz not null default now()
+);
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'social_events' and column_name = 'pushed_at') then
+    insert into public.social_pushes (event_id, pushed_at) select id, pushed_at from public.social_events where pushed_at is not null on conflict do nothing;
+    alter table public.social_events drop column pushed_at;
+  end if;
+end $$;
 create index if not exists social_events_user_idx on public.social_events (user_id, created_at desc);
 create index if not exists social_events_pair_idx on public.social_events (actor, user_id);
 
 alter table public.shared_interests enable row level security;
 alter table public.social_events enable row level security;
-revoke all on public.shared_interests, public.social_events from anon, authenticated, public;
+alter table public.social_pushes enable row level security;
+revoke all on public.shared_interests, public.social_events, public.social_pushes from anon, authenticated, public;
 grant select on public.shared_interests to authenticated;
-grant select (id, actor, kind, media_type, tmdb_id, title, created_at) on public.social_events to authenticated;
+grant select on public.social_events to authenticated;
 
 drop policy if exists shared_own on public.shared_interests;
 create policy shared_own on public.shared_interests for select to authenticated using (owner = auth.uid());

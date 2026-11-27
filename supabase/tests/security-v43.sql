@@ -77,7 +77,7 @@ reset role;
 select t.login(:A); set role authenticated;
 select t.ok(t.their(:B, 603) = 'si', '8. A ve la respuesta de B');
 select t.ok((select count(*) from public.social_events where kind = 'match' and tmdb_id = 603 and title = 'Matrix') = 1, 'A recibe un aviso de nueva coincidencia (con título)');
-select t.fails('select pushed_at from public.social_events', 'permission denied', 'columna interna de avisos ilegible');
+select t.fails('select * from public.social_pushes', 'permission denied', 'control interno de avisos ilegible');
 reset role;
 -- 10-12. B pasa a Muchas ganas → una sola «coincidencia máxima»; reenvíos y desorden no duplican
 select t.login(:B); set role authenticated;

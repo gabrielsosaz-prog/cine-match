@@ -69,10 +69,14 @@ Deno.serve(async (req) => {
 // deno-lint-ignore no-explicit-any
 async function notifyEvents(admin: any, actor: string, ids: number[]) {
   const since = new Date(Date.now() - 3600_000).toISOString();
-  const { data: evs } = await admin.from('social_events').update({ pushed_at: new Date().toISOString() })
-    .in('id', ids).eq('actor', actor).is('pushed_at', null).gt('created_at', since).in('kind', ['match', 'match_max'])
-    .select('id, user_id, actor, kind, media_type, tmdb_id, title');
-  if (!evs?.length) return { sent: 0, reason: 'not_applicable' };
+  const { data: cand } = await admin.from('social_events').select('id, user_id, actor, kind, media_type, tmdb_id, title')
+    .in('id', ids).eq('actor', actor).gt('created_at', since).in('kind', ['match', 'match_max']);
+  if (!cand?.length) return { sent: 0, reason: 'not_applicable' };
+  // Reclamo atómico: sólo el primer pedido por evento inserta la marca (los repetidos no vuelven a avisar)
+  const { data: claimed } = await admin.from('social_pushes').upsert(cand.map((e: { id: number }) => ({ event_id: e.id })), { onConflict: 'event_id', ignoreDuplicates: true }).select('event_id');
+  const won = new Set((claimed ?? []).map((c: { event_id: number }) => c.event_id));
+  const evs = cand.filter((e: { id: number }) => won.has(e.id));
+  if (!evs.length) return { sent: 0, reason: 'not_applicable' };
   const jwk = Deno.env.get('VAPID_PRIVATE_JWK');
   const pub = Deno.env.get('VAPID_PUBLIC_KEY');
   if (!jwk || !pub) return { error: 'vapid_not_configured' };

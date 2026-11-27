@@ -97,8 +97,9 @@ export default function App() {
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-ink-950/95 backdrop-blur" aria-label="Navegación principal">
           <div className="mx-auto flex max-w-xl">
             {NAV.map((n) => (
+              // «Compartidas» es la palabra más larga: un poco más de ancho para que entre sin cortarse en 360 px
               <NavLink key={n.to} to={n.to} end={n.to === '/'} data-testid={`nav-${n.to.slice(1) || 'inicio'}`}
-                className={({ isActive }) => `flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-start gap-0.5 px-0.5 pb-1 pt-2 text-center text-[10px] font-medium leading-[1.1] ${isActive ? 'text-accent' : 'text-slate-400'}`}>
+                className={({ isActive }) => `flex min-h-[54px] min-w-0 ${n.to === '/compartidas' ? 'flex-[1.3_1_0%] tracking-[-0.02em]' : 'flex-1'} flex-col items-center justify-start gap-0.5 px-0.5 pb-1 pt-2 text-center text-[10px] font-medium leading-[1.1] ${isActive ? 'text-accent' : 'text-slate-400'}`}>
                 <span className="relative">{n.icon}{n.to === '/compartidas' && <InboxBadge />}</span><span className="max-w-full">{n.label}</span>
               </NavLink>
             ))}

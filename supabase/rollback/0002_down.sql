@@ -14,7 +14,7 @@ drop function if exists public.put_shared(jsonb), public.get_shared(), public.co
   public._contacts_v43(), public._recs_v43(), public._want_v43(), public._prune_shared(uuid, text, int), public._ping(uuid, uuid),
   public._match_level(text, text), public._mutual(uuid, uuid, text), public._grants(uuid, uuid, text), public._since(uuid, uuid, text, int),
   public._exchanged(uuid, uuid, text, int);
-drop table if exists public.shared_interests, public.social_events;
+drop table if exists public.social_pushes, public.shared_interests, public.social_events;
 alter table public.contacts drop constraint if exists contacts_blocked_v43;
 alter table public.contacts drop column if exists share_interests, drop column if exists share_ratings, drop column if exists notify_matches;
 alter table public.social_profiles drop column if exists notify_recs, drop column if exists notify_matches, drop column if exists notify_max;
