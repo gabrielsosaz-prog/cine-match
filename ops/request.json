@@ -1,1 +1,1 @@
-{ "task": "provision", "n": 1 }
+{ "task": "publicconfig,security", "n": 2 }
