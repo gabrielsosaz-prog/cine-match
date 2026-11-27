@@ -54,6 +54,8 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         navigateFallback: 'index.html',
+        // v4.2: manejo de notificaciones push (public/push-sw.js)
+        importScripts: ['push-sw.js'],
         // El catálogo narrativo (varios MB) no se precarga: se descarga al usarse y queda en caché por versión
         globIgnores: ['catalog/**'],
         navigateFallbackDenylist: [/^\/catalog\//, /^\/api\//],
