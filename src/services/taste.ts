@@ -42,6 +42,10 @@ export async function interestMap(profileId: string): Promise<Map<TitleKey, Inte
   return latestInterests(await listInterests(profileId));
 }
 
+/** v4.3 · Oyentes de respuestas de interés nuevas (los usa la capa social; no cambian nada de lo local). */
+const interestListeners = new Set<(r: InterestRecord) => void>();
+export function onInterestRecorded(fn: (r: InterestRecord) => void) { interestListeners.add(fn); return () => { interestListeners.delete(fn); }; }
+
 /** Guarda una respuesta de interés (historial; nunca borra respuestas anteriores). */
 export async function recordInterest(profileId: string, key: TitleKey, answer: InterestAnswer, o: { engine?: string; rank?: number; seenRating?: number; source?: string; recompute?: boolean } = {}): Promise<InterestRecord> {
   const prev = await db.interests.where('[profileId+key]').equals([profileId, key]).toArray();
@@ -62,6 +66,8 @@ export async function recordInterest(profileId: string, key: TitleKey, answer: I
   });
   recordLedgerSoon(profileId);
   scheduleLocalBackup();
+  // v4.3: avisa a quien escuche (intereses compartidos) sin depender de la pantalla desde la que se respondió
+  for (const fn of interestListeners) { try { fn(rec); } catch { /* un oyente no afecta el guardado */ } }
   // Igual que al valorar o descartar: el ranking se recalcula en segundo plano (la lista visible no cambia hasta
   // «Actualizar ranking», así el título respondido no desaparece bajo el dedo).
   if (o.recompute !== false) void requestRecompute(profileId, { trigger: 'interés', extraKeys: [key] }, 600).catch(() => undefined);

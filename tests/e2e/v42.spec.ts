@@ -50,7 +50,7 @@ test('v4.2: tarjeta 3×2 en 360 px, Aspectos en la tarjeta, barra de 7 con Recib
 
   // Barra inferior
   const nav = page.getByRole('navigation', { name: 'Navegación principal' });
-  expect(await nav.getByRole('link').allInnerTexts()).toEqual(['Inicio', 'Buscar', 'Similares', 'Quiero ver', 'Recibidas', 'Notas', 'Ajustes']);
+  expect(await nav.getByRole('link').allInnerTexts()).toEqual(['Inicio', 'Buscar', 'Similares', 'Quiero ver', 'Compartidas', 'Notas', 'Ajustes']);
   for (const l of await nav.getByRole('link').all()) {
     const b = (await l.boundingBox())!;
     expect(b.width).toBeGreaterThanOrEqual(44); expect(b.height).toBeGreaterThanOrEqual(44);
@@ -113,7 +113,7 @@ test('v4.2: tarjeta 3×2 en 360 px, Aspectos en la tarjeta, barra de 7 con Recib
   await page.mouse.click(5, 5);
 
   // Recibidas sin cuenta
-  await page.getByTestId('nav-recibidas').click();
+  await page.getByTestId('nav-compartidas').click();
   await expect(page.getByText(/cuenta|no están disponibles/).first()).toBeVisible();
   await noHorizontalScroll(page);
 

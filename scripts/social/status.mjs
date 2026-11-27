@@ -11,6 +11,8 @@ const rows = await sql(ref, `select
   (select count(*) from public.recommendations)::int as recomendaciones,
   (select count(*) from public.want_items)::int as quiero_ver_sync,
   (select count(*) from public.push_subscriptions)::int as push,
+  (select count(*) from public.shared_interests)::int as intereses_compartidos,
+  (select count(*) from public.social_events)::int as eventos,
   pg_size_pretty(pg_database_size(current_database())) as tamano_base`).catch((e) => [{ error: String(e).slice(0, 200) }]);
 console.log(JSON.stringify(rows?.[0]));
 const fns = await api('GET', `/projects/${ref}/functions`).catch(() => ({ data: [] }));

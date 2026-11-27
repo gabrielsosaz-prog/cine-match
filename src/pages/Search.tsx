@@ -1,3 +1,4 @@
+import { SocialInterestStrip } from '../ui/SharedInterests';
 import ShareAction from '../ui/ShareAction';
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -46,7 +47,8 @@ export function SearchResults({ hits, country, profileId }: { hits: SearchHit[];
   return (
     <ul className="space-y-2" aria-label="Resultados">
       {hits.map((h, i) => (
-        <li key={h.key} data-testid="search-result" data-key={h.key} className="relative">
+        <li key={h.key} data-testid="search-result" data-key={h.key}>
+          <div className="relative">
           {/* v4.2: Compartir sin entrar a la ficha */}
           <div className="absolute bottom-2.5 right-2.5 z-10"><ShareAction variant="icon" target={{ k: h.key, title: h.title, year: h.year, posterPath: h.posterPath }} /></div>
           <TitleLink k={h.key} className="flex gap-3 rounded-2xl bg-ink-900 p-2.5 pr-14 ring-1 ring-white/5">
@@ -62,6 +64,9 @@ export function SearchResults({ hits, country, profileId }: { hits: SearchHit[];
               {ratings?.[i] && <div className="mt-1 text-xs font-semibold text-accent">{[ratings[i]!.watched ? 'Vista' : 'No vista', ratings[i]!.list ? LIST_LABELS[ratings[i]!.list!] : '', ratings[i]!.overall !== undefined ? `${ratings[i]!.overall}/10` : ''].filter(Boolean).join(' · ')}</div>}
             </div>
           </TitleLink>
+          </div>
+          {/* v4.3: intereses compartidos sólo en los títulos con relación social */}
+          <SocialInterestStrip k={h.key} title={h.title} profileId={profileId} rating={ratings?.[i]} />
         </li>
       ))}
     </ul>

@@ -13,11 +13,25 @@ export interface Contact {
   /** Lo que la otra persona autorizó respecto de mí */
   theirShareMatches: boolean;
   theirShareScores: boolean;
+  /** v4.3 · Yo autoricé compartir mis intereses en los títulos intercambiados con esta persona */
+  shareInterests: boolean;
+  /** v4.3 · Yo autoricé compartir mis valoraciones posteriores (sólo títulos intercambiados) */
+  shareRatings: boolean;
+  /** v4.3 · Quiero recibir avisos de coincidencias con esta persona */
+  notifyMatches: boolean;
+  theirShareInterests: boolean;
+  theirShareRatings: boolean;
   linked: boolean;
   createdAt: number;
 }
 export interface Invite { id: string; createdAt: number; expiresAt: number; usedAt?: number; declinedAt?: number; revokedAt?: number }
-export interface SentRec { id: string; recipient: string; key: TitleKey; createdAt: number }
+export interface SentRec { id: string; recipient: string; key: TitleKey; createdAt: number; title?: string; year?: number; posterPath?: string; comment?: string }
+/** v4.3 · Interés / valoración de un contacto en un título intercambiado (sólo lo autorizado mutuamente). */
+export interface SharedRow { contact: string; key: TitleKey; answer?: 'no' | 'quiza' | 'si' | 'mucho'; answerAt?: number; rating?: number; ratingAt?: number }
+export interface SocialEvent { id: number; actor: string; kind: 'shared' | 'match' | 'match_max'; key?: TitleKey; title?: string; createdAt: number }
+export interface SocialPrefs { notifyRecs: boolean; notifyMatches: boolean; notifyMax: boolean }
+export interface PutItem { key: TitleKey; f: 'answer' | 'rating'; v: string | null; at: number }
+export interface PutResult { key: TitleKey; f: 'answer' | 'rating'; status: 'ok' | 'stale' | 'not_shared' | 'invalid'; events: number[] }
 export interface InboxRec {
   id: string;
   sender: string;

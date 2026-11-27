@@ -53,8 +53,11 @@ jobs:
           git add src/social/config.ts
           git diff --cached --quiet || { git commit -m "v4.2: configuración pública del servicio social (URL y clave anon; sin claves administrativas)"; git push origin HEAD:${{ github.ref_name }}; }
       - name: Pruebas de seguridad contra la API de producción (usuarios A, B y C)
-        if: contains(steps.task.outputs.task, 'security')
+        if: contains(steps.task.outputs.task, 'security ') || endsWith(steps.task.outputs.task, 'security')
         run: node scripts/social/security-prod.mjs
+      - name: v4.3 · intereses compartidos contra la API de producción (usuarios A, B, C y D)
+        if: contains(steps.task.outputs.task, 'security43')
+        run: node scripts/social/security-v43.mjs
       - name: Flujo real en dos sesiones (Android emulado, TMDB real, Supabase real)
         if: contains(steps.task.outputs.task, 'e2e')
         run: |

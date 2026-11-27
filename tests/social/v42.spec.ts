@@ -138,7 +138,7 @@ test('v4.2 · dos teléfonos: vincular una vez, recomendar con un toque, recibir
     await expect(b.getByTestId('inbox-badge')).toHaveText('1', { timeout: 30000 });
     await shot(b, 'barra-360-contador');
     await noHScroll(b);
-    await b.getByTestId('nav-recibidas').click();
+    await b.getByTestId('nav-compartidas').click();
     const item = b.getByTestId('inbox-item').first();
     await expect(item.getByTestId('inbox-from-name')).toHaveText('Ana');
     await expect(item).toHaveAttribute('data-status', 'nueva');
@@ -196,7 +196,7 @@ test('v4.2 · dos teléfonos: vincular una vez, recomendar con un toque, recibir
     await shot(b, 'selector-contactos');
     await b.getByTestId('share-send').click();
     await expect(noticeText(b)).toContainText('Recomendación enviada a Ana');
-    await a.getByTestId('nav-recibidas').click();
+    await a.getByTestId('nav-compartidas').click();
     const ia = a.getByTestId('inbox-item').first();
     await expect(ia.getByTestId('inbox-comment')).toContainText('Creo que esta nos puede gustar', { timeout: 30000 });
     await expect(ia.getByTestId('inbox-when')).toContainText('Hoy');
@@ -247,7 +247,7 @@ test('v4.2 · dos teléfonos: vincular una vez, recomendar con un toque, recibir
     await b.getByTestId('account-submit').click();
     await expect(b.getByTestId('account-display')).toHaveText('Beto Prueba', { timeout: 30000 });
     await b.reload();
-    await b.getByTestId('nav-recibidas').click();
+    await b.getByTestId('nav-compartidas').click();
     await expect(b.getByTestId('inbox-item').first()).toBeVisible({ timeout: 30000 });
     const ratedAfter = await b.evaluate(async () => { const r = indexedDB.open('cine-match'); const d: IDBDatabase = await new Promise((res) => { r.onsuccess = () => res(r.result); }); const n: number = await new Promise((res) => { const q = d.transaction('ratings').objectStore('ratings').count(); q.onsuccess = () => res(q.result); }); d.close(); return n; });
     expect(ratedAfter).toBe(ratedBefore);

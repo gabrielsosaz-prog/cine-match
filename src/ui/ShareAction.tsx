@@ -26,7 +26,8 @@ const SHARE_FG = '#7DD3FC';
 
 function announce(r: ShareResult, onUndo?: () => void) {
   if (r.status === 'sent') {
-    const nid = pushNotice({ kind: 'info', text: `Recomendación enviada a ${r.to}`, action: { label: 'Deshacer', run: () => { void (async () => {
+    const withInterest = activeContacts().some((c) => c.alias === r.to && c.shareInterests);
+    const nid = pushNotice({ kind: 'info', text: `Recomendación enviada a ${r.to}${withInterest ? ' (con tu interés, si lo marcaste)' : ''}`, action: { label: 'Deshacer', run: () => { void (async () => {
       try { const ok = await undoShare(r.id); pushNotice({ kind: 'info', text: ok ? `Envío a ${r.to} deshecho.` : 'Ya no se puede deshacer este envío.' }, 4000); onUndo?.(); }
       catch (e) { pushNotice({ kind: 'error', text: `No se pudo deshacer: ${(e as Error).message}` }); }
     })(); } } }, UNDO_MS);

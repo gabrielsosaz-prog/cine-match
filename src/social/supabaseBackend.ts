@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { titleKey, parseKey, type MediaType, type TitleKey } from '../types';
 import type { SocialBackend } from './backend';
-import { SocialError, toSocialError, type Contact, type InboxRec, type SocialUser } from './types';
+import { SocialError, toSocialError, type Contact, type InboxRec, type PutResult, type SharedRow, type SocialUser } from './types';
 
 const ts = (v?: string | null) => (v ? Date.parse(v) : undefined);
 const toUser = (u: User | null | undefined): SocialUser | null => (u ? { id: u.id, email: u.email ?? undefined } : null);
@@ -62,14 +62,16 @@ export function createSupabaseBackend(url: string, key: string): SocialBackend {
 
     async listContacts() {
       const [rows, perms] = await Promise.all([
-        q(sb.from('contacts').select('contact, alias, favorite, blocked, share_matches, share_scores, created_at').order('created_at')),
-        q(sb.rpc('contact_permissions')),
+        q(sb.from('contacts').select('contact, alias, favorite, blocked, share_matches, share_scores, share_interests, share_ratings, notify_matches, created_at').order('created_at')),
+        q(sb.rpc('contact_permissions_v43')),
       ]);
       const pm = new Map(((perms ?? []) as any[]).map((p) => [p.contact, p]));
       return ((rows ?? []) as any[]).map((r): Contact => {
         const p = pm.get(r.contact);
         return { id: r.contact, alias: r.alias, favorite: r.favorite, blocked: r.blocked, shareMatches: r.share_matches, shareScores: r.share_scores,
-          theirShareMatches: Boolean(p?.their_share_matches), theirShareScores: Boolean(p?.their_share_scores), linked: Boolean(p?.linked), createdAt: ts(r.created_at)! };
+          theirShareMatches: Boolean(p?.their_share_matches), theirShareScores: Boolean(p?.their_share_scores), linked: Boolean(p?.linked), createdAt: ts(r.created_at)!,
+          shareInterests: Boolean(r.share_interests), shareRatings: Boolean(r.share_ratings), notifyMatches: r.notify_matches !== false,
+          theirShareInterests: Boolean(p?.their_share_interests), theirShareRatings: Boolean(p?.their_share_ratings) };
       });
     },
     async updateContact(id, patch) {
@@ -78,6 +80,9 @@ export function createSupabaseBackend(url: string, key: string): SocialBackend {
       if (patch.favorite !== undefined) row.favorite = patch.favorite;
       if (patch.shareMatches !== undefined) row.share_matches = patch.shareMatches;
       if (patch.shareScores !== undefined) row.share_scores = patch.shareScores;
+      if (patch.shareInterests !== undefined) row.share_interests = patch.shareInterests;
+      if (patch.shareRatings !== undefined) row.share_ratings = patch.shareRatings;
+      if (patch.notifyMatches !== undefined) row.notify_matches = patch.notifyMatches;
       const me = await uid();
       // Un solo favorito: primero se quita el anterior
       if (patch.favorite) await q(sb.from('contacts').update({ favorite: false }).eq('owner', me).eq('favorite', true).neq('contact', id));
@@ -121,8 +126,8 @@ export function createSupabaseBackend(url: string, key: string): SocialBackend {
     async retract(id) { return Boolean(await q(sb.rpc('retract_recommendation', { p_id: id }))); },
     async listSent() {
       const me = await uid();
-      const d = await q(sb.from('recommendations').select('id, recipient, media_type, tmdb_id, created_at').eq('sender', me).order('created_at', { ascending: false }).limit(1000));
-      return ((d ?? []) as any[]).map((r) => ({ id: r.id, recipient: r.recipient, key: titleKey(r.media_type, r.tmdb_id), createdAt: ts(r.created_at)! }));
+      const d = await q(sb.from('recommendations').select('id, recipient, media_type, tmdb_id, title, year, poster_path, comment, created_at').eq('sender', me).order('created_at', { ascending: false }).limit(1000));
+      return ((d ?? []) as any[]).map((r) => ({ id: r.id, recipient: r.recipient, key: titleKey(r.media_type, r.tmdb_id), createdAt: ts(r.created_at)!, title: r.title, year: r.year ?? undefined, posterPath: r.poster_path ?? undefined, comment: r.comment ?? undefined }));
     },
     async listInbox() {
       const me = await uid();
@@ -172,6 +177,43 @@ export function createSupabaseBackend(url: string, key: string): SocialBackend {
       return ((d ?? []) as any[]).map((r) => ({ key: titleKey(r.media_type, r.tmdb_id) as TitleKey, myScore: r.my_score === null ? undefined : Number(r.my_score), theirScore: r.their_score === null ? undefined : Number(r.their_score), myAddedAt: ts(r.my_added_at)!, theirAddedAt: ts(r.their_added_at)! }));
     },
 
+    async getPrefs() {
+      const d = (await q(sb.from('social_profiles').select('notify_recs, notify_matches, notify_max').maybeSingle())) as any;
+      return { notifyRecs: d?.notify_recs !== false, notifyMatches: Boolean(d?.notify_matches), notifyMax: Boolean(d?.notify_max) };
+    },
+    async setPrefs(p) {
+      const me = await uid();
+      const row: Record<string, boolean> = {};
+      if (p.notifyRecs !== undefined) row.notify_recs = p.notifyRecs;
+      if (p.notifyMatches !== undefined) row.notify_matches = p.notifyMatches;
+      if (p.notifyMax !== undefined) row.notify_max = p.notifyMax;
+      await q(sb.from('social_profiles').update(row).eq('user_id', me));
+    },
+    async putShared(items) {
+      if (!items.length) return [];
+      const d = await q(sb.rpc('put_shared', { p_items: items.map((i) => { const { type, id } = parseKey(i.key); return { t: type, id, f: i.f, v: i.v, at: new Date(i.at).toISOString() }; }) }));
+      return ((d ?? []) as any[]).map((r): PutResult => ({ key: titleKey(r.media_type, r.tmdb_id), f: r.field, status: r.status, events: (r.events ?? []).map(Number) }));
+    },
+    async getShared() {
+      const d = await q(sb.rpc('get_shared'));
+      return ((d ?? []) as any[]).map((r): SharedRow => ({ contact: r.contact, key: titleKey(r.media_type, r.tmdb_id), answer: r.answer ?? undefined, answerAt: ts(r.answer_at),
+        rating: r.rating === null || r.rating === undefined ? undefined : Number(r.rating), ratingAt: ts(r.rating_at) }));
+    },
+    subscribeEvents(onEvent) {
+      let ch: ReturnType<SupabaseClient['channel']> | undefined;
+      let stopped = false;
+      uid().then((me) => {
+        if (stopped) return;
+        ch = sb.channel(`events-${me}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_events', filter: `user_id=eq.${me}` }, (p) => {
+            const r = p.new as any;
+            onEvent({ id: Number(r.id), actor: r.actor, kind: r.kind, key: r.media_type ? titleKey(r.media_type, r.tmdb_id) : undefined, title: r.title ?? undefined, createdAt: ts(r.created_at) ?? Date.now() });
+          })
+          .subscribe();
+      }).catch(() => undefined);
+      return () => { stopped = true; if (ch) sb.removeChannel(ch); };
+    },
+    async notifyEvents(ids) { if (ids.length) await q(sb.functions.invoke('notify', { body: { event_ids: ids } })); },
     async savePush(sub) {
       const me = await uid();
       await q(sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint!));

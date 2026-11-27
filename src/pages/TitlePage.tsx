@@ -1,3 +1,4 @@
+import { SocialInterestStrip } from '../ui/SharedInterests';
 import ShareAction from '../ui/ShareAction';
 import { TrailerButton } from '../ui/Trailer';
 import { audienceOf, countriesOf, countryName } from '../services/filters';
@@ -73,6 +74,7 @@ export default function TitlePage() {
       <AudienceInfo meta={meta} />
       <div className="flex flex-wrap items-center gap-2"><TrailerButton key={meta.key} k={meta.key} originalLanguage={meta.originalLanguage} country={settings.country} title={meta.title} year={meta.year} /></div>
       <div data-testid="title-share"><ShareAction variant="full" target={{ k: meta.key, title: meta.title, year: meta.year, posterPath: meta.posterPath }} /></div>
+      <SocialInterestStrip k={meta.key} title={meta.title} profileId={profileId} rating={rating ?? undefined} />
       <Card className="space-y-2" data-testid="title-scores">
         <div className="flex items-center gap-3">
           <ScorePair item={pred ?? undefined} meta={meta} />
