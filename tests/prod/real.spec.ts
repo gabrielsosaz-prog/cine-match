@@ -132,7 +132,7 @@ test('producción: guardado, actores, filtros, notas y Similares con TMDB real',
   await page.getByTestId('similar-search').fill('Volver al futuro');
   await page.getByTestId('similar-hit').first().click();
   await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 180000 });
-  const sims = await page.getByTestId('similar-item').evaluateAll((els) => els.slice(0, 8).map((e) => `${e.querySelector('h3')?.textContent} · ${e.querySelector('[data-testid=similarity]')?.textContent}`));
+  const sims = await page.getByTestId('similar-item').evaluateAll((els) => els.slice(0, 8).map((e) => `${e.querySelector('h3')?.textContent} · ${e.querySelector('[data-testid=card-compat]')?.textContent}`));
   log('Similares a Volver al futuro:', sims);
   log('Perfil:', await page.getByTestId('similar-profile').innerText());
   await page.screenshot({ path: `test-results/prod-${info.project.name}-similares.png`, fullPage: true });

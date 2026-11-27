@@ -71,7 +71,7 @@ export default function App() {
           <div className="mx-auto flex max-w-xl">
             {NAV.map((n) => (
               <NavLink key={n.to} to={n.to} end={n.to === '/'} data-testid={`nav-${n.to.slice(1) || 'inicio'}`}
-                className={({ isActive }) => `flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] font-medium leading-[1.1] ${isActive ? 'text-accent' : 'text-slate-400'}`}>
+                className={({ isActive }) => `flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-start gap-0.5 px-0.5 pb-1 pt-2 text-center text-[10px] font-medium leading-[1.1] ${isActive ? 'text-accent' : 'text-slate-400'}`}>
                 {n.icon}<span className="max-w-full">{n.label}</span>
               </NavLink>
             ))}

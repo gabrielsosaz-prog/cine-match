@@ -71,9 +71,12 @@ test('producción v3.4: preferencias con evidencia real, diagnóstico y credenci
   // Cada «Baja por … (TMDB: …)» tiene esa evidencia en la ficha real
   let checked = 0;
   for (const k of keys) {
-    const line = page.locator(`[data-testid="rec-item"][data-key="${k}"]`).getByTestId('rec-prefs');
-    if (!(await line.count())) continue;
-    const text = await line.innerText();
+    // v4.1: «Sube por» va en «Por tu perfil» y «Baja por» en «Qué podría no gustarte» (desplegable)
+    const card = page.locator(`[data-testid="rec-item"][data-key="${k}"]`);
+    if ((await card.getByTestId('more-panel').count()) === 0) await card.getByTestId('more-toggle').click();
+    const parts = [...await card.getByTestId('card-why').allInnerTexts(), ...await card.getByTestId('more-cons').allInnerTexts()];
+    const text = parts.join(' ').split('\n').filter((l) => /^(Sube|Baja) por/.test(l.trim())).join(' · ');
+    if (!text) continue;
     const f = await facts(page, k);
     log(k, f.title, '→', text, '| TMDB géneros:', f.genres.join(','));
     for (const part of text.matchAll(/\(TMDB: ([^)]+)\)/g)) for (const e of part[1].split(', ')) {
@@ -101,6 +104,7 @@ test('producción v3.4: preferencias con evidencia real, diagnóstico y credenci
   await page.getByTestId('diagnostic-toggle').check();
   await page.goto('/#/');
   await expect(page.getByTestId('diag-bar')).toBeVisible({ timeout: 240000 });
+  await page.getByTestId('rec-item').first().getByTestId('more-toggle').click();
   const panel = page.getByTestId('rec-item').first().getByTestId('diag-panel');
   await panel.locator('summary').click();
   log('diagnóstico #1:', (await panel.innerText()).replace(/\s+/g, ' ').slice(0, 600));

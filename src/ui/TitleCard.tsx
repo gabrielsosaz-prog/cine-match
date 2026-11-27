@@ -14,7 +14,8 @@ import { db } from '../db/db';
 import { useApp } from '../hooks/useApp';
 import { friendlyError } from '../providers/errors';
 import { availabilityState } from '../services/availability';
-import { getTitle } from '../services/catalog';
+import { peekFullTitle } from '../services/catalog';
+import { getNarrativeIndex } from '../services/narrativeCatalog';
 import { countriesOf, countryName } from '../services/filters';
 import { safely } from '../services/notices';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
@@ -51,15 +52,27 @@ export interface InterestCtx {
 }
 
 const SYNOPSIS_SHORT = 200;
-const triedFull = new Set<TitleKey>();
-/** Pide la ficha completa (sinopsis en español, dirección, países) una sola vez por sesión y título. */
-function useFullMeta(meta: TitleMeta, near: boolean) {
+/** Fichas completas pedidas sólo para mostrar (una vez por sesión y título; null = TMDB no respondió). */
+const fullCache = new Map<TitleKey, Promise<TitleMeta | null>>();
+/**
+ * Completa la ficha (sinopsis en español, dirección, países) cuando la tarjeta se acerca a la pantalla. No la guarda en
+ * el catálogo local: lo que se mira no cambia los datos con que se calcula el próximo ranking.
+ */
+function useFullMeta(base: TitleMeta, near: boolean): { meta: TitleMeta; loading: boolean } {
   const { settings } = useApp();
+  const [got, setGot] = useState<{ key: TitleKey; meta: TitleMeta | null }>();
+  const needs = base.completeness !== 'full';
   useEffect(() => {
-    if (!near || meta.completeness === 'full' || triedFull.has(meta.key)) return;
-    triedFull.add(meta.key);
-    getTitle(meta.key, { language: settings.language, country: settings.country }).catch(() => undefined);
-  }, [near, meta.key, meta.completeness]);
+    if (!near || !needs) return;
+    let alive = true;
+    let p = fullCache.get(base.key);
+    if (!p) { p = peekFullTitle(base.key, { language: settings.language, country: settings.country }).then((m) => m ?? null, () => null); fullCache.set(base.key, p); }
+    p.then((m) => { if (alive) setGot({ key: base.key, meta: m }); });
+    return () => { alive = false; };
+  }, [near, needs, base.key]);
+  if (!needs) return { meta: base, loading: false };
+  const mine = got?.key === base.key ? got : undefined;
+  return { meta: mine?.meta ?? base, loading: !mine };
 }
 /** true cuando la tarjeta está cerca de la pantalla (carga progresiva). */
 function useNear(ref: React.RefObject<HTMLElement>) {
@@ -108,14 +121,14 @@ const Icon = {
 const btn = 'flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold leading-tight';
 const neutral = `${btn} bg-ink-800 text-slate-200 ring-1 ring-white/10`;
 
-export default function TitleCard({ k, meta, snap, rating, rank, info, interest, profileId, track, onTouch, actionsExtra, testId = 'rec-item', interestTestPrefix = 'interest' }: {
+export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info, interest, profileId, track, onTouch, actionsExtra, testId = 'rec-item', interestTestPrefix = 'interest' }: {
   k: TitleKey; meta: TitleMeta; snap?: AvailabilitySnapshot | null; rating?: Rating; rank?: number; info: CardInfo; interest?: InterestCtx;
   profileId: string; track?: (p: Promise<unknown>) => void; onTouch?: (k: TitleKey) => void; actionsExtra?: ReactNode; testId?: string; interestTestPrefix?: string;
 }) {
   const ref = useRef<HTMLLIElement>(null);
   const near = useNear(ref);
   const [moreOpen, setMoreOpen] = useState(false);
-  useFullMeta(meta, near || moreOpen);
+  const { meta, loading: metaLoading } = useFullMeta(baseMeta, near || moreOpen);
   const [panel, setPanel] = useState<'score' | 'aspects' | 'comment'>();
   const [longText, setLongText] = useState(false);
   const watched = Boolean(rating?.watched);
@@ -184,7 +197,7 @@ export default function TitleCard({ k, meta, snap, rating, rank, info, interest,
                 <button type="button" className="ml-1 font-semibold text-accent" data-testid="synopsis-more" onClick={() => { onTouch?.(k); setLongText(!longText); }}>{longText ? 'Leer menos' : 'Leer más'}</button>
               )}
             </p>
-          ) : meta.completeness !== 'full' && near ? <p className="text-xs text-slate-500" data-testid="synopsis-loading">Cargando sinopsis…</p>
+          ) : metaLoading && near ? <p className="text-xs text-slate-500" data-testid="synopsis-loading">Cargando sinopsis…</p>
             : <p className="text-xs italic text-slate-500" data-testid="synopsis-none">{meta.overviewLang === 'en' ? 'TMDB no tiene la sinopsis en español.' : 'Sinopsis no disponible.'}</p>}
         </div>
         {info.why && info.why.length > 0 && (
@@ -261,7 +274,7 @@ export default function TitleCard({ k, meta, snap, rating, rank, info, interest,
             {info.cons?.length ? info.cons.map((c, i) => <p key={i} className="text-xs text-slate-300">{c}</p>) : <p className="text-xs text-slate-500">Sin datos que indiquen algo que podría no gustarte.</p>}
           </Section>
           <Section title="Información técnica" testId="more-tech">
-            <TechGrid meta={meta} snap={snap} />
+            <TechGrid meta={meta} snap={snap} loading={metaLoading} />
           </Section>
           {info.reliability && info.reliability.length > 0 && (
             <Section title="Fiabilidad" testId="more-reliability">
@@ -302,20 +315,22 @@ function Section({ title, children, tone = '#4ADE80', testId }: { title: string;
 
 function SimilarRow({ s }: { s: SimilarRef }) {
   const m = useLiveQuery(() => (s.key ? db.titles.get(s.key) : undefined), [s.key]);
+  // Sin ficha local: póster del catálogo narrativo ya cargado (sin pedir nada a TMDB)
+  const poster = m?.posterPath ?? (s.key ? getNarrativeIndex()?.get(s.key)?.poster : undefined);
   const body = (
     <>
-      {m?.posterPath ? <Poster path={m.posterPath} title={s.title} size="w92" className="h-12 w-8 shrink-0" /> : <span className="h-12 w-8 shrink-0 rounded-md bg-ink-700" aria-hidden="true" />}
+      {poster ? <Poster path={poster} title={s.title} size="w92" className="h-12 w-8 shrink-0" /> : <span className="h-12 w-8 shrink-0 rounded-md bg-ink-700" aria-hidden="true" />}
       <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium text-slate-100">{s.title}</span>{s.note && <span className="block text-[11px] leading-snug text-slate-400">{s.note}</span>}</span>
     </>
   );
   return <li data-testid="similar-ref-row">{s.key ? <TitleLink k={s.key} className="flex items-center gap-2">{body}</TitleLink> : <div className="flex items-center gap-2">{body}</div>}</li>;
 }
 
-function TechGrid({ meta, snap }: { meta: TitleMeta; snap?: AvailabilitySnapshot | null }) {
+function TechGrid({ meta, snap, loading }: { meta: TitleMeta; snap?: AvailabilitySnapshot | null; loading?: boolean }) {
   const genres = meta.genres.filter((g) => !/^Género \d+$/.test(g.name)).map((g) => g.name);
   const people = meta.directors.map((d) => d.name).slice(0, 3);
   const countries = countriesOf(meta).map(countryName);
-  const missing = meta.completeness === 'full' ? 'Sin datos' : 'Cargando…';
+  const missing = loading ? 'Cargando…' : 'Sin datos';
   const rows: [string, string][] = [
     ['Géneros', genres.join(', ') || missing],
     [meta.type === 'tv' ? 'Creación' : 'Dirección', people.join(', ') || missing],
