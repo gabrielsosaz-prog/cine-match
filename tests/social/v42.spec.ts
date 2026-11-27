@@ -177,8 +177,13 @@ test('v4.2 · dos teléfonos: vincular una vez, recomendar con un toque, recibir
     await tb.getByRole('button', { name: 'Nota general 8' }).click();
     await tb.getByTestId('score-save').click();
     await expect(tb.getByTestId('quick-score')).toHaveText(/Tu nota 8/);
-    await a.getByTestId('nav-inicio').click();
-    await expect(a.locator(`[data-testid="rec-item"][data-key="${key}"]`).getByTestId('quick-score')).toHaveText(/Puntuar/);
+    // La nota de B no toca la base local de A (A guardó el título pero no lo puntuó)
+    const aRating = await a.evaluate((k) => new Promise<{ overall?: number; list?: string } | undefined>((res) => {
+      const req = indexedDB.open('cine-match');
+      req.onsuccess = () => { const all = req.result.transaction('ratings').objectStore('ratings').getAll(); all.onsuccess = () => { res((all.result as { key: string }[]).find((r) => r.key === k) as never); req.result.close(); }; };
+    }), key);
+    expect(aRating?.list).toBe('want');
+    expect(aRating?.overall).toBeUndefined();
 
     // 13. B → A con el selector de contactos (B no tiene favorito) y comentario
     await b.getByTestId('nav-buscar').click();
