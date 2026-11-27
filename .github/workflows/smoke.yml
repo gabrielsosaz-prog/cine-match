@@ -57,6 +57,9 @@ jobs:
           echo "--- v3.1: videos oficiales (tráiler) de Volver al futuro"
           curl -fsS --max-time 30 "$APP/api/tmdb/movie/105/videos?language=es-MX&include_video_language=es,en,null" -o /tmp/vd.json
           python3 -c "import json;r=json.load(open('/tmp/vd.json'))['results'];print([(x['site'],x['type'],x['iso_639_1'],x.get('official'),x['name'][:40]) for x in r[:6]]);assert r"
+          echo "--- v4.1: videos de Breaking Bad (tv/1396) para revisar la prueba de tráileres"
+          curl -fsS --max-time 30 "$APP/api/tmdb/tv/1396/videos?language=es-MX&include_video_language=es,en,null" -o /tmp/bb.json
+          python3 -c "import json;r=json.load(open('/tmp/bb.json'))['results'];print(len(r),'videos');[print('-',x['site'],x['type'],x['iso_639_1'],x.get('iso_3166_1'),x.get('official'),x['key'],x['name'][:60]) for x in r[:12]]"
           echo "--- v3.1: descubrir por país de origen (Argentina) y ficha de persona (Ricardo Darín, buscado por nombre)"
           curl -fsS --max-time 30 "$APP/api/tmdb/discover/movie?with_origin_country=AR&sort_by=vote_count.desc&language=es-MX" -o /tmp/oc.json
           python3 -c "import json;r=json.load(open('/tmp/oc.json'))['results'];print([x['title'] for x in r[:5]]);assert r"

@@ -9,13 +9,12 @@ import { useRatings } from '../hooks/useRatings';
 import { friendlyError } from '../providers/errors';
 import { DEFAULT_FILTERS, type RankFilters } from '../services/filters';
 import { safely } from '../services/notices';
-import { setNotInterested, setWatched } from '../services/ratings';
+import { interestMap, recordInterest } from '../services/taste';
 import { explainSimilar, findSimilar, MAX_REFS, type RefWeight, type SimilarMode, type SimilarResponse, type SimilarResult } from '../services/similar';
-import type { Named, TitleKey, TitleMeta } from '../types';
-import { AvailabilityLine, ChannelBars, Empty, ErrorNote, Poster, publicScore, ScorePair, Spinner, TitleLink, TypeBadge } from '../ui/components';
+import type { InterestAnswer, Named, Rating, TitleKey, TitleMeta } from '../types';
+import { ChannelBars, Empty, ErrorNote, personalState, Poster, publicScore, Spinner } from '../ui/components';
+import TitleCard, { type CardInfo } from '../ui/TitleCard';
 import FilterPanel from '../ui/FilterPanel';
-import { TrailerButton } from '../ui/Trailer';
-import { num } from '../ui/format';
 import { useSearch } from './Search';
 
 type SimSort = 'combined' | 'similarity' | 'affinity' | 'public' | 'year' | 'title';
@@ -45,6 +44,7 @@ export default function Similar() {
   const [listReady, setListReady] = useState(false);
   const { page, setPage } = useScrollRestore('similar', listReady);
   const rs = useRatings(profileId);
+  const interests = useLiveQuery(() => interestMap(profileId), [profileId]);
 
   // Referencia recibida desde la ficha de un título
   useEffect(() => {
@@ -186,7 +186,7 @@ export default function Similar() {
         : `No encontramos títulos parecidos con estos filtros${onlyMine ? ' en tus plataformas' : ''}.`}</span></Empty>}
       <ul className="space-y-3" data-testid="similar-list" data-current={String(!busy && respSig === sig)}>
         {rows.slice(0, page * PAGE).map(({ r, meta, snap }) => (
-          <SimilarCard key={r.key} r={r} meta={meta} snap={snap} profileId={profileId} userScore={rs.byKey.get(r.key)?.overall} watched={rs.byKey.get(r.key)?.watched ?? false}
+          <SimilarCard key={r.key} r={r} meta={meta} snap={snap} profileId={profileId} rating={rs.byKey.get(r.key)} refs={refs} personalized={Boolean(resp?.personalized)} interest={interests?.get(r.key)?.answer}
             lines={explainSimilar(r, title, refs.length)} refName={title} onAddRef={refs.length < MAX_REFS && !refs.includes(r.key) ? () => addRef(r.key) : undefined} />
         ))}
       </ul>
@@ -198,45 +198,33 @@ export default function Similar() {
   );
 }
 
-function SimilarCard({ r, meta, snap, profileId, userScore, watched, lines, onAddRef, refName }: {
-  r: SimilarResult; meta: TitleMeta; snap: any; profileId: string; userScore?: number; watched: boolean; lines: string[]; onAddRef?: () => void; refName: (k: TitleKey) => string;
+/** v4.1 · Tarjeta común con los datos de Similares: similitud (contexto de esta pantalla) y «Para vos» de v3.4. */
+function SimilarCard({ r, meta, snap, profileId, rating, lines, onAddRef, refName, refs, personalized, interest }: {
+  r: SimilarResult; meta: TitleMeta; snap: any; profileId: string; rating?: Rating; lines: string[]; onAddRef?: () => void; refName: (k: TitleKey) => string; refs: TitleKey[]; personalized: boolean; interest?: InterestAnswer;
 }) {
-  const [open, setOpen] = useState(false);
+  const ps = personalState(r.affinity);
+  const per = r.perRef.length ? r.perRef : refs.map((k) => ({ key: k, percent: r.percent }));
+  const personal = personalized && r.affinity ? r.affinity.explanation.slice(0, 2) : [];
+  const info: CardInfo = {
+    compat: `Similitud ${r.percent} % · confianza ${r.confidence}`,
+    primaryLabel: 'Para vos', primary: ps.kind === 'insufficient' ? undefined : r.affinity!.score,
+    why: personal.length ? personal : lines.slice(0, 1), whyTitle: personal.length ? 'Por tu perfil' : 'Por qué se parece',
+    similar: per.filter((p) => p.key !== r.key).map((p) => ({ key: p.key, title: refName(p.key), note: `${p.percent} % de parecido` })),
+    similarNote: lines.join(' '),
+    cons: (r.affinity?.rejectionPenalty ?? 0) < -0.05 ? ['Se parece a títulos que descartaste con «No me interesa».'] : [],
+    badges: r.sameFranchise ? <span className="text-amber-200">misma saga</span> : undefined,
+    reliability: [
+      `La similitud mide el parecido narrativo con tus referencias (confianza ${r.confidence}: cuánta evidencia la respalda), no cuánto te gustaría.`,
+      ps.kind === 'insufficient' ? 'Información insuficiente para estimar «Para vos».' : `«Para vos» es la estimación del motor v3.4${ps.kind === 'provisional' ? ' (provisional, con poca evidencia)' : ''}; Similares la usa con cualquier motor elegido.`,
+    ],
+    moreExtra: r.affinity ? (
+      <details className="rounded-lg bg-ink-950/60 p-2"><summary className="cursor-pointer text-xs font-semibold text-slate-300">Cómo se calculó «Para vos»</summary>
+        <div className="mt-1"><ChannelBars channels={r.affinity.channels} base={r.affinity.base} score={r.affinity.score} /></div></details>
+    ) : undefined,
+  };
   return (
-    <li className="rounded-2xl bg-ink-900 p-3 ring-1 ring-white/5" data-testid="similar-item" data-key={r.key}>
-      <div className="flex gap-3">
-        <TitleLink k={r.key} className="shrink-0"><Poster path={meta.posterPath} title={meta.title} className="h-28 w-[76px]" /></TitleLink>
-        <div className="min-w-0 flex-1">
-          <TitleLink k={r.key} className="block min-w-0"><h3 className="line-clamp-2 font-semibold leading-tight">{meta.title}</h3></TitleLink>
-          <div className="mt-1"><ScorePair item={r.affinity} meta={meta} userScore={userScore} compact /></div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
-            <TypeBadge type={meta.type} />{meta.year && <span>{meta.year}</span>}
-            <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-200" data-testid="similarity">Similitud {r.percent}%</span>
-            <span className="text-[10px]" data-testid="similarity-confidence">confianza {r.confidence}</span>
-            {r.sameFranchise && <span className="text-[10px] text-amber-200">misma saga</span>}
-          </div>
-          <div className="mt-1.5"><AvailabilityLine snap={snap} compact /></div>
-          <button type="button" onClick={() => setOpen(!open)} className="mt-1.5 text-left text-xs text-slate-300" data-testid="similar-explanation">
-            {open ? lines.map((l, i) => <p key={i}>• {l}</p>) : <span className="line-clamp-2">{lines[0]}</span>}
-          </button>
-          {open && r.perRef.length > 1 && (
-            <ul className="mt-2 space-y-0.5 text-[11px] text-slate-400" data-testid="similar-per-ref">
-              {r.perRef.map((p) => <li key={p.key} className="flex items-center gap-2"><span className="w-28 truncate">{refName(p.key)}</span><span className="h-1.5 flex-1 rounded bg-ink-800"><span className="block h-1.5 rounded bg-violet-400/70" style={{ width: `${p.percent}%` }} /></span><span className="w-8 text-right">{p.percent}%</span></li>)}
-            </ul>
-          )}
-          {open && <div className="mt-2 flex flex-wrap items-center gap-2"><TrailerButton k={r.key} originalLanguage={meta.originalLanguage} title={meta.title} year={meta.year} compact /></div>}
-          {open && r.affinity && <div className="mt-2 rounded-lg bg-ink-950/60 p-2"><p className="mb-1 text-[10px] text-slate-500">«Para vos» (afinidad, distinta de la similitud):</p><ChannelBars channels={r.affinity.channels} base={r.affinity.base} score={r.affinity.score} /></div>}
-        </div>
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-1.5">
-        <button type="button" data-testid="similar-watched" aria-pressed={watched} onClick={() => safely(() => setWatched(profileId, r.key, !watched), 'la marca de vista')}
-          className={`rounded-lg px-1 py-1.5 text-[11px] font-semibold ${watched ? 'bg-emerald-500/20 text-emerald-300' : 'bg-ink-800 text-slate-300 ring-1 ring-white/10'}`}>{watched ? '✓ Vista' : '○ Vista'}</button>
-        <button type="button" data-testid="similar-not-interested" onClick={() => safely(() => setNotInterested(profileId, r.key, true), '«No me interesa»')}
-          className="rounded-lg bg-ink-800 px-1 py-1.5 text-[11px] font-semibold text-slate-300 ring-1 ring-white/10">✕ No me interesa</button>
-        {onAddRef ? <button type="button" data-testid="similar-add-ref" onClick={onAddRef} className="rounded-lg bg-ink-800 px-1 py-1.5 text-[11px] font-semibold text-accent ring-1 ring-white/10">＋ Referencia</button>
-          : <TitleLink k={r.key} className="rounded-lg bg-ink-800 px-1 py-1.5 text-center text-[11px] font-semibold text-slate-300 ring-1 ring-white/10">Puntuar</TitleLink>}
-      </div>
-      {userScore !== undefined && r.affinity && <p className="mt-1 text-[10px] text-slate-500">Tu nota {num(userScore, 0)} · estimación para vos {num(r.affinity.score)} (se muestran por separado).</p>}
-    </li>
+    <TitleCard k={r.key} meta={meta} snap={snap} rating={rating} info={info} profileId={profileId} testId="similar-item"
+      interest={{ value: interest, onPick: (a) => { void safely(() => recordInterest(profileId, r.key, a, { engine: 'similares', source: 'similares' }), 'tu respuesta'); } }}
+      actionsExtra={onAddRef ? <button type="button" data-testid="similar-add-ref" onClick={onAddRef} className="mt-2 w-full rounded-lg bg-ink-800 py-2 text-xs font-semibold text-accent ring-1 ring-white/10">＋ Usar como referencia</button> : undefined} />
   );
 }

@@ -51,7 +51,7 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
   page.on('pageerror', (e) => errors.push(e.message));
   const v = await (await page.request.get('/version.json')).json();
   log(info.project.name, JSON.stringify(v));
-  expect(v.version).toBe('3.5.0');
+  expect(v.version).toBe('4.1.0');
   expect(v.algorithm).toBe('hybrid-narrative-3.4.0');
   await start(page);
 
@@ -131,15 +131,26 @@ test('producción v3.2: personas, reparto, actores + países y tráileres con TM
   // 16-19. Tráileres
   let searchSeen = false;
   for (const [k, name, year] of [['movie/105', 'Volver al Futuro', 1985], ['tv/1396', 'Breaking Bad', 2008], ['movie/496243', 'Parásitos', 2019], ['tv/111803', 'The White Lotus', 2021], ['tv/94997', 'La casa del dragón', 2022]] as const) {
-    await page.goto(`/#/t/${k}`);
-    await page.getByTestId('trailer-button').click();
+    // v4.1: carga completa de la ficha antes de abrir el tráiler (antes, con la navegación por hash y el «Atrás» de la
+    // vuelta anterior, el reproductor de Breaking Bad podía cerrarse solo y la prueba esperaba 15 min sin informar)
     const modal = page.getByTestId('trailer-modal');
-    await expect(modal.or(page.getByTestId('trailer-none')).first()).toBeVisible({ timeout: 60000 });
-    if (!(await modal.isVisible())) { log(k, 'sin tráiler informado por TMDB'); continue; }
-    const versions = await page.getByTestId('trailer-version').evaluateAll((els) => els.map((e) => e.textContent?.replace(/\s+/g, ' ').trim()));
+    let opened = false, none = false;
+    for (let attempt = 1; attempt <= 2 && !opened && !none; attempt++) {
+      await page.goto(`/#/t/${k}`);
+      if (attempt > 1) await page.reload();
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 60000 });
+      await page.getByTestId('trailer-button').first().click();
+      await expect(modal.or(page.getByTestId('trailer-none')).first()).toBeVisible({ timeout: 60000 });
+      if (!(await modal.isVisible())) { none = true; break; }
+      opened = await expect(modal.getByTestId('trailer-audio')).toBeVisible({ timeout: 30000 }).then(() => true, () => false);
+      if (!opened) log(k, `intento ${attempt}: el reproductor no quedó abierto ·`, (await page.locator('body').innerText()).slice(0, 300).replace(/\s+/g, ' '));
+    }
+    if (none) { log(k, 'sin tráiler informado por TMDB'); continue; }
+    expect(opened, `${k}: el reproductor de tráiler no quedó abierto`).toBe(true);
+    const versions = await modal.getByTestId('trailer-version').evaluateAll((els) => els.map((e) => e.textContent?.replace(/\s+/g, ' ').trim()));
     const search = modal.getByTestId('trailer-youtube-search');
-    log(k, 'elegido:', await page.getByTestId('trailer-audio').innerText(), '| versiones:', versions, '| búsqueda YouTube:', (await search.count()) ? await search.first().getAttribute('href') : 'no');
-    const audio = await page.getByTestId('trailer-audio').innerText();
+    log(k, 'elegido:', await modal.getByTestId('trailer-audio').innerText({ timeout: 30000 }), '| versiones:', versions, '| búsqueda YouTube:', (await search.count()) ? await search.first().getAttribute('href') : 'no');
+    const audio = await modal.getByTestId('trailer-audio').innerText({ timeout: 30000 });
     if (k === 'movie/105') expect(audio).toContain('español');
     if (k === 'movie/496243') expect(versions.some((x) => /VOSE/.test(x ?? '') && /Subtítulos en español indicados/.test(x ?? ''))).toBe(true);
     // «[Subtitled]» en inglés no se presenta como subtítulos en español

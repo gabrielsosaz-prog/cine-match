@@ -13,7 +13,7 @@ test('producción v3.5: motor principal 3.4.0 y comparación a ciegas', async ({
   page.on('pageerror', (e) => errors.push(e.message));
   const v = await (await page.request.get('/version.json')).json();
   log(info.project.name, JSON.stringify(v));
-  expect(v).toMatchObject({ version: '3.5.0', algorithm: 'hybrid-narrative-3.4.0', candidate: 'hybrid-personal-3.5.0' });
+  expect(v).toMatchObject({ version: '4.1.0', algorithm: 'hybrid-narrative-3.4.0', candidate: 'hybrid-personal-3.5.0' });
   await page.goto('/');
   await expect(page.getByText('Paso 1 de 3')).toBeVisible();
   for (const p of ['netflix', 'prime', 'disney', 'max', 'paramount']) { const c = page.getByTestId(`ob-${p}`); if (await c.count() && (await c.getAttribute('aria-pressed')) === 'false') await c.click(); }

@@ -280,17 +280,26 @@ export function compatibilityLevel(percentile: number): 'muy alta' | 'alta' | 'm
 export function makeExplainer(ctx: AttractionContext, titleOf: (k: TitleKey) => string | undefined) {
   const sets = attractionSets(ctx.idx, ctx.ratings, ctx.interests, ctx.taste);
   const rowKey = new Map(ctx.idx.titles.filter((t) => t.row >= 0).map((t) => [t.row, t.key]));
-  return (s: AttractionScore): { pros: string[]; cons: string[]; similar: string[] } => {
+  return (s: AttractionScore): { pros: string[]; cons: string[]; similar: string[]; similarKeys: TitleKey[] } => {
     const pros = s.rules.filter((h) => h.w > 0).sort((a, b) => b.w - a.w).map((h) => cap(h.label));
     const cons = s.rules.filter((h) => h.w < 0).sort((a, b) => a.w - b.w).map((h) => cap(h.label));
     const similar: string[] = [];
+    const similarKeys: TitleKey[] = [];
     const c = ctx.idx.get(s.key);
     if (c && c.row >= 0 && ctx.idx.emb) {
-      // sólo referencias con peso completo (notas altas, «Me interesa» o más, títulos de referencia)
-      const best = sets.pos.filter((a) => a.w >= 1).map((a) => ({ k: rowKey.get(a.row)!, v: cosine(ctx.idx, c.row, a.row) })).sort((a, b) => b.v - a.v);
-      for (const b of best) { const t = titleOf(b.k) ?? ctx.idx.get(b.k)?.title; if (t && !similar.includes(t)) similar.push(t); if (similar.length >= 2) break; }
+      const own = (titleOf(s.key) ?? c.title ?? '').trim().toLowerCase();
+      // sólo referencias con peso completo (notas altas, «Me interesa» o más, títulos de referencia).
+      // v4.1: nunca el propio título (p. ej. uno que marcaste «Me interesa» es referencia de sí mismo) ni otro
+      // con el mismo nombre. Sólo cambia la explicación: el puntaje y el orden no usan esta lista.
+      const best = sets.pos.filter((a) => a.w >= 1 && a.row !== c.row).map((a) => ({ k: rowKey.get(a.row)!, v: cosine(ctx.idx, c.row, a.row) })).sort((a, b) => b.v - a.v);
+      for (const b of best) {
+        if (!b.k || b.k === s.key) continue;
+        const t = titleOf(b.k) ?? ctx.idx.get(b.k)?.title;
+        if (t && t.trim().toLowerCase() !== own && !similar.includes(t)) { similar.push(t); similarKeys.push(b.k); }
+        if (similar.length >= 2) break;
+      }
     }
-    return { pros, cons, similar };
+    return { pros, cons, similar, similarKeys };
   };
 }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

@@ -130,6 +130,20 @@ describe('v4.0 · orden, candidatos y exclusiones', () => {
     expect(['muy alta', 'alta', 'media', 'baja']).toContain(it.attraction!.level);
     expect(it.attraction!.similar).toContain('Película uno');
   });
+  it('v4.1: «Parecida a» nunca es el propio título (aunque sea referencia por «Me interesa»); el orden no cambia', () => {
+    const titles = new Map<TitleKey, TitleMeta>([['movie:1' as TitleKey, { title: 'Película uno' } as TitleMeta], ['movie:10' as TitleKey, { title: 'Diez' } as TitleMeta]]);
+    const withSelf: InterestRecord[] = [...interests, { id: 'b', profileId: P, key: 'movie:10' as TitleKey, answer: 'mucho', at: 2 }];
+    const c2: AttractionContext = { ...ctx, interests: withSelf };
+    const cands = ['movie:10', 'movie:11', 'movie:13'] as TitleKey[];
+    const out = rankWithAttraction({ profile: {} as never, ratings, titles, settings: {}, attraction: c2, candidates: cands });
+    const ten = out.find((i) => i.key === 'movie:10')!;
+    expect(ten.attraction!.similar).not.toContain('Diez');
+    expect(ten.attraction!.similarKeys).not.toContain('movie:10');
+    expect(ten.attraction!.similar[0]).toBe('Película uno');
+    expect(ten.attraction!.similarKeys![0]).toBe('movie:1');
+    // el puntaje y el orden son los del método (la lista de parecidos sólo es explicación)
+    expect(out.map((i) => i.key)).toEqual(rankAttraction(scoreAttraction(c2, cands), idx).map((s) => s.key));
+  });
   it('v4.0 está registrado junto a v3.4 y v3.5', () => {
     expect(Object.keys(ENGINES).sort()).toEqual(['v3.4', 'v3.5', 'v4.0']);
     expect(ENGINE_LABEL['attraction-4.0.0']).toBe('v4.0');

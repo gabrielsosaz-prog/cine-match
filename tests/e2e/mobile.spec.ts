@@ -39,7 +39,7 @@ test('flujo completo en Android: configurar, incorporar, recomendar, buscar y va
   // Inicio con ranking explicado
   await expect(page.getByRole('heading', { name: 'Para vos' })).toBeVisible();
   await expect(page.getByTestId('rec-item').first()).toBeVisible({ timeout: 20000 });
-  await expect(page.getByTestId('rec-explanation').first()).not.toBeEmpty();
+  await expect(page.getByTestId('card-why').first()).not.toBeEmpty();
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-inicio.png`, fullPage: false });
 
@@ -77,7 +77,7 @@ test('flujo completo en Android: configurar, incorporar, recomendar, buscar y va
 
   // Persistencia entre sesiones: recargar
   await page.reload();
-  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await page.getByRole('link', { name: /^Notas$/ }).click();
   await expect(page.getByTestId('rating-row').filter({ hasText: 'Scifi Film' })).toContainText('6');
   await page.screenshot({ path: `test-results/${info.project.name}-valoraciones.png` });
 
@@ -162,7 +162,7 @@ test('v2: filtro de vistos y acciones rápidas sin salir del ranking', async ({ 
   await expect(page.getByTestId('rec-item').filter({ hasText: name })).toHaveCount(1);
   await page.getByTestId('watched-filter-unwatched').click();
 
-  // Puntuación general rápida: no marca vista, recalcula y no cambia de pantalla
+  // Puntuación general rápida dentro de la tarjeta (v4.1: al guardar se marca vista), sin cambiar de pantalla
   const card = page.getByTestId('rec-item').nth(1);
   const scoredName = await titleOf(card);
   await card.evaluate((e) => e.scrollIntoView({ block: 'center' }));
@@ -171,28 +171,25 @@ test('v2: filtro de vistos y acciones rápidas sin salir del ranking', async ({ 
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-v2-acciones.png` });
   await card.getByRole('button', { name: 'Nota general 9' }).click();
-  await expect(card.getByTestId('quick-after-save')).toBeVisible({ timeout: 15000 });
+  await card.getByTestId('score-save').click();
+  await expect(card.getByTestId('quick-score-row')).toBeHidden({ timeout: 15000 });
   await expect(page).toHaveURL(/#\/$/);
   const scoredCard = page.getByTestId('rec-item').filter({ hasText: scoredName });
-  await expect(scoredCard).toHaveCount(1); // puntuar no la marca como vista
-  await expect(scoredCard.getByTestId('quick-watched')).toHaveAttribute('aria-pressed', 'false');
-  await expect(scoredCard).toContainText('tu nota');
-  await scoredCard.getByTestId('quick-done').click();
+  await expect(scoredCard).toHaveCount(1); // sigue en la lista hasta actualizar el ranking
+  await expect(scoredCard.getByTestId('quick-watched')).toHaveAttribute('aria-pressed', 'true');
+  await expect(scoredCard.getByTestId('quick-score')).toContainText('Tu nota 9');
 
-  // Panel de aspectos dentro del ranking, editando la valoración existente
-  await scoredCard.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  // Aspectos dentro de la tarjeta, editando la valoración existente
+  await scoredCard.getByTestId('more-toggle').click();
   await scoredCard.getByTestId('quick-aspects').click();
-  const sheet = page.getByTestId('aspects-sheet');
-  await expect(sheet).toBeVisible();
-  await expect(sheet.getByTestId('overall')).toContainText('9');
-  await sheet.getByTestId('dim-acting').getByRole('radio', { name: /4 estrellas$/ }).click();
-  await sheet.getByTestId('dim-pacing').getByRole('radio', { name: /2 estrellas$/ }).click();
+  await scoredCard.getByTestId('dim-acting').getByRole('radio', { name: /4 estrellas$/ }).click();
+  await scoredCard.getByTestId('dim-pacing').getByRole('radio', { name: /2 estrellas$/ }).click();
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-v2-aspectos.png` });
-  await sheet.getByTestId('save-rating').click();
-  await expect(sheet).toBeHidden({ timeout: 15000 });
+  await scoredCard.getByTestId('aspects-save').click();
   await expect(page).toHaveURL(/#\/$/);
-  await expect(page.getByTestId('rec-item').filter({ hasText: scoredName }).getByTestId('quick-aspects')).toContainText('2/7');
+  await expect(scoredCard.getByTestId('quick-aspects')).toContainText('2/7');
+  await expect(scoredCard.getByTestId('quick-score')).toContainText('Tu nota 9');
 
   // Combinado con plataforma y tipo
   await page.getByTestId('filter-tv').click();
@@ -269,8 +266,8 @@ test('v2.1: puntuar varios títulos seguidos sin que desaparezcan; actualizar el
     await card.evaluate((e) => e.scrollIntoView({ block: 'center' }));
     await card.getByTestId('quick-score').click();
     await card.getByRole('button', { name: `Nota general ${7 + i}` }).click();
-    await expect(card.getByTestId('quick-after-save')).toBeVisible({ timeout: 15000 });
-    await card.getByTestId('quick-done').click();
+    await card.getByTestId('score-save').click();
+    await expect(card.getByTestId('quick-score')).toContainText(`Tu nota ${7 + i}`, { timeout: 15000 });
   }
   // Marcar una como vista con el filtro «No vistos»: sigue visible durante la interacción
   await items.nth(3).getByTestId('quick-watched').click();
@@ -294,35 +291,38 @@ test('v2.1: estrellas, «Otros» y borrador ante un cierre accidental', async ({
   await card.evaluate((e) => e.scrollIntoView({ block: 'center' }));
   await card.getByTestId('quick-score').click();
   await card.getByRole('button', { name: 'Nota general 8' }).click();
-  await card.getByTestId('quick-complete').click();
-  const sheet = page.getByTestId('aspects-sheet');
-  await expect(sheet).toBeVisible();
-  await expect(sheet.getByTestId('dim-story')).toBeVisible();
+  await card.getByTestId('score-save').click();
+  await expect(card.getByTestId('quick-score')).toContainText('Tu nota 8', { timeout: 15000 });
+  // v4.1: aspectos dentro de la tarjeta («Más información y acciones»)
+  await card.getByTestId('more-toggle').click();
+  await card.getByTestId('quick-aspects').click();
+  const panel = card.getByTestId('aspects-panel');
   // Orden exacto de los siete aspectos
-  const labels = await sheet.locator('[data-testid^="dim-"]:not([data-testid$="-clear"])').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
+  const labels = await panel.locator('[data-testid^="dim-"]:not([data-testid$="-clear"])').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
   expect(labels).toEqual(['dim-story', 'dim-acting', 'dim-ending', 'dim-emotion', 'dim-visuals', 'dim-pacing', 'dim-suspense']);
-  await expect(sheet).not.toContainText('Originalidad');
-  await expect(sheet).not.toContainText('Personajes');
-  await sheet.getByTestId('dim-story').getByRole('radio', { name: /5 estrellas$/ }).click();
-  await sheet.getByTestId('dim-ending').getByRole('radio', { name: /3 estrellas$/ }).click();
-  await sheet.getByTestId('dim-ending-clear').click(); // quitar una estrella ya asignada
-  await sheet.getByTestId('comment').fill('Me gustó la idea de que en realidad vivimos dentro de una simulación.');
-  await expect(sheet.getByTestId('comment-interpretation')).toContainText('realidad simulada');
+  await expect(panel).not.toContainText('Originalidad');
+  await expect(panel).not.toContainText('Personajes');
+  await panel.getByTestId('dim-story').getByRole('radio', { name: /5 estrellas$/ }).click();
+  await panel.getByTestId('dim-ending').getByRole('radio', { name: /3 estrellas$/ }).click();
+  await panel.getByTestId('dim-ending-clear').click(); // quitar una estrella ya asignada
+  await panel.getByTestId('aspects-save').click();
+  await expect(card.getByTestId('quick-aspects')).toContainText('1/7', { timeout: 15000 });
+  // Comentario: cerrar sin guardar conserva el borrador
+  await card.getByTestId('card-comment').click();
+  await card.getByTestId('comment').fill('Me gustó la idea de que en realidad vivimos dentro de una simulación.');
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-v21-estrellas.png` });
-  // Cierre accidental tocando fuera: el borrador se conserva
-  await page.screenshot({ path: `test-results/${info.project.name}-v21-antes-de-cerrar.png` });
-  await page.mouse.click(10, 50);
-  await expect(sheet).toBeHidden();
-  const c2 = page.locator(`[data-testid="rec-item"][data-key="${key}"]`);
-  await expect(c2).toContainText('borrador');
-  await c2.getByTestId('quick-aspects').click();
-  await expect(page.getByTestId('draft-restored')).toBeVisible();
+  await card.getByTestId('card-comment').click(); // cierre accidental
+  await expect(card.getByTestId('comment-panel')).toHaveCount(0);
+  await card.getByTestId('card-comment').click();
+  await expect(card.getByTestId('comment')).toHaveValue(/simulación/);
+  await card.getByTestId('comment-save').click();
+  await expect(card.getByTestId('comment-panel')).toHaveCount(0, { timeout: 15000 });
+  await expect(card.getByTestId('card-comment')).toContainText('✓');
+  // La ficha completa muestra lo guardado y la interpretación local del comentario
+  await page.locator(`[data-testid="rec-item"][data-key="${key}"]`).getByTestId('card-open').click();
   await expect(page.getByTestId('comment')).toHaveValue(/simulación/);
-  await page.getByTestId('save-rating').click();
-  await expect(sheet).toBeHidden({ timeout: 15000 });
-  await expect(c2.getByTestId('quick-aspects')).toContainText('1/7');
-  await expect(c2).not.toContainText('borrador');
+  await expect(page.getByTestId('comment-interpretation')).toContainText('realidad simulada');
 });
 
 test('v2.1: «No me interesa», descartados y reversión', async ({ page }) => {
@@ -331,15 +331,16 @@ test('v2.1: «No me interesa», descartados y reversión', async ({ page }) => {
   const key = await card.getAttribute('data-key');
   const name = await titleOf(card);
   await card.evaluate((e) => e.scrollIntoView({ block: 'center' }));
-  await card.getByTestId('quick-not-interested').click();
+  await card.getByTestId('interest-no').click();
   await expect(card.getByTestId('dismissed-note')).toBeVisible();
   await expect(card).toHaveAttribute('data-dismissed', 'true'); // sigue visible hasta actualizar
   await card.getByTestId('undo-not-interested').click();
-  await expect(card.getByTestId('quick-not-interested')).toBeVisible();
-  await card.getByTestId('quick-not-interested').click();
+  await expect(card.getByTestId('dismissed-note')).toHaveCount(0);
+  await card.getByTestId('interest-no').click();
+  await expect(card.getByTestId('dismissed-note')).toBeVisible();
   await page.getByTestId('apply-ranking').click();
   await expect(page.locator(`[data-testid="rec-item"][data-key="${key}"]`)).toHaveCount(0, { timeout: 15000 });
-  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await page.getByRole('link', { name: /^Notas$/ }).click();
   await page.getByTestId('view-dismissed').click();
   const row = page.getByTestId('rating-row').filter({ hasText: name });
   await expect(row).toBeVisible();
@@ -380,7 +381,7 @@ test('v2.1: panel de filtros combinables con indicador y limpieza', async ({ pag
 
 test('v2.1: porcentaje de aspectos y acceso a los faltantes', async ({ page }) => {
   await onboardQuick(page);
-  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await page.getByRole('link', { name: /^Notas$/ }).click();
   const row = page.getByTestId('rating-row').first();
   await expect(row.getByTestId('completion')).toHaveAttribute('data-percent', '0');
   await row.getByTestId('row-complete').click();
@@ -429,12 +430,13 @@ test('v3: 10 recomendaciones al inicio, «Ver más» de a 10 y notas pública y 
   await expect(page.getByTestId('rec-item')).toHaveCount(10);
   await expect(page.getByTestId('rows-count')).toContainText('Mostrando 10 de');
   const first = page.getByTestId('rec-item').first();
-  await expect(first.getByTestId('score-personal')).toBeVisible();
+  await expect(first.getByTestId('box-primary')).toHaveAttribute('data-label', 'Para vos');
   await expect(first.getByTestId('score-public')).toContainText('TMDB');
   await page.getByTestId('show-more').click();
   await expect(page.getByTestId('rec-item')).toHaveCount(20);
   // Diagnóstico por canal en la explicación
-  await first.getByTestId('rec-explanation').click();
+  await first.getByTestId('more-toggle').click();
+  await first.getByTestId('rec-explanation').locator('summary').click();
   await expect(first.getByTestId('channel-bars')).toBeVisible();
   // Ordenar por público: la lista sigue completa y se conserva al recargar
   await page.getByTestId('home-sort').selectOption('public');
@@ -466,7 +468,7 @@ test('v3: guardar en la ficha confirma sin esperar el recálculo y las valoracio
     await page.getByTestId('save-rating').click();
     await expect(page.getByTestId('save-status')).toContainText('Guardado', { timeout: 5000 });
   }
-  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await page.getByRole('link', { name: /^Notas$/ }).click();
   await expect(page.getByTestId('rating-row').first()).toBeVisible();
   const rows = await page.getByTestId('rating-row').count();
   expect(rows).toBeGreaterThanOrEqual(5); // las de la incorporación + esta (puede coincidir con una ya puntuada)
@@ -475,7 +477,7 @@ test('v3: guardar en la ficha confirma sin esperar el recálculo y las valoracio
 
 test('v3: el orden A-Z de Valoraciones se conserva al editar un título y al recargar', async ({ page }) => {
   await onboardQuick(page);
-  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await page.getByRole('link', { name: /^Notas$/ }).click();
   await page.getByTestId('ratings-sort').selectOption('title');
   await expect(page.getByTestId('ratings-dir')).toHaveText('A→Z');
   const names = async () => (await page.getByTestId('rating-row').locator('.truncate.font-medium').allInnerTexts()).map((x) => x.trim());
@@ -489,7 +491,7 @@ test('v3: el orden A-Z de Valoraciones se conserva al editar un título y al rec
   await expect(page.getByTestId('ratings-sort')).toHaveValue('title');
   expect(await names()).toEqual(before);
   await page.getByRole('link', { name: /Inicio/ }).click();
-  await page.getByRole('link', { name: /Valoraciones/ }).click();
+  await page.getByRole('link', { name: /^Notas$/ }).click();
   await expect(page.getByTestId('ratings-sort')).toHaveValue('title');
   await page.reload();
   await expect(page.getByTestId('ratings-sort')).toHaveValue('title');
@@ -541,7 +543,7 @@ test('v3: Similares con dos referencias, similitud y afinidad separadas, filtros
   await expect(page.getByTestId('similar-ref')).toHaveCount(1);
   await expect(page.getByTestId('similar-item').first()).toBeVisible({ timeout: 30000 });
   const first = page.getByTestId('similar-item').first();
-  await expect(first.getByTestId('similarity')).toContainText('%');
+  await expect(first.getByTestId('card-compat')).toContainText('Similitud');
   await expect(first.getByTestId('score-public')).toBeVisible();
   await expect(page.getByTestId('similar-personalized')).toBeVisible();
   // Segunda referencia
@@ -553,10 +555,10 @@ test('v3: Similares con dos referencias, similitud y afinidad separadas, filtros
   const results = await page.getByTestId('similar-item').locator('h3').allInnerTexts();
   for (const r of refs) expect(results).not.toContain(r.replace('✕', '').trim());
   // Explicación + acción rápida
-  await first.getByTestId('similar-explanation').click();
-  await first.getByTestId('similar-watched').evaluate((e) => e.scrollIntoView({ block: 'center' }));
-  await first.getByTestId('similar-watched').click();
-  await expect(first.getByTestId('similar-watched')).toHaveAttribute('aria-pressed', 'true');
+  await expect(first.getByTestId('card-why')).not.toBeEmpty();
+  await first.getByTestId('quick-watched').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await first.getByTestId('quick-watched').click();
+  await expect(first.getByTestId('quick-watched')).toHaveAttribute('aria-pressed', 'true');
   // Filtro: sólo series
   await page.getByTestId('filters-toggle').click();
   await page.getByTestId('panel-tv').click();

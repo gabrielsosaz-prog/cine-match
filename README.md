@@ -61,6 +61,14 @@ Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se 
 - **Filtros avanzados** combinables (tipo, géneros incluidos/excluidos, años, plataformas, vistos, duración, afinidad mínima), con indicador, «Limpiar filtros» y «Restablecer generales». Se aplican al conjunto de candidatos antes de ordenar; si no hay resultados se indica qué filtro restringe y se puede buscar más en TMDB con esos filtros.
 - **Porcentaje de aspectos completados** (aspectos / 7 × 100) en Valoraciones, con filtros, orden y acceso directo a los faltantes.
 
+### Novedades v4.1 (sólo interfaz; motores v3.4, v3.5 y v4.0 sin cambios)
+
+- **Tarjeta común** (`src/ui/TitleCard.tsx`) en Inicio, Similares y Quiero ver: póster, título, año · tipo · duración, plataformas en texto, compatibilidad, dos recuadros (Satisfacción/Para vos y TMDB), sinopsis en español con «Leer más», «Por tu perfil», acciones 2×2 (tráiler en la app, Quiero verla/Guardada, Ya la vi/Vista, Puntuar), fila de interés y desplegable «Más información y acciones» (Parecida a, Qué podría no gustarte, información técnica, fiabilidad, aspectos, comentario, ficha).
+- **Barra inferior de 7 accesos** con íconos: Inicio, Buscar, Similares, Quiero ver, Notas, Mis gustos, Ajustes.
+- La sinopsis completa se pide sólo cuando la tarjeta se acerca a la pantalla (una vez por sesión, con la caché existente) y el tráiler sólo al tocar «Ver tráiler».
+- «Parecida a» (v4.0) ya no muestra el propio título; el puntaje no cambia (ranking idéntico verificado con datos reales).
+- Sin cambios en el esquema de almacenamiento ni en el formato de copia (`cine-match-export/4`).
+
 ### Novedades v3.5 (app 3.5.0; el motor principal sigue siendo `hybrid-narrative-3.4.0`)
 
 - **Motor candidato `hybrid-personal-3.5.0`** (`src/engine/personalEngine.ts`): combina el motor 3.4.0 con un modelo personal regularizado sobre rasgos interpretables (géneros, formato, calidad pública, época, idioma, 48 rasgos narrativos) y un modelo de interés que aprende de «No me interesa» sin tratarlo como nota negativa. Con menos de 8 notas se comporta igual que 3.4.0.

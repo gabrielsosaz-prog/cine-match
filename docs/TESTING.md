@@ -1,3 +1,11 @@
+# Resultados de pruebas (v4.1, interfaz compacta)
+
+- Unitarias (Vitest): 292/292. Tipos: sin errores.
+- Interfaz en emulación Android (Pixel 7 y 360 px, TMDB simulado): 82/82, incluida `tests/e2e/v41.spec.ts` (tarjeta común en las tres pantallas, sincronización, persistencia, tres motores, sin desborde horizontal, posición estable).
+- Equivalencia v4.0 con datos reales (sólo local, fuera del repositorio): 400/400 recomendaciones idénticas en orden y puntajes; «Parecida a» consigo mismo pasó de 13 casos a 0.
+- Actualización v4.0 → v4.1 con una copia real (sólo local): notas, intereses, perfil de gustos, perfiles y ajustes idénticos.
+- Producción con TMDB real: `tests/prod/v41.spec.ts` (workflow «Flujos reales en producción»).
+
 # Resultados de pruebas (v3.6, incidente de persistencia)
 
 - Vitest: **275/275 OK**. 28 nuevas en `tests/unit/v36-storage.test.ts`: instalación nueva sin escrituras; error al abrir
