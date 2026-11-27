@@ -7,10 +7,10 @@
  * Vacíos = la app funciona igual, sin funciones sociales.
  */
 export const SOCIAL_CONFIG = {
-  url: '',
-  anonKey: '',
+  url: 'https://wocofvwwafasimgnvrwd.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvY29mdnd3YWZhc2ltZ252cndkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU4MTM0MjcsImV4cCI6MjExMTM4OTQyN30.fIKhKeiqL4kn2tKrNSrLB82UIbItyUxLtGEltQZvYKo',
   /** Clave pública VAPID (base64url) para notificaciones push */
-  vapidPublicKey: '',
+  vapidPublicKey: 'BNGmENYGhWAQJld02KRFBR--X84CTmUREGrBpdzfftphjqBfvg_aSvlrUBmAiZEgFBzCbediwznaV50gDlXKQ14',
 };
 
 /** Pruebas: un servidor social simulado (tests/fixtures/fakeSocialServer.mjs) reemplaza a Supabase. */
