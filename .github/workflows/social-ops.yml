@@ -63,6 +63,8 @@ jobs:
         if: contains(steps.task.outputs.task, 'prodlive')
         run: |
           npx playwright install --with-deps chromium
+          for i in $(seq 1 40); do curl -s "$APP_URL/version.json?t=$i" | grep -q '"4.2.0"' && break; sleep 15; done
+          curl -s "$APP_URL/version.json"
           SOCIAL_BASE=https://cine-match-pied-tau.vercel.app npx playwright test -c playwright.social.config.ts --reporter=line
       - name: Publicar capturas (sin datos personales)
         if: always() && (contains(steps.task.outputs.task, 'e2e') || contains(steps.task.outputs.task, 'prodlive'))
