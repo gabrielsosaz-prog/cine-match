@@ -11,3 +11,4 @@ for f in supabase/migrations/*.sql; do $T -q -f "$f"; done
 # Segunda pasada: las migraciones deben ser idempotentes
 for f in supabase/migrations/*.sql; do $T -q -f "$f"; done
 $T -f supabase/tests/security.sql
+$T -f supabase/tests/security-v43.sql
