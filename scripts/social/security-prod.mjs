@@ -95,13 +95,15 @@ try {
   ok(!back.error && (await A.c.from('recommendations').select('id').eq('recipient', A.id)).data?.length === 1, '13. B recomienda a A (ambos sentidos)');
 
   // 14. C no accede a nada privado de A ni de B (API directa)
-  await zero(C.c.from('recommendations').select('*'), '14. C: recomendaciones de A/B');
+  await zero(C.c.from('recommendations').select('id, sender, recipient, title, comment'), '14. C: recomendaciones de A/B');
+  await fails(C.c.from('recommendations').select('*'), /permission denied/, '14. C: «select *» rechazado (columnas internas)');
   await zero(C.c.from('contacts').select('*'), '14. C: contactos de A/B');
   await zero(C.c.from('want_items').select('*'), '14. C: Quiero ver de A/B');
   await zero(C.c.from('rec_inbox').select('*'), '14. C: bandeja de B');
   await zero(C.c.from('social_profiles').select('*').neq('user_id', C.id), '14. C: perfiles ajenos');
   await zero(C.c.from('push_subscriptions').select('*'), '14. C: suscripciones ajenas');
-  await zero(C.c.from('invites').select('*'), '14. C: invitaciones ajenas');
+  await zero(C.c.from('invites').select('id, created_at, expires_at, used_at'), '14. C: invitaciones ajenas');
+  await fails(C.c.from('invites').select('code_hash'), /permission denied/, '14. C: hash de códigos ilegible');
   await fails(C.c.rpc('get_matches', { p_contact: A.id }), /matches_not_authorized/, '14. C: coincidencias con A');
   await fails(C.c.rpc('send_recommendation', { p_recipient: A.id, p_media_type: 'movie', p_tmdb_id: 1, p_title: 'x' }), /not_a_contact/, '14. C: enviar a A');
   await fails(C.c.from('recommendations').insert({ sender: A.id, recipient: B.id, sender_name: 'Ana', media_type: 'movie', tmdb_id: 1, title: 'falsa' }), /permission|denied|violates/i, '14. C: insertar como A');
