@@ -165,9 +165,9 @@ test('v4.1: tarjeta común en Inicio, Quiero ver y Similares, sincronizada y per
   const shots = info.project.name;
   await onboardQuick(page);
 
-  // Barra inferior: 7 accesos en orden, entran sin desplazamiento horizontal, áreas táctiles ≥ 44 px
+  // Barra inferior (v4.2): 7 accesos en orden (Mis gustos pasó a Ajustes), sin desplazamiento horizontal, áreas táctiles ≥ 44 px
   const nav = page.getByRole('navigation', { name: 'Navegación principal' });
-  expect(await nav.getByRole('link').allInnerTexts()).toEqual(['Inicio', 'Buscar', 'Similares', 'Quiero ver', 'Notas', 'Mis gustos', 'Ajustes']);
+  expect(await nav.getByRole('link').allInnerTexts()).toEqual(['Inicio', 'Buscar', 'Similares', 'Quiero ver', 'Recibidas', 'Notas', 'Ajustes']);
   const vw = await page.evaluate(() => window.innerWidth);
   for (const l of await nav.getByRole('link').all()) {
     const b = (await l.boundingBox())!;
