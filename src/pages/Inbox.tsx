@@ -175,10 +175,10 @@ function ReceivedList({ focus }: { focus?: string }) {
           <option value="all">Todos</option>{senders.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
         </select>
         <select aria-label="Tipo" value={type} onChange={(e) => setType(e.target.value as typeof type)} className="min-w-0 rounded-lg bg-ink-800 p-2 ring-1 ring-white/10">
-          <option value="all">Películas y series</option><option value="movie">Películas</option><option value="tv">Series</option>
+          <option value="all">Todo tipo</option><option value="movie">Películas</option><option value="tv">Series</option>
         </select>
         <select aria-label="Orden" data-testid="inbox-sort" value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="min-w-0 rounded-lg bg-ink-800 p-2 ring-1 ring-white/10">
-          <option value="fecha">Más recientes</option><option value="para-vos">Para vos</option><option value="tmdb">TMDB</option>
+          <option value="fecha">Recientes</option><option value="para-vos">Para vos</option><option value="tmdb">TMDB</option>
         </select>
       </div>
       {!s.inbox.length && <Empty>Todavía no te recomendaron nada. Cuando un contacto te envíe un título, aparece acá.</Empty>}

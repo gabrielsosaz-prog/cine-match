@@ -171,6 +171,8 @@ async function onIncoming(id: string) {
     if (!rec || state.inbox.some((r) => r.id === id)) return;
     set({ inbox: [rec, ...state.inbox] });
     const who = contactName(rec.sender) ?? rec.senderName;
+    // En la propia bandeja no hace falta el aviso: la tarjeta aparece arriba
+    if (typeof location !== 'undefined' && location.hash.startsWith('#/recibidas')) return;
     pushNotice({ kind: 'info', text: `${who} te recomendó «${rec.title}».`, action: { label: 'Ver', run: () => onOpenRec?.(rec.id) } }, 7000);
   } catch { /* se verá en la próxima actualización */ }
 }
