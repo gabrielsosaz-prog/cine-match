@@ -485,7 +485,7 @@ export async function rankWithFilters(profileId: string, run: RecommendationRun,
  * Estimación «Para vos» de títulos puntuales (ficha, Similares). Con `holdOut`, el título se estima SIN su propia
  * valoración (así la estimación de algo que ya puntuaste no es un eco de tu nota).
  */
-export async function predictFor(profileId: string, keys: TitleKey[], o: { holdOut?: boolean } = {}): Promise<Map<TitleKey, RecommendationItem>> {
+export async function predictFor(profileId: string, keys: TitleKey[], o: { holdOut?: boolean; extraTitles?: TitleMeta[] } = {}): Promise<Map<TitleKey, RecommendationItem>> {
   const settings = await getSettings(profileId);
   // La estimación puntual es la nota de v3.4 con cualquier motor (v3.5 sólo cambia el orden de «Para vos»)
   const engine = getEngine();
@@ -493,6 +493,8 @@ export async function predictFor(profileId: string, keys: TitleKey[], o: { holdO
   const target = new Set(keys);
   const train = o.holdOut ? ratings.filter((r) => !target.has(r.key)) : ratings;
   const all = await titleMap([...ratings.map((r) => r.key), ...keys]);
+  // v4.2: fichas que se muestran sin guardarlas en el catálogo local (p. ej. «Me recomendaron»); no cambian el perfil
+  for (const m of o.extraTitles ?? []) if (target.has(m.key) && !all.has(m.key)) all.set(m.key, m);
   const profile = engine.buildProfile(train, all, settings);
   // Para estimar no se excluyen vistos/descartados: la exclusión es del ranking, no de la estimación
   const neutral = train.filter((r) => !target.has(r.key));

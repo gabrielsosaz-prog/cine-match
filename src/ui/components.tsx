@@ -36,8 +36,8 @@ export function AvailabilityLine({ snap, compact }: { snap?: AvailabilitySnapsho
   return <div className="text-[11px] text-amber-300">⚠ Disponibilidad no confirmada{compact ? '' : `: ${st.reason}`}</div>;
 }
 
-export function Card({ children, className = '', 'data-testid': testId }: { children: ReactNode; className?: string; 'data-testid'?: string }) {
-  return <div data-testid={testId} className={`rounded-2xl bg-ink-900 p-4 ring-1 ring-white/5 ${className}`}>{children}</div>;
+export function Card({ children, className = '', 'data-testid': testId, id }: { children: ReactNode; className?: string; 'data-testid'?: string; id?: string }) {
+  return <div id={id} data-testid={testId} className={`rounded-2xl bg-ink-900 p-4 ring-1 ring-white/5 ${className}`}>{children}</div>;
 }
 
 export function Chip({ active, onClick, children, testId }: { active?: boolean; onClick?: () => void; children: ReactNode; testId?: string }) {

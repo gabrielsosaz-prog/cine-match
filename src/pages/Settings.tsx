@@ -15,6 +15,8 @@ import { engineFor } from '../services/recommendations';
 import { Card, Chip } from '../ui/components';
 
 import { diagnosticOn, setDiagnostic } from '../services/diagnostics';
+import { initSocial } from '../social/store';
+import { useSocial } from '../social/useSocial';
 
 const ENGINE_OPTIONS: { id: EngineChoice; label: string; help: string }[] = [
   { id: 'v3.4', label: 'v3.4 — Estable', help: 'Motor anterior, el predeterminado. Ordena por nota estimada para vos.' },
@@ -64,6 +66,49 @@ export default function Settings() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Ajustes</h1>
       {msg && <p role="status" className="rounded-xl bg-emerald-500/10 p-3 text-sm text-emerald-200">{msg}</p>}
+      <SettingsMenu />
+      <Card className="space-y-2" data-testid="taste-card" id="mis-gustos">
+        <h2 className="font-semibold">Mis gustos</h2>
+        <p className="text-sm text-slate-300">Lo que el sistema aprendió de tus notas (géneros, temáticas, aspectos) y tu perfil de gustos editable que usa v4.0.</p>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <Link to="/gustos" data-testid="taste-summary-link" className="text-accent underline">Ver lo que aprendió</Link>
+          <Link to="/mi-perfil" data-testid="taste-link" className="text-accent underline">Editar mi perfil de gustos</Link>
+          <Link to="/estadisticas" data-testid="stats-link" className="text-accent underline">Estadísticas de motores</Link>
+        </div>
+      </Card>
+      <Card className="space-y-2" data-testid="engine-card" id="motor">
+        <h2 className="font-semibold">Motor de recomendaciones</h2>
+        <div role="radiogroup" aria-label="Motor de recomendaciones" className="space-y-2">
+          {ENGINE_OPTIONS.map((o) => (
+            <label key={o.id} className="flex items-start gap-2 text-sm text-slate-300">
+              <input type="radio" name="engine" data-testid={`engine-${o.id}`} checked={engineSel === o.id} className="mt-1"
+                onChange={async () => {
+                  setEngineSel(o.id);
+                  await updateSettings(profileId, { engine: o.id, engineChangedAt: Date.now() });
+                  requestRecompute(profileId, { trigger: 'cambio de motor' }).catch(() => undefined);
+                  setMsg(`Motor ${o.label}. «Para vos» se recalcula con este motor; tus valoraciones no cambian.`);
+                }} />
+              <span><span className="font-medium text-slate-100">{o.label}</span><br /><span className="text-[11px] text-slate-400">{o.help}</span></span>
+            </label>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-500">Se guarda por perfil y se aplica a «Para vos» y a sus filtros. Podés cambiar de motor cuando quieras sin perder datos.</p>
+      </Card>
+      <Card className="space-y-2" data-testid="backup-card" id="copias">
+        <h2 className="font-semibold">Copias de seguridad</h2>
+        <p className="text-sm text-slate-300">Tus valoraciones viven en este navegador. Si el sistema o el navegador borran los datos del sitio, sólo una copia fuera del teléfono las salva.</p>
+        <ul className="text-xs text-slate-400">
+          <li data-testid="persist-status">Protección contra borrado automático: {persist.supported ? (persist.persisted ? 'activada' : 'no concedida por el navegador (instalá la app en la pantalla de inicio y usala seguido)') : 'no disponible en este navegador'}</li>
+          <li data-testid="last-backup">Última copia fuera del teléfono: {ledger?.lastExternalBackupAt ? new Date(ledger.lastExternalBackupAt).toLocaleDateString('es-AR') + ` (${ledger.lastExternalBackupTotal ?? 0} valoraciones)` : 'nunca'}</li>
+          <li>Copias locales automáticas: se guardan solas después de valorar (sirven si falla la app, no si se borra el navegador).</li>
+        </ul>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={doExport} data-testid="backup-now" className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-ink-950">Guardar copia fuera del teléfono</button>
+          <Link to="/recuperar" data-testid="recovery-link" className="rounded-lg bg-ink-700 px-3 py-2 text-sm">Importar o recuperar</Link>
+        </div>
+        <p className="text-[11px] text-slate-500">La copia es un archivo JSON con todos los perfiles; no incluye tu clave. Importar nunca pisa valoraciones más nuevas y siempre muestra antes qué va a cambiar.</p>
+      </Card>
+      <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Configuración</h2>
       <Card className="space-y-2">
         <h2 className="font-semibold">País</h2>
         <select value={settings.country} onChange={(e) => set({ country: e.target.value })} className="w-full rounded-lg bg-ink-800 p-2.5 ring-1 ring-white/10" aria-label="País">
@@ -102,32 +147,6 @@ export default function Settings() {
         <p className="text-sm text-slate-300">{config.proxyUrl ? 'Proxy propio configurado.' : config.tmdbToken ? 'Clave de TMDB guardada en este dispositivo.' : 'Sin configurar.'}</p>
         <Link to="/configurar" className="text-sm text-accent underline">Cambiar clave o proxy</Link>
       </Card>
-      <Card className="space-y-2" data-testid="engine-card">
-        <h2 className="font-semibold">Motor de recomendaciones</h2>
-        <div role="radiogroup" aria-label="Motor de recomendaciones" className="space-y-2">
-          {ENGINE_OPTIONS.map((o) => (
-            <label key={o.id} className="flex items-start gap-2 text-sm text-slate-300">
-              <input type="radio" name="engine" data-testid={`engine-${o.id}`} checked={engineSel === o.id} className="mt-1"
-                onChange={async () => {
-                  setEngineSel(o.id);
-                  await updateSettings(profileId, { engine: o.id, engineChangedAt: Date.now() });
-                  requestRecompute(profileId, { trigger: 'cambio de motor' }).catch(() => undefined);
-                  setMsg(`Motor ${o.label}. «Para vos» se recalcula con este motor; tus valoraciones no cambian.`);
-                }} />
-              <span><span className="font-medium text-slate-100">{o.label}</span><br /><span className="text-[11px] text-slate-400">{o.help}</span></span>
-            </label>
-          ))}
-        </div>
-        <p className="text-[11px] text-slate-500">Se guarda por perfil y se aplica a «Para vos» y a sus filtros. Podés cambiar de motor cuando quieras sin perder datos.</p>
-      </Card>
-      <Card className="space-y-2" data-testid="taste-card">
-        <h2 className="font-semibold">Mi perfil de gustos</h2>
-        <p className="text-sm text-slate-300">Preferencias flexibles y exclusiones estrictas que usa v4.0. Se editan de a una, sin repetir el cuestionario.</p>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <Link to="/mi-perfil" data-testid="taste-link" className="text-accent underline">Editar mi perfil de gustos</Link>
-          <Link to="/estadisticas" data-testid="stats-link" className="text-accent underline">Estadísticas de motores</Link>
-        </div>
-      </Card>
       <Card className="space-y-2">
         <h2 className="font-semibold">Modo diagnóstico (desarrollo)</h2>
         <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" data-testid="diagnostic-toggle" defaultChecked={diagnosticOn()} onChange={(e) => { setDiagnostic(e.target.checked); setMsg(e.target.checked ? 'Modo diagnóstico activado: en Inicio, cada recomendación muestra su cálculo y se puede exportar.' : 'Modo diagnóstico desactivado.'); }} />
@@ -140,20 +159,6 @@ export default function Settings() {
         <Link to="/comparar" data-testid="ab-link" className="text-sm text-accent underline">Abrir comparación</Link>
         <p className="text-[11px] text-slate-500">Opcional. No cambia tus valoraciones ni el orden de «Para vos».</p>
       </Card>
-      <Card className="space-y-2" data-testid="backup-card">
-        <h2 className="font-semibold">Copias de seguridad</h2>
-        <p className="text-sm text-slate-300">Tus valoraciones viven en este navegador. Si el sistema o el navegador borran los datos del sitio, sólo una copia fuera del teléfono las salva.</p>
-        <ul className="text-xs text-slate-400">
-          <li data-testid="persist-status">Protección contra borrado automático: {persist.supported ? (persist.persisted ? 'activada' : 'no concedida por el navegador (instalá la app en la pantalla de inicio y usala seguido)') : 'no disponible en este navegador'}</li>
-          <li data-testid="last-backup">Última copia fuera del teléfono: {ledger?.lastExternalBackupAt ? new Date(ledger.lastExternalBackupAt).toLocaleDateString('es-AR') + ` (${ledger.lastExternalBackupTotal ?? 0} valoraciones)` : 'nunca'}</li>
-          <li>Copias locales automáticas: se guardan solas después de valorar (sirven si falla la app, no si se borra el navegador).</li>
-        </ul>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={doExport} data-testid="backup-now" className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-ink-950">Guardar copia fuera del teléfono</button>
-          <Link to="/recuperar" data-testid="recovery-link" className="rounded-lg bg-ink-700 px-3 py-2 text-sm">Importar o recuperar</Link>
-        </div>
-        <p className="text-[11px] text-slate-500">La copia es un archivo JSON con todos los perfiles; no incluye tu clave. Importar nunca pisa valoraciones más nuevas y siempre muestra antes qué va a cambiar.</p>
-      </Card>
       <Card className="space-y-2">
         <h2 className="font-semibold">Borrar datos</h2>
         <p className="text-sm text-slate-300">Borra valoraciones, perfiles, ajustes y copias locales de este dispositivo. No se puede deshacer. Escribí <b>BORRAR</b> para habilitarlo.</p>
@@ -164,5 +169,35 @@ export default function Settings() {
       </Card>
       <p className="text-center text-[10px] text-slate-500">Cine Match AI · motor {engineFor(settings).version}<br />Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB. Disponibilidad provista por JustWatch a través de TMDB.</p>
     </div>
+  );
+}
+
+/** v4.2 · Accesos de Ajustes: cuenta y funciones sociales, gustos, motor y copias. */
+function SettingsMenu() {
+  const s = useSocial();
+  useEffect(() => { void initSocial(); }, []);
+  const account = !s.available ? 'No disponible' : s.phase === 'ready' ? (s.user?.displayName ?? s.user?.email ?? 'Sesión iniciada') : s.phase === 'signed-out' ? 'Sin cuenta (opcional)' : 'Cargando…';
+  const linked = s.contacts.filter((c) => c.linked && !c.blocked).length;
+  const rows: [string, string, string, string][] = [
+    ['/ajustes/cuenta', 'Mi cuenta', account, 'settings-account'],
+    ['/gustos', 'Mis gustos', 'Lo que aprendió el sistema y tu perfil', 'settings-taste'],
+    ['/ajustes/contactos', 'Mis contactos', s.phase === 'ready' ? `${linked} ${linked === 1 ? 'contacto' : 'contactos'}` : 'Invitar y vincular', 'settings-contacts'],
+    ['/ajustes/privacidad', 'Privacidad y permisos', 'Qué se comparte y con quién', 'settings-privacy'],
+    ['/ajustes/notificaciones', 'Notificaciones', 'Avisos de recomendaciones nuevas', 'settings-notifications'],
+  ];
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return (
+    <nav className="overflow-hidden rounded-2xl bg-ink-900 ring-1 ring-white/5" aria-label="Secciones de Ajustes" data-testid="settings-menu">
+      {rows.map(([to, label, sub, id]) => (
+        <Link key={to} to={to} data-testid={id} className="flex min-h-[52px] items-center gap-3 border-b border-white/5 px-4 py-2">
+          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-100">{label}</span><span className="block truncate text-[11px] text-slate-400">{sub}</span></span><span aria-hidden="true" className="text-slate-500">›</span>
+        </Link>
+      ))}
+      {([['motor', 'Motor de recomendaciones'], ['copias', 'Copias de seguridad']] as const).map(([id, label]) => (
+        <button key={id} type="button" onClick={() => jump(id)} className="flex min-h-[48px] w-full items-center gap-3 border-b border-white/5 px-4 text-left text-sm font-semibold text-slate-100 last:border-0">
+          <span className="flex-1">{label}</span><span aria-hidden="true" className="text-slate-500">↓</span>
+        </button>
+      ))}
+    </nav>
   );
 }

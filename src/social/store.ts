@@ -349,3 +349,9 @@ function updateBadge() {
   const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
   try { if (n) nav.setAppBadge?.(n).catch(() => undefined); else nav.clearAppBadge?.().catch(() => undefined); } catch { /* no soportado */ }
 }
+
+/** Coincidencias con un contacto (sincroniza antes la lista propia, si está autorizada). */
+export async function fetchMatches(contactId: string) {
+  await syncWantNow();
+  return (await getBackend()).getMatches(contactId);
+}
