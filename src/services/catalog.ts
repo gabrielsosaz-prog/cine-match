@@ -83,6 +83,18 @@ export async function getTitle(key: TitleKey, opts: { language: string; country:
   }
 }
 
+/**
+ * Ficha completa SÓLO para mostrar (sinopsis, dirección, países): usa la caché si ya está completa y, si no, la pide
+ * a TMDB sin guardarla. Así mirar una lista no cambia los datos con que se calcula el próximo ranking.
+ */
+export async function peekFullTitle(key: TitleKey, opts: { language: string; country: string }): Promise<TitleMeta | undefined> {
+  const cached = await db.titles.get(key);
+  if (cached && cached.completeness === 'full' && (cached.metaVersion ?? 1) >= META_VERSION) return cached;
+  const { type, id } = parseKey(key);
+  const client = await getClient();
+  return (await client.details(type, id, opts.language, opts.country)).meta;
+}
+
 export async function ensureFullTitles(keys: TitleKey[], opts: { language: string; country: string }, limit = 40): Promise<TitleMeta[]> {
   const out: TitleMeta[] = [];
   let failures = 0;

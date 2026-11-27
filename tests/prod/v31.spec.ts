@@ -34,13 +34,13 @@ test('producción v3.1: Similares narrativo (White Lotus), tráiler, persona, pa
   const list = page.locator('[data-testid="similar-list"][data-current="true"] [data-testid="similar-item"]');
   await expect(list.first()).toBeVisible({ timeout: 240000 });
   await expect(page.getByTestId('similar-semantic')).toContainText('Análisis semántico real');
-  const rows = await list.evaluateAll((els) => els.slice(0, 12).map((e) => `${e.querySelector('h3')?.textContent} · ${e.querySelector('[data-testid=similarity]')?.textContent} · ${e.querySelector('[data-testid=similarity-confidence]')?.textContent}`));
+  const rows = await list.evaluateAll((els) => els.slice(0, 12).map((e) => `${e.querySelector('h3')?.textContent} · ${e.querySelector('[data-testid=card-compat]')?.textContent}`));
   log('Similares a The White Lotus:', rows);
-  const pcts = (await page.getByTestId('similarity').allInnerTexts()).map((t) => Number(t.replace(/\D/g, '')));
+  const pcts = (await list.getByTestId('card-compat').allInnerTexts()).map((t) => Number(t.split('%')[0].replace(/\D/g, '')));
   expect(Math.max(...pcts)).toBeLessThan(100);
   log('perfil:', (await page.getByTestId('similar-profile').innerText()).replace(/\s+/g, ' '));
-  await list.first().getByTestId('similar-explanation').click();
-  log('explicación del primero:', (await list.first().getByTestId('similar-explanation').innerText()).replace(/\s+/g, ' '));
+  await list.first().getByTestId('more-toggle').click();
+  log('explicación del primero:', (await list.first().getByTestId('more-similar').innerText()).replace(/\s+/g, ' '));
   await page.screenshot({ path: `test-results/prod-${info.project.name}-v31-whitelotus.png`, fullPage: true });
 
   // Tráiler en una ficha real (Volver al futuro, 105)
