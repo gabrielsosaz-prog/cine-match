@@ -1,1 +1,1 @@
-{ "app": "Cine Match AI", "version": "3.5.0", "algorithm": "hybrid-narrative-3.4.0", "candidate": "hybrid-personal-3.5.0" }
+{ "app": "Cine Match AI", "version": "4.1.0", "algorithm": "hybrid-narrative-3.4.0", "candidate": "hybrid-personal-3.5.0", "engines": { "v3.4": "hybrid-narrative-3.4.0", "v3.5": "hybrid-personal-3.5.0", "v4.0": "attraction-4.0.0" } }

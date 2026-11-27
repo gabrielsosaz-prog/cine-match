@@ -280,6 +280,8 @@ export interface RecommendationItem {
     pros: string[];
     cons: string[];
     similar: string[];
+    /** v4.1: claves de los títulos de `similar` (mismo orden), para mostrar su póster. Ausente en rankings anteriores. */
+    similarKeys?: TitleKey[];
   };
 }
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useApp } from './hooks/useApp';
 import Home from './pages/Home';
@@ -20,13 +20,16 @@ import { ScrollToTopOnPush } from './hooks/useScrollRestore';
 import ErrorBoundary from './ui/ErrorBoundary';
 import Notices from './ui/Notices';
 
-const NAV = [
-  { to: '/', label: 'Inicio', icon: '★' },
-  { to: '/buscar', label: 'Buscar', icon: '⌕' },
-  { to: '/similares', label: 'Similares', icon: '≈' },
-  { to: '/valoraciones', label: 'Valoraciones', icon: '✎' },
-  { to: '/gustos', label: 'Mis gustos', icon: '♥' },
-  { to: '/ajustes', label: 'Ajustes', icon: '⚙' },
+const svg = (d: ReactNode) => <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
+/** v4.1: siete accesos. «Valoraciones» se llama «Notas» sólo en la barra (la pantalla conserva su nombre). */
+const NAV: { to: string; label: string; icon: ReactNode }[] = [
+  { to: '/', label: 'Inicio', icon: svg(<path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.1 5.9L12 16.5l-5.3 2.9 1.1-5.9-4.4-4.1 6-.7z" />) },
+  { to: '/buscar', label: 'Buscar', icon: svg(<><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L21 21" /></>) },
+  { to: '/similares', label: 'Similares', icon: svg(<><circle cx="9" cy="12" r="5.5" /><circle cx="15" cy="12" r="5.5" /></>) },
+  { to: '/pendientes', label: 'Quiero ver', icon: svg(<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z" />) },
+  { to: '/valoraciones', label: 'Notas', icon: svg(<><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></>) },
+  { to: '/gustos', label: 'Mis gustos', icon: svg(<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" />) },
+  { to: '/ajustes', label: 'Ajustes', icon: svg(<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>) },
 ];
 
 export default function App() {
@@ -67,8 +70,9 @@ export default function App() {
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-ink-950/95 backdrop-blur" aria-label="Navegación principal">
           <div className="mx-auto flex max-w-xl">
             {NAV.map((n) => (
-              <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => `flex min-w-0 flex-1 flex-col items-center py-2 text-[10px] min-[380px]:text-[11px] ${isActive ? 'text-accent' : 'text-slate-400'}`}>
-                <span className="text-lg leading-none" aria-hidden>{n.icon}</span><span className="max-w-full truncate">{n.label}</span>
+              <NavLink key={n.to} to={n.to} end={n.to === '/'} data-testid={`nav-${n.to.slice(1) || 'inicio'}`}
+                className={({ isActive }) => `flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] font-medium leading-[1.1] ${isActive ? 'text-accent' : 'text-slate-400'}`}>
+                {n.icon}<span className="max-w-full">{n.label}</span>
               </NavLink>
             ))}
           </div>

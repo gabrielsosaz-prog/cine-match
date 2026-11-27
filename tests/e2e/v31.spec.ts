@@ -36,7 +36,7 @@ test('v3.1: «Para vos (estricto)» ordena globalmente, también después de «V
   await page.getByTestId('show-more').click();
   await page.getByTestId('show-more').click();
   await expect(page.getByTestId('rec-item')).toHaveCount(30);
-  const all = (await page.getByTestId('rec-item').getByTestId('score-personal').allInnerTexts()).map(num);
+  const all = (await page.getByTestId('rec-item').getByTestId('box-primary').locator('div:nth-child(2)').allInnerTexts()).map(num);
   const vals = all.filter((x) => !Number.isNaN(x));
   expect(vals.length).toBeGreaterThan(20);
   for (let i = 1; i < vals.length; i++) expect(vals[i]).toBeLessThanOrEqual(vals[i - 1]);
@@ -141,16 +141,17 @@ test('v3.1: Similares con modos En común / Combinar, importancia por referencia
   await expect(page.getByTestId('similar-ref')).toHaveCount(2);
   await expect(page.getByTestId('similar-mode-common')).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('[data-testid="similar-list"][data-current="true"] [data-testid="similar-item"]').first()).toBeVisible({ timeout: 30000 });
-  const pcts = (await page.getByTestId('similarity').allInnerTexts()).map(num);
+  const pcts = (await page.getByTestId('similar-item').getByTestId('card-compat').allInnerTexts()).map((t) => t.split('%')[0]).map(num);
   expect(Math.max(...pcts)).toBeLessThan(100);
-  await expect(page.getByTestId('similarity-confidence').first()).toContainText('confianza');
+  await expect(page.getByTestId('card-compat').first()).toContainText('confianza');
   await page.getByTestId('similar-mode-combine').click();
   await expect(page.getByTestId('similar-mode-combine')).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('[data-testid="similar-list"][data-current="true"] [data-testid="similar-item"]').first()).toBeVisible({ timeout: 30000 });
   await page.getByTestId('similar-ref-weight').first().selectOption('2');
   await expect(page.locator('[data-testid="similar-list"][data-current="true"] [data-testid="similar-item"]').first()).toBeVisible({ timeout: 30000 });
-  await page.getByTestId('similar-explanation').first().click();
-  await expect(page.getByTestId('similar-per-ref').first()).toBeVisible();
+  await page.getByTestId('similar-item').first().getByTestId('more-toggle').click();
+  await expect(page.getByTestId('similar-item').first().getByTestId('similar-ref-row')).toHaveCount(2);
+  await expect(page.getByTestId('similar-item').first().getByTestId('similar-ref-row').first()).toContainText('% de parecido');
   await expect(page.getByTestId('similar-semantic')).toBeVisible();
   // Abrir un resultado y volver: referencias, modo y resultados se conservan
   const firstTitle = await page.getByTestId('similar-item').first().locator('h3').innerText();

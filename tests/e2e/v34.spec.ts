@@ -61,7 +61,11 @@ test('v3.4: preferencias del texto (aplicadas y no aplicadas) ordenan sin quitar
   expect(keys.length).toBeGreaterThan(0);
   // Un título romántico muestra por qué bajó (evidencia de TMDB)
   const rom = keys.find((k) => byKey.get(k)!.genres.includes(10749));
-  if (rom) await expect(page.locator(`[data-testid="rec-item"][data-key="${rom}"]`).getByTestId('rec-prefs')).toContainText('Baja por');
+  if (rom) {
+    const c = page.locator(`[data-testid="rec-item"][data-key="${rom}"]`);
+    await c.getByTestId('more-toggle').click();
+    await expect(c.getByTestId('more-cons')).toContainText('Baja por');
+  }
 
   // Persistencia al recargar
   await page.reload();
@@ -77,6 +81,7 @@ test('v3.4: modo diagnóstico apagado por defecto; al activarlo muestra el cálc
   await page.getByTestId('diagnostic-toggle').check();
   await page.goto('/#/');
   await expect(page.getByTestId('diag-bar')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('rec-item').first().getByTestId('more-toggle').click();
   const first = page.getByTestId('rec-item').first().getByTestId('diag-panel');
   await first.locator('summary').click();
   await expect(first).toContainText('Señales');

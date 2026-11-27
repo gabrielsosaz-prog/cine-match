@@ -7,8 +7,16 @@ on:
         description: URL de la app
         required: false
         default: https://cine-match-pied-tau.vercel.app
+      spec:
+        description: Pruebas a correr (vacío = todas; p. ej. tests/prod/v41.spec.ts)
+        required: false
+        default: ''
+      capturas_branch:
+        description: Rama donde publicar sólo las capturas prod-*.png (vacío = no publicar). Perfil nuevo, sin datos personales.
+        required: false
+        default: ''
 permissions:
-  contents: read
+  contents: write
 jobs:
   prod:
     runs-on: ubuntu-latest
@@ -18,9 +26,22 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test -c playwright.prod.config.ts --reporter=line
+      - run: npx playwright test -c playwright.prod.config.ts --reporter=line $SPEC
         env:
           PROD_URL: ${{ github.event.inputs.url }}
+          SPEC: ${{ github.event.inputs.spec }}
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: capturas-produccion, path: test-results/, retention-days: 7 }
+      - name: Publicar capturas
+        if: always() && github.event.inputs.capturas_branch != ''
+        env:
+          BR: ${{ github.event.inputs.capturas_branch }}
+        run: |
+          mkdir -p /tmp/caps && find test-results -name 'prod-*.png' -exec cp {} /tmp/caps/ \;
+          ls /tmp/caps | head -50
+          git config user.name "cine-match-bot"; git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan "$BR-tmp"; git rm -rfq . ; rm -rf ./* 
+          cp /tmp/caps/*.png . 2>/dev/null || true
+          git add -A; git commit -qm "Capturas de producción ($GITHUB_RUN_ID)" || exit 0
+          git push -f origin "HEAD:$BR"

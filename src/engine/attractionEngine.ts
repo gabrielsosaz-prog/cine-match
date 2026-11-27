@@ -37,7 +37,7 @@ export function rankWithAttraction(input: RankInput): RecommendationItem[] {
     return {
       key: s.key, rank: i + 1, score: clip(s.satisfaction), confidence: 0.3, confidenceLabel: 'baja' as const,
       explanation, exploration: false, provisional: true,
-      attraction: { value: Math.round(s.attraction * 100) / 100, percentile, level, satisfaction: Math.round(clip(s.satisfaction) * 10) / 10, satisfactionReliable: reliable, pros: ex.pros, cons: ex.cons, similar: ex.similar },
+      attraction: { value: Math.round(s.attraction * 100) / 100, percentile, level, satisfaction: Math.round(clip(s.satisfaction) * 10) / 10, satisfactionReliable: reliable, pros: ex.pros, cons: ex.cons, similar: ex.similar, similarKeys: ex.similarKeys },
     };
   });
 }

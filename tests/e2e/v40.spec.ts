@@ -95,10 +95,13 @@ test('v4.0: perfil importado, ranking por atractivo con tres puntuaciones, inter
   const rated = new Set((await dump(page, 'ratings') as { key: string }[]).map((r) => r.key));
   for (const k of keys) expect(rated.has(k), k).toBe(false);
   const first = page.getByTestId('rec-item').first();
-  await expect(first.getByTestId('v4-compat')).toBeVisible();
-  await expect(first.getByTestId('v4-satisfaction')).toContainText('poco fiable');
-  await expect(first.getByTestId('v4-public')).toContainText('TMDB');
-  await expect(first.getByTestId('v4-why')).toBeVisible();
+  await expect(first.getByTestId('card-compat')).toContainText('Compatibilidad');
+  await expect(first.getByTestId('box-primary')).toHaveAttribute('data-label', 'Satisfacción');
+  await expect(first.getByTestId('score-public')).toContainText('TMDB');
+  await expect(first.getByTestId('card-why')).toBeVisible();
+  await first.getByTestId('more-toggle').click();
+  await expect(first.getByTestId('more-reliability')).toContainText('poco fiable');
+  await first.getByTestId('more-close').click();
   await noHorizontalScroll(page);
   await first.scrollIntoViewIfNeeded();
   await page.screenshot({ path: `test-results/${info.project.name}-v40-ranking.png`, fullPage: false });
@@ -151,7 +154,7 @@ test('v4.0: perfil importado, ranking por atractivo con tres puntuaciones, inter
   // Los otros motores siguen disponibles y se puede volver libremente
   await page.goto('/#/');
   await pickEngine(page, 'v3.4');
-  await expect(page.getByTestId('rec-item').first().getByTestId('v4-scores')).toHaveCount(0);
+  await expect(page.getByTestId('rec-item').first().getByTestId('box-primary')).toHaveAttribute('data-label', 'Para vos');
   await pickEngine(page, 'v3.5');
   await pickEngine(page, 'v4.0');
 
