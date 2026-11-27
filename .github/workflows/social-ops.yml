@@ -1,7 +1,7 @@
 name: Servicio social (Supabase)
 # v4.2 · Operaciones del backend social desde GitHub Actions (el token de Supabase es un secreto del repositorio y
 # nunca se imprime). Se dispara al cambiar ops/request.json en una rama de desarrollo o a mano.
-# Tareas: provision · deploy-function · security · e2e · cleanup · status
+# Tareas: provision · snapshot · migrate · deploy-function · security · security43 · e2e · e2e43 · cleanup · status
 on:
   push:
     branches: ['claude/**']
@@ -32,6 +32,12 @@ jobs:
           T="${{ github.event.inputs.task }}"
           if [ -z "$T" ]; then T=$(node -p "require('./ops/request.json').task"); fi
           echo "task=$T" >> "$GITHUB_OUTPUT"; echo "Tarea: $T"
+      - name: Punto de recuperación de la base (copia privada backup_v42)
+        if: contains(steps.task.outputs.task, 'snapshot')
+        run: node scripts/social/snapshot.mjs
+      - name: Aplicar migraciones
+        if: contains(steps.task.outputs.task, 'migrate')
+        run: node scripts/social/migrate.mjs
       - name: Crear y configurar el proyecto
         if: contains(steps.task.outputs.task, 'provision')
         run: node scripts/social/provision.mjs
