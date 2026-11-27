@@ -15,6 +15,7 @@ import { useApp } from '../hooks/useApp';
 import { friendlyError } from '../providers/errors';
 import { availabilityState } from '../services/availability';
 import { peekFullTitle } from '../services/catalog';
+import { getNarrativeIndex } from '../services/narrativeCatalog';
 import { countriesOf, countryName } from '../services/filters';
 import { safely } from '../services/notices';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
@@ -314,9 +315,11 @@ function Section({ title, children, tone = '#4ADE80', testId }: { title: string;
 
 function SimilarRow({ s }: { s: SimilarRef }) {
   const m = useLiveQuery(() => (s.key ? db.titles.get(s.key) : undefined), [s.key]);
+  // Sin ficha local: póster del catálogo narrativo ya cargado (sin pedir nada a TMDB)
+  const poster = m?.posterPath ?? (s.key ? getNarrativeIndex()?.get(s.key)?.poster : undefined);
   const body = (
     <>
-      {m?.posterPath ? <Poster path={m.posterPath} title={s.title} size="w92" className="h-12 w-8 shrink-0" /> : <span className="h-12 w-8 shrink-0 rounded-md bg-ink-700" aria-hidden="true" />}
+      {poster ? <Poster path={poster} title={s.title} size="w92" className="h-12 w-8 shrink-0" /> : <span className="h-12 w-8 shrink-0 rounded-md bg-ink-700" aria-hidden="true" />}
       <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium text-slate-100">{s.title}</span>{s.note && <span className="block text-[11px] leading-snug text-slate-400">{s.note}</span>}</span>
     </>
   );
