@@ -70,7 +70,9 @@ jobs:
           mkdir -p /tmp/caps && find test-results -name 'v42-*.png' -exec cp {} /tmp/caps/ \; || true
           ls /tmp/caps | head -60
           git config user.name "cine-match-bot"; git config user.email "actions@users.noreply.github.com"
-          git checkout --orphan capturas-v42-tmp; git rm -rfq . ; rm -rf ./* 
+          # En un worktree aparte, para no tocar el código que usan los pasos siguientes (limpieza y estado)
+          git worktree add --detach /tmp/capwt HEAD
+          cd /tmp/capwt && git checkout -q --orphan capturas-v42-tmp && git rm -rfq . && rm -rf ./*
           cp /tmp/caps/*.png . 2>/dev/null || true
           git add -A; git commit -qm "Capturas v4.2 ($GITHUB_RUN_ID)" || exit 0
           git push -f origin HEAD:capturas-v42
