@@ -48,6 +48,7 @@ async function exercise(page: Page, card: Locator, shots: string) {
   await expect(card.getByTestId('more-tech')).not.toContainText('Cargando', { timeout: 60000 });
   log(shots, 'técnica:', (await card.getByTestId('more-tech').innerText()).replace(/\s+/g, ' '));
   await card.getByTestId('more-panel').evaluate((e) => e.scrollIntoView({ block: 'start' }));
+  await expect.poll(() => card.getByTestId('more-panel').locator('img').evaluateAll((im) => im.every((i) => (i as HTMLImageElement).complete)), { timeout: 15000 }).toBe(true);
   await page.screenshot({ path: `test-results/prod-${shots}-desplegada.png` });
   await card.getByTestId('quick-aspects').click();
   await card.getByRole('radio', { name: 'Trama y guion: 4 estrellas' }).click();
@@ -154,6 +155,9 @@ test('producción v4.1: tarjeta común con TMDB real en las tres pantallas y los
       log(shots, 'v4.0 «Parecida a» de', own, '→', refs);
       expect(refs).not.toContain(own);
       await c.getByTestId('more-panel').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      // pósters chicos de «Parecida a»: carga diferida; se espera a que terminen antes de la captura
+      await expect.poll(() => c.getByTestId('similar-ref-row').locator('img').evaluateAll((im) => im.every((i) => (i as HTMLImageElement).complete)), { timeout: 15000 }).toBe(true);
+      log(shots, 'pósters «Parecida a» (ancho natural):', await c.getByTestId('similar-ref-row').locator('img').evaluateAll((im) => im.map((i) => (i as HTMLImageElement).naturalWidth)));
       await page.screenshot({ path: `test-results/prod-${shots}-v40-desplegada.png` });
     }
     await noHorizontalScroll(page);
