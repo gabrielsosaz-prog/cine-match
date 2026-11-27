@@ -30,6 +30,10 @@ El proxy sólo permite rutas de lectura (búsqueda, discover, fichas, proveedore
 
 Vercel (plan Hobby gratuito) publica la app y la función `/api/tmdb` en el mismo dominio, y vuelve a publicar en cada push a `main`. Pasos: vercel.com → *Sign up with GitHub* → *Add New → Project* → importar `cine-match` → agregar `TMDB_READ_ACCESS_TOKEN` → *Deploy*. GitHub Actions (`.github/workflows/tests.yml`) corre las pruebas en cada push.
 
+### Recuperación de v4.1
+
+v4.1 queda recuperable: en Vercel → Deployments, promover el despliegue del commit `ecac00b` («Promote to Production»), o revertir en GitHub el merge de v4.2. Los datos locales no cambian de esquema, así que volver a v4.1 no pierde nada; el servicio social simplemente deja de verse.
+
 ## Arquitectura
 
 | Capa | Elección | Motivo |
@@ -60,6 +64,18 @@ Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se 
 - **Las tarjetas no desaparecen al puntuar**: nota general → la tarjeta queda → se ofrece completar aspectos y «Otros» → «Listo». El modelo se recalcula solo; el orden visible cambia únicamente con **Actualizar ranking** (un aviso indica cambios pendientes). Los cambios sin guardar del panel quedan como borrador si se cierra por accidente.
 - **Filtros avanzados** combinables (tipo, géneros incluidos/excluidos, años, plataformas, vistos, duración, afinidad mínima), con indicador, «Limpiar filtros» y «Restablecer generales». Se aplican al conjunto de candidatos antes de ordenar; si no hay resultados se indica qué filtro restringe y se puede buscar más en TMDB con esos filtros.
 - **Porcentaje de aspectos completados** (aspectos / 7 × 100) en Valoraciones, con filtros, orden y acceso directo a los faltantes.
+
+### Novedades v4.2 Social (motores v3.4, v3.5 y v4.0 sin cambios)
+
+- **Cuentas opcionales** (Ajustes → Mi cuenta) con Supabase Auth: correo y contraseña gestionados por el proveedor (nunca se guardan a mano). La app sigue funcionando entera sin cuenta. Crear una cuenta **no sube** tu historial: sólo se sincroniza lo que cada función social autorizada necesita. Cada cuenta queda ligada a un perfil local; si en el mismo teléfono entra otra cuenta, se crea otro perfil local y nada se mezcla ni se borra.
+- **Mis contactos** (Ajustes): invitación por código o enlace (12 caracteres aleatorios, vence a las 72 h, un solo uso, se guarda sólo su hash), aceptar/rechazar, alias, destinatario favorito (se ofrece solo si hay un único contacto), eliminar, bloquear y revocar permisos. No hay búsqueda de usuarios ni perfiles públicos.
+- **Tarjeta 3 × 2** (alternativa C) en Inicio, Buscar, Similares, Quiero ver, Me recomendaron y Para ver juntos: Tráiler · Quiero verla · **Compartir** / Ya la vi · Puntuar · **Aspectos** (abre el selector dentro de la tarjeta). «Compartir» también en la ficha.
+- **Compartir**: con favorito, un toque envía y muestra «Recomendación enviada a …» con Deshacer; sin favorito, selector compacto. Menú secundario (▾ o pulsación larga): otro destinatario, comentario opcional (280), a quién ya se envió, cambiar favorito. Reenviar es siempre explícito (el servidor rechaza duplicados). Sin conexión queda «pendiente» y se envía al volver; nunca se confirma algo que no llegó.
+- **Me recomendaron** (barra: «Recibidas», con contador): «Ana te recomienda», fecha, indicador de nueva, comentario, puntajes **tuyos**, estados nueva/consultada/guardada/vista/archivada, filtros y orden, archivar con Deshacer. Recibir no cuenta como interés.
+- **Para ver juntos** (pestaña en Me recomendaron): con autorización mutua muestra sólo los títulos que **ambos** tienen en Quiero ver; la puntuación del otro sólo si la compartió. Puntaje conjunto = promedio − 0,25 × diferencia (explicado en pantalla; si falta un puntaje no se inventa).
+- **Avisos**: contador en la app, actualización en tiempo real y aviso discreto; notificaciones push (Web Push) en la PWA instalada en Android, con permiso pedido después de explicarlo y un interruptor en Ajustes → Notificaciones.
+- **Ajustes** reorganizado: Mi cuenta, Mis gustos (sale de la barra), Mis contactos, Privacidad y permisos, Notificaciones, Motor, Copias y el resto de la configuración.
+- Backend: `supabase/` (migración con RLS y funciones `SECURITY DEFINER`, función `notify` para push). Operación desde GitHub Actions (`.github/workflows/social-ops.yml`, `ops/request.json`). Sin cambios en el esquema local ni en el formato de copia (`cine-match-export/4`).
 
 ### Novedades v4.1 (sólo interfaz; motores v3.4, v3.5 y v4.0 sin cambios)
 
@@ -217,6 +233,8 @@ IndexedDB funciona igual dentro del WebView. Para publicar en Play Store convien
 
 ## Privacidad
 
-Sin cuentas, sin analítica, sin servidor propio. Los datos viven en el dispositivo; se pueden exportar, importar y borrar desde Ajustes. La exportación no incluye el token.
+Sin analítica. Sin cuenta, todo vive en el dispositivo como hasta v4.1; se puede exportar, importar y borrar desde Ajustes (la exportación no incluye el token ni la sesión).
+
+Con cuenta (v4.2, opcional) el servidor (Supabase, plan gratuito, región São Paulo) guarda sólo: correo y nombre visible; vínculos con contactos y sus permisos; recomendaciones enviadas (título, año, póster, comentario) y su estado para quien las recibe; y, **sólo si autorizás «Para ver juntos»**, tu lista Quiero ver (y tu puntaje sólo si además lo autorizás). Valoraciones, aspectos, perfil de gustos, notas e historial **no se suben**. Cada persona ve sólo lo suyo (políticas por fila verificadas con pruebas). Se puede revocar todo en Ajustes → Privacidad y eliminar la cuenta con sus datos sociales en Ajustes → Mi cuenta; los datos locales quedan.
 
 Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB.

@@ -1,3 +1,4 @@
+import ShareAction from '../ui/ShareAction';
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { LIST_LABELS } from '../constants';
@@ -45,8 +46,10 @@ export function SearchResults({ hits, country, profileId }: { hits: SearchHit[];
   return (
     <ul className="space-y-2" aria-label="Resultados">
       {hits.map((h, i) => (
-        <li key={h.key} data-testid="search-result" data-key={h.key}>
-          <TitleLink k={h.key} className="flex gap-3 rounded-2xl bg-ink-900 p-2.5 ring-1 ring-white/5">
+        <li key={h.key} data-testid="search-result" data-key={h.key} className="relative">
+          {/* v4.2: Compartir sin entrar a la ficha */}
+          <div className="absolute bottom-2.5 right-2.5 z-10"><ShareAction variant="icon" target={{ k: h.key, title: h.title, year: h.year, posterPath: h.posterPath }} /></div>
+          <TitleLink k={h.key} className="flex gap-3 rounded-2xl bg-ink-900 p-2.5 pr-14 ring-1 ring-white/5">
             <Poster path={h.posterPath} title={h.title} className="h-24 w-16 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="font-semibold leading-tight">{h.title}</div>

@@ -1,6 +1,6 @@
 {
   "name": "cine-match-ai",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "description": "Recomendador personal de películas y series (PWA)",
   "scripts": {
     "dev": "vite",
@@ -18,6 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "dexie": "^4.0.10",
     "dexie-react-hooks": "^1.1.7",
     "react": "^18.3.1",

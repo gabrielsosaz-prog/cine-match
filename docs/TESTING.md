@@ -1,3 +1,14 @@
+# Resultados de pruebas (v4.2 Social)
+
+- Unitarias (Vitest): 295/295 (incluye cifrado Web Push: descifrado de ida y vuelta, sal y claves nuevas por envío, firma VAPID; verificado además contra la librería independiente `http_ece`). Tipos: sin errores.
+- Seguridad de la base (Postgres 16 local, `supabase/tests/run-local.sh`): 73/73 con usuarios A, B y C (RLS, funciones, límites de frecuencia, invitaciones vencidas/rechazadas/reutilizadas, bloqueo, revocación, eliminación de cuenta, comentarios con caracteres de control y bidireccionales, migración aplicada dos veces).
+- Seguridad contra la API de producción (`scripts/social/security-prod.mjs`, workflow «Servicio social»): 51 comprobaciones con tres cuentas reales efímeras, todas OK; las cuentas se borran al terminar.
+- Interfaz en emulación Android (Pixel 7 y 360 px, TMDB simulado): 84/84, incluida `tests/e2e/v42.spec.ts` (tarjeta 3 × 2, Aspectos en la tarjeta, barra con Recibidas, Ajustes, uso sin cuenta sin ninguna petición al servicio social).
+- Dos teléfonos (`tests/social/v42.spec.ts`): contra un servidor simulado local y contra Supabase real + TMDB real (workflow): crear cuentas, invitar y aceptar, favorito, compartir con un toque, duplicado, contador, Me recomendaron, guardar, Para ver juntos con autorización mutua, puntuación del otro sólo si la comparte, recomendación en sentido inverso con comentario, archivar con Deshacer, sin conexión → pendiente → enviada, revocación, cerrar y volver a iniciar sesión.
+- Motores: `src/engine` sin cambios. Top 400 de v4.0 con datos reales (sólo local): 400/400 idénticas en orden y puntaje entre v4.1 y v4.2; contra el prototipo de v4.0, 60/60 (la lista guardada del prototipo tiene 60 títulos).
+- Actualización v4.1 → v4.2 con el respaldo real (`tests/upgrade/upgrade-v41-v42.mjs`, sólo local): 611 registros idénticos, ninguna clave local perdida, copia de seguridad con el mismo formato y contenido, igual tras reabrir.
+- Rendimiento: JavaScript inicial 216,6 → 225,4 KB gz (+4 %); el cliente social (≈61 KB gz) y las pantallas sociales se cargan aparte, sólo con cuenta o al abrirlas.
+
 # Resultados de pruebas (v4.1, interfaz compacta)
 
 - Unitarias (Vitest): 292/292. Tipos: sin errores.

@@ -218,8 +218,11 @@ describe('v3.4 · público y credenciales', () => {
     const files: string[] = [];
     const walk = (d: string) => { if (!existsSync(d)) return; for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx|js|mjs|html|json)$/.test(f) && statSync(p).size < 5e6) files.push(p); } };
     walk('src'); walk('dist'); walk('scripts');
-    const jwt = /eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}/;
-    const leaks = files.filter((p) => jwt.test(readFileSync(p, 'utf8')));
+    // v4.2: la única excepción es la clave PÚBLICA «anon» de Supabase (rol anon, pública por diseño). Cualquier otro
+    // JWT —un token de TMDB o una clave service_role— es una filtración.
+    const jwt = /eyJ[A-Za-z0-9_-]{30,}\.([A-Za-z0-9_-]{30,})\.[A-Za-z0-9_-]*/g;
+    const isPublicAnon = (payload: string) => { try { const j = JSON.parse(Buffer.from(payload, 'base64url').toString()); return j.iss === 'supabase' && j.role === 'anon'; } catch { return false; } };
+    const leaks = files.filter((p) => [...readFileSync(p, 'utf8').matchAll(jwt)].some((m) => !isPublicAnon(m[1])));
     expect(leaks).toEqual([]);
   });
 });

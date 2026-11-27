@@ -82,7 +82,8 @@ test('flujo completo en Android: configurar, incorporar, recomendar, buscar y va
   await page.screenshot({ path: `test-results/${info.project.name}-valoraciones.png` });
 
   // Perfil de gustos
-  await page.getByRole('link', { name: /Mis gustos/ }).click();
+  await page.getByRole('link', { name: 'Ajustes' }).click();
+  await page.getByTestId('settings-taste').click();
   await expect(page.getByText('Géneros preferidos')).toBeVisible();
   await noHorizontalScroll(page);
   await page.screenshot({ path: `test-results/${info.project.name}-gustos.png`, fullPage: true });

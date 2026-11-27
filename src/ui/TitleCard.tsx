@@ -1,5 +1,6 @@
 /**
- * v4.1 · Tarjeta común de recomendación (Inicio / Para vos, Similares y Quiero ver).
+ * v4.1 · Tarjeta común de recomendación (Inicio / Para vos, Similares, Quiero ver y, desde v4.2, Me recomendaron y Para ver juntos).
+ * v4.2: la cuadrícula de acciones pasa de 2 × 2 a 3 × 2 (suma Compartir y el acceso directo a Aspectos); el resto no cambia.
  *
  * Sólo interfaz: no calcula puntajes ni cambia el orden. Cada pantalla le pasa los datos de SU contexto (motor elegido,
  * similitud o lista) ya calculados; la tarjeta no inventa sinopsis, explicaciones ni puntajes.
@@ -25,6 +26,7 @@ import type { AvailabilitySnapshot, DimensionId, DimensionScores, InterestAnswer
 import { Poster, publicScore, StarRow, TitleLink } from './components';
 import { num, relTime } from './format';
 import { TrailerModal, YouTubeSearchLink } from './Trailer';
+import ShareAction from './ShareAction';
 
 export interface SimilarRef { key?: TitleKey; title: string; note?: string }
 export interface CardInfo {
@@ -115,11 +117,15 @@ const Icon = {
   eye: (on: boolean) => on
     ? <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
     : <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>,
+  aspects: <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>,
   star: <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true" fill="currentColor"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4L2.8 9.5l6.4-.8z" /></svg>,
 };
 
 const btn = 'flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold leading-tight';
 const neutral = `${btn} bg-ink-800 text-slate-200 ring-1 ring-white/10`;
+/** v4.2: celdas de la cuadrícula 3 × 2 (ícono arriba y texto compacto; entran en 360 px con 52 px de alto) */
+const gbtn = 'flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[12px] font-semibold leading-tight';
+const gneutral = `${gbtn} bg-ink-800 text-slate-200 ring-1 ring-white/10`;
 
 export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info, interest, profileId, track, onTouch, actionsExtra, testId = 'rec-item', interestTestPrefix = 'interest' }: {
   k: TitleKey; meta: TitleMeta; snap?: AvailabilitySnapshot | null; rating?: Rating; rank?: number; info: CardInfo; interest?: InterestCtx;
@@ -131,6 +137,8 @@ export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info,
   const { meta, loading: metaLoading } = useFullMeta(baseMeta, near || moreOpen);
   const [panel, setPanel] = useState<'score' | 'aspects' | 'comment'>();
   const [longText, setLongText] = useState(false);
+  const [aspectsAt, setAspectsAt] = useState<'grid' | 'more'>('grid');
+  const dimCount = rating ? Object.keys(rating.dimensions).length : 0;
   const watched = Boolean(rating?.watched);
   const saved = rating?.list === 'want' || rating?.list === 'watching';
   const dismissed = Boolean(rating?.notInterested);
@@ -215,21 +223,27 @@ export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info,
         </div>
       )}
 
-      {/* Acciones principales 2 × 2 */}
-      <div className="mt-2.5 grid grid-cols-2 gap-2" role="group" aria-label={`Acciones para ${meta.title}`}>
-        <button type="button" className={neutral} data-testid="trailer-button" onClick={openTrailer} disabled={tr.busy}>{Icon.play}{tr.busy ? 'Buscando…' : 'Ver tráiler'}</button>
+      {/* v4.2 · Acciones principales 3 × 2 (alternativa C): Tráiler · Quiero verla · Compartir / Ya la vi · Puntuar · Aspectos */}
+      <div className="mt-2.5 grid grid-cols-3 gap-1.5" role="group" aria-label={`Acciones para ${meta.title}`} data-testid="card-actions" data-grid="3x2">
+        <button type="button" className={gneutral} data-testid="trailer-button" onClick={openTrailer} disabled={tr.busy}>{Icon.play}<span className="max-w-full truncate">{tr.busy ? 'Buscando…' : 'Tráiler'}</span></button>
         <button type="button" data-testid="quick-want" aria-pressed={saved}
           onClick={() => run(() => rateAndLearn(profileId, k, { list: saved ? null : 'want' }), saved ? 'el cambio en «Quiero ver»' : '«Quiero verla»')}
-          className={`${btn} ${saved ? 'ring-1 ring-emerald-500/40' : ''}`} style={saved ? { background: '#123222', color: '#4ADE80' } : { background: '#F4B83F', color: '#1A1205' }}>
-          {Icon.bookmark(saved)}{saved ? 'Guardada' : 'Quiero verla'}
+          className={`${gbtn} ${saved ? 'ring-1 ring-emerald-500/40' : ''}`} style={saved ? { background: '#123222', color: '#4ADE80' } : { background: '#F4B83F', color: '#1A1205' }}>
+          {Icon.bookmark(saved)}<span className="max-w-full truncate">{saved ? 'Guardada' : 'Quiero verla'}</span>
         </button>
+        <ShareAction target={{ k, title: meta.title, year: meta.year, posterPath: meta.posterPath }} />
         <button type="button" data-testid="quick-watched" aria-pressed={watched} onClick={() => run(() => setWatched(profileId, k, !watched), 'la marca de vista')}
-          className={watched ? `${btn} bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/40` : neutral}>
-          {Icon.eye(watched)}{watched ? 'Vista' : 'Ya la vi'}
+          className={watched ? `${gbtn} bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/40` : gneutral}>
+          {Icon.eye(watched)}<span className="max-w-full truncate">{watched ? 'Vista' : 'Ya la vi'}</span>
         </button>
         <button type="button" data-testid="quick-score" aria-expanded={panel === 'score'} onClick={() => { onTouch?.(k); setPanel(panel === 'score' ? undefined : 'score'); }}
-          className={panel === 'score' ? `${btn} bg-accent text-ink-950` : neutral}>
-          {Icon.star}{rating?.overall !== undefined ? <>Tu nota {num(rating.overall, rating.overall % 1 ? 1 : 0)}</> : 'Puntuar'}
+          className={panel === 'score' ? `${gbtn} bg-accent text-ink-950` : gneutral}>
+          <span style={panel === 'score' ? undefined : { color: '#FFBB38' }}>{Icon.star}</span><span className="max-w-full truncate">{rating?.overall !== undefined ? <>Tu nota {num(rating.overall, rating.overall % 1 ? 1 : 0)}</> : 'Puntuar'}</span>
+        </button>
+        <button type="button" data-testid="quick-aspects-grid" aria-expanded={panel === 'aspects' && aspectsAt === 'grid'}
+          onClick={() => { onTouch?.(k); setAspectsAt('grid'); setPanel(panel === 'aspects' && aspectsAt === 'grid' ? undefined : 'aspects'); }}
+          className={panel === 'aspects' && aspectsAt === 'grid' ? `${gbtn} bg-accent text-ink-950` : gneutral}>
+          {Icon.aspects}<span className="max-w-full truncate">Aspectos{dimCount ? ` ${dimCount}/${DIMENSIONS.length}` : ''}</span>
         </button>
       </div>
       {watched && <p className="mt-1 text-[11px] text-slate-500" data-testid="watched-hint">Marcada como vista. Tocá «Vista» para deshacerlo; tus notas no cambian.</p>}
@@ -239,6 +253,7 @@ export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info,
       {tr.open !== undefined && tr.list?.[tr.open] && (
         <TrailerModal choice={tr.list[tr.open]} versions={tr.list} onPick={(i) => setTr((s) => ({ ...s, open: i }))} onClose={() => setTr((s) => ({ ...s, open: undefined }))} search={{ title: meta.title, year: meta.year }} />
       )}
+      {panel === 'aspects' && aspectsAt === 'grid' && <AspectsPanel value={rating?.dimensions ?? {}} onSave={(d) => run(() => rateAndLearn(profileId, k, { dimensions: d }), 'los aspectos').then(closeIfSaved)} />}
       {panel === 'score' && <ScorePanel current={rating?.overall} onSave={(v) => run(() => rateAndLearn(profileId, k, { overall: v, watched: true }), 'la valoración').then(closeIfSaved)} onCancel={() => setPanel(undefined)} />}
 
       {/* Respuestas de interés (antes de verla). «Ya la vi» está en las acciones principales. */}
@@ -283,10 +298,10 @@ export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info,
           )}
           {info.moreExtra}
           <div>
-            <button type="button" data-testid="quick-aspects" aria-expanded={panel === 'aspects'} onClick={() => setPanel(panel === 'aspects' ? undefined : 'aspects')} className={`${neutral} w-full`}>
+            <button type="button" data-testid="quick-aspects" aria-expanded={panel === 'aspects' && aspectsAt === 'more'} onClick={() => { setAspectsAt('more'); setPanel(panel === 'aspects' && aspectsAt === 'more' ? undefined : 'aspects'); }} className={`${neutral} w-full`}>
               {Icon.star}Puntuar aspectos{rating && Object.keys(rating.dimensions).length ? ` · ${Object.keys(rating.dimensions).length}/${DIMENSIONS.length}` : ''}
             </button>
-            {panel === 'aspects' && <AspectsPanel value={rating?.dimensions ?? {}} onSave={(d) => run(() => rateAndLearn(profileId, k, { dimensions: d }), 'los aspectos').then(closeIfSaved)} />}
+            {panel === 'aspects' && aspectsAt === 'more' && <AspectsPanel value={rating?.dimensions ?? {}} onSave={(d) => run(() => rateAndLearn(profileId, k, { dimensions: d }), 'los aspectos').then(closeIfSaved)} />}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" data-testid="card-comment" aria-expanded={panel === 'comment'} onClick={() => setPanel(panel === 'comment' ? undefined : 'comment')} className={neutral}>
