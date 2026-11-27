@@ -7,7 +7,7 @@
  */
 import { db } from '../db/db';
 import { createProfile, updateConfig } from '../db/repo';
-import { pushNotice } from '../services/notices';
+import { dismissNotice, pushNotice } from '../services/notices';
 import { parseKey, type TitleKey } from '../types';
 import type { SocialBackend } from './backend';
 import { socialEndpoint } from './config';
@@ -164,6 +164,10 @@ function mergeInbox(server: InboxRec[]) {
   return server.map((r) => { const l = local.get(r.id); return l ? { ...r, seenAt: r.seenAt ?? l.seenAt, archivedAt: l.archivedAt !== undefined || r.archivedAt === undefined ? l.archivedAt : r.archivedAt } : r; });
 }
 
+const incomingNotices = new Set<number>();
+/** Al abrir Me recomendaron, los avisos de «X te recomendó…» ya no hacen falta. */
+export function clearIncomingNotices() { for (const n of incomingNotices) dismissNotice(n); incomingNotices.clear(); }
+
 async function onIncoming(id: string) {
   if (state.inbox.some((r) => r.id === id)) return;
   try {
@@ -173,7 +177,7 @@ async function onIncoming(id: string) {
     const who = contactName(rec.sender) ?? rec.senderName;
     // En la propia bandeja no hace falta el aviso: la tarjeta aparece arriba
     if (typeof location !== 'undefined' && location.hash.startsWith('#/recibidas')) return;
-    pushNotice({ kind: 'info', text: `${who} te recomendó «${rec.title}».`, action: { label: 'Ver', run: () => onOpenRec?.(rec.id) } }, 7000);
+    incomingNotices.add(pushNotice({ kind: 'info', text: `${who} te recomendó «${rec.title}».`, action: { label: 'Ver', run: () => onOpenRec?.(rec.id) } }, 7000));
   } catch { /* se verá en la próxima actualización */ }
 }
 

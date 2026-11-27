@@ -12,7 +12,7 @@ import { useRatings } from '../hooks/useRatings';
 import { pushNotice, safely } from '../services/notices';
 import { predictFor } from '../services/recommendations';
 import { interestMap, recordInterest } from '../services/taste';
-import { initSocial, markSeen, setArchived } from '../social/store';
+import { clearIncomingNotices, initSocial, markSeen, setArchived } from '../social/store';
 import { displayTitle, type DisplayTitle } from '../social/titles';
 import type { InboxRec } from '../social/types';
 import { useSocial } from '../social/useSocial';
@@ -25,7 +25,7 @@ import Together from './Together';
 export default function Inbox() {
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') === 'juntos' ? 'juntos' : 'recibidas';
-  useEffect(() => { void initSocial(); }, []);
+  useEffect(() => { void initSocial(); clearIncomingNotices(); }, []);
   return (
     <div className="space-y-3">
       <h1 className="text-2xl font-bold">Me recomendaron</h1>
@@ -165,7 +165,7 @@ function ReceivedList({ focus }: { focus?: string }) {
   return (
     <div className="space-y-3">
       {!s.reachable && <p className="rounded-lg bg-amber-500/10 p-2 text-xs text-amber-200" data-testid="social-offline">Sin conexión con el servicio social: se muestra lo último recibido.</p>}
-      <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4" data-testid="inbox-filters">
+      <div className="flex flex-wrap gap-1.5" data-testid="inbox-filters">
         {([['todas', 'Todas'], ['nuevas', `Nuevas${counts.nuevas ? ` (${counts.nuevas})` : ''}`], ['vistas', 'Vistas'], ['archivadas', `Archivadas${counts.archivadas ? ` (${counts.archivadas})` : ''}`]] as const).map(([id, l]) => (
           <Chip key={id} active={filter === id} onClick={() => setFilter(id)} testId={`inbox-filter-${id}`}>{l}</Chip>
         ))}
@@ -209,7 +209,7 @@ function ReceivedList({ focus }: { focus?: string }) {
                   <p className="min-w-0 flex-1 truncate text-sm font-bold text-sky-200"><span data-testid="inbox-from-name">{who}</span> te recomienda</p>
                   {newAtEntry.current.has(r.id) && !r.archivedAt && <span className="rounded-full bg-sky-400 px-2 py-0.5 text-[10px] font-bold text-ink-950" data-testid="inbox-new">Nueva</span>}
                 </div>
-                <p className="text-[11px] text-slate-400"><span data-testid="inbox-when">{whenLabel(r.createdAt)}</span> · <span data-testid="inbox-status">{STATUS_LABEL[st]}</span></p>
+                <p className="text-[11px] text-slate-400"><span data-testid="inbox-when">{whenLabel(r.createdAt)}</span>{st !== 'nueva' && <> · <span data-testid="inbox-status">{STATUS_LABEL[st]}</span></>}</p>
                 {r.comment && <p className="mt-1 whitespace-pre-line break-words rounded-lg bg-sky-500/10 px-2.5 py-1.5 text-[13px] italic text-sky-100" data-testid="inbox-comment">«{r.comment}»</p>}
               </div>
               {t && t !== 'error' ? (

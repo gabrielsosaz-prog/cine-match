@@ -44,7 +44,7 @@ function TogetherInner() {
   return (
     <div className="space-y-3">
       {contacts.length > 1 && (
-        <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">{contacts.map((x) => <Chip key={x.id} active={x.id === c.id} onClick={() => setWho(x.id)} testId="together-contact">{x.alias}</Chip>)}</div>
+        <div className="flex flex-wrap gap-1.5">{contacts.map((x) => <Chip key={x.id} active={x.id === c.id} onClick={() => setWho(x.id)} testId="together-contact">{x.alias}</Chip>)}</div>
       )}
       <Permissions contactId={c.id} />
       {c.shareMatches && c.theirShareMatches && <MatchList key={c.id} contactId={c.id} alias={c.alias} theirScores={c.theirShareScores} />}
@@ -137,13 +137,13 @@ function MatchList({ contactId, alias, theirScores }: { contactId: string; alias
       <div className="grid grid-cols-2 gap-1.5 text-xs">
         <select aria-label="Tipo" value={type} onChange={(e) => setType(e.target.value as typeof type)} className="min-w-0 rounded-lg bg-ink-800 p-2 ring-1 ring-white/10"><option value="all">Películas y series</option><option value="movie">Películas</option><option value="tv">Series</option></select>
         <select aria-label="Orden" data-testid="together-sort" value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="min-w-0 rounded-lg bg-ink-800 p-2 ring-1 ring-white/10">
-          <option value="propia">Mejor puntuación propia</option><option value="tmdb">TMDB</option><option value="recientes">Agregadas recientemente</option>
-          <option value="conjunta" disabled={!canJoint}>Mejor coincidencia conjunta{canJoint ? '' : ' (no disponible)'}</option>
+          <option value="propia">Mi puntaje</option><option value="tmdb">TMDB</option><option value="recientes">Recientes</option>
+          <option value="conjunta" disabled={!canJoint}>Conjunta{canJoint ? '' : ' (no disponible)'}</option>
         </select>
-        <select aria-label="Duración" value={len} onChange={(e) => setLen(e.target.value as typeof len)} className="min-w-0 rounded-lg bg-ink-800 p-2 ring-1 ring-white/10"><option value="all">Cualquier duración</option><option value="corta">Cortas (≤ 100 min / ≤ 2 temp.)</option><option value="larga">Largas</option></select>
-        <select aria-label="Género" value={genre ?? ''} onChange={(e) => setGenre(e.target.value ? Number(e.target.value) : undefined)} className="min-w-0 rounded-lg bg-ink-800 p-2 ring-1 ring-white/10"><option value="">Todos los géneros</option>{genres.map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select>
+        <select aria-label="Duración" value={len} onChange={(e) => setLen(e.target.value as typeof len)} className="min-w-0 rounded-lg bg-ink-800 p-2 ring-1 ring-white/10"><option value="all">Duración</option><option value="corta">Cortas (≤ 100 min / ≤ 2 temp.)</option><option value="larga">Largas</option></select>
+        <select aria-label="Género" value={genre ?? ''} onChange={(e) => setGenre(e.target.value ? Number(e.target.value) : undefined)} className="min-w-0 rounded-lg bg-ink-800 p-2 ring-1 ring-white/10"><option value="">Géneros</option>{genres.map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select>
       </div>
-      <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
+      <div className="flex flex-wrap gap-1.5" data-testid="together-platforms">
         {PLATFORMS.filter((p) => settings.platforms.includes(p.id)).map((p) => <Chip key={p.id} active={plats.includes(p.id)} onClick={() => setPlats(plats.includes(p.id) ? plats.filter((x) => x !== p.id) : [...plats, p.id])}>{p.label}</Chip>)}
       </div>
       {sort === 'conjunta' && <p className="text-[11px] text-slate-500">Coincidencia conjunta = promedio de las dos puntuaciones − {JOINT_PENALTY.toString().replace('.', ',')} × su diferencia. Los títulos sin las dos puntuaciones van al final.</p>}
@@ -160,7 +160,7 @@ function MatchList({ contactId, alias, theirScores }: { contactId: string; alias
           const my = mine(m.key);
           const joint = jointScore(my, m.theirScore);
           const info: CardInfo = {
-            compat: 'Ambos quieren verla',
+            compat: p && ps.kind !== 'insufficient' ? `Afinidad con confianza ${p.confidenceLabel}` : undefined,
             primaryLabel: 'Para vos', primary: my,
             why: p?.explanation ?? [],
             badges: <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-300" data-testid="together-both">Ambos quieren verla</span>,
