@@ -17,7 +17,7 @@ import { pushNotice, safely } from '../services/notices';
 import { predictFor } from '../services/recommendations';
 import { interestMap, recordInterest } from '../services/taste';
 import { JOINT_PENALTY, jointScore } from '../social/joint';
-import { fetchMatches, refresh, updateContact, wantDirty } from '../social/store';
+import { fetchMatches, refresh, syncWantNow, updateContact } from '../social/store';
 import { toSocialError, type Match } from '../social/types';
 import { useSocial } from '../social/useSocial';
 import type { MediaType, PlatformId, RecommendationItem, TitleKey, TitleMeta } from '../types';
@@ -59,7 +59,7 @@ function Permissions({ contactId }: { contactId: string }) {
   const [withScore, setWithScore] = useState(true);
   const act = async (patch: Parameters<typeof updateContact>[1]) => {
     setBusy(true);
-    try { await updateContact(c.id, patch); wantDirty(0); } catch (e) { pushNotice({ kind: 'error', text: toSocialError(e).message }); } finally { setBusy(false); }
+    try { await updateContact(c.id, patch); await syncWantNow(); } catch (e) { pushNotice({ kind: 'error', text: toSocialError(e).message }); } finally { setBusy(false); }
   };
   if (!c.shareMatches) return (
     <div className="space-y-2 rounded-2xl bg-ink-900 p-4 text-sm text-slate-300 ring-1 ring-white/5" data-testid="together-authorize">
@@ -88,7 +88,14 @@ function MatchList({ contactId, alias, theirScores }: { contactId: string; alias
   const load = async () => {
     try { setMatches(await fetchMatches(contactId)); setError(undefined); } catch (e) { setError(toSocialError(e).message); }
   };
-  useEffect(() => { void load(); const t = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 60_000); return () => clearInterval(t); }, [contactId, wantSig, theirScores]);
+  useEffect(() => {
+    // Se actualiza sola: al volver a la app y cada 20 s mientras está a la vista (la otra persona puede autorizar o guardar en cualquier momento)
+    void load();
+    const onVis = () => { if (document.visibilityState === 'visible') void load(); };
+    const t = setInterval(onVis, 20_000);
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, [contactId, wantSig, theirScores]);
   const keys = useMemo(() => (matches ?? []).map((m) => m.key), [matches]);
   const sig = keys.join(',');
   const titles = useLiveQuery(() => db.titles.bulkGet(keys), [sig]) ?? [];

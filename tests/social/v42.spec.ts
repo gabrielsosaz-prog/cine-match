@@ -161,6 +161,7 @@ test('v4.2 · dos teléfonos: vincular una vez, recomendar con un toque, recibir
     for (const p of [a, b]) {
       await p.goto('./#/recibidas?tab=juntos');
       await p.getByTestId('together-enable').click();
+      await expect(p.getByTestId('together-status')).toBeVisible({ timeout: 30000 });
     }
     await a.reload();
     await expect(a.locator(`[data-testid="together-item"][data-key="${key}"]`)).toBeVisible({ timeout: 60000 });
