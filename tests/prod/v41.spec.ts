@@ -70,7 +70,7 @@ test('producción v4.1: tarjeta común con TMDB real en las tres pantallas y los
   page.on('pageerror', (e) => errors.push(e.message));
   const v = await (await page.request.get('/version.json')).json();
   log(shots, JSON.stringify(v));
-  expect(v.version).toBe('4.2.0');
+  expect(v.version).toBe('4.3.0');
   await page.goto('/');
   await expect(page.getByText('Paso 1 de 3')).toBeVisible();
   await page.getByTestId('ob-next').click();

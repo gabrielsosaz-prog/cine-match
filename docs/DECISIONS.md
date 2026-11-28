@@ -73,3 +73,9 @@
 - **Web Push sin dependencias.** Cifrado aes128gcm y firma VAPID con WebCrypto en la función `notify` (verificado contra una implementación independiente). La clave privada VAPID vive sólo como secreto de Supabase.
 - **Puntaje conjunto simple**: promedio − 0,25 × |diferencia|, para preferir títulos que gustan parecido a los dos. No toca los motores.
 - **Sin etiqueta de versión**: el proxy de este entorno no permite empujar tags; el punto de recuperación es el commit `ecac00b` (v4.1.0) y su despliegue en Vercel.
+- **v4.3: reutilizar las cuatro respuestas de interés, sin un voto nuevo.** Lo que se comparte es la última respuesta local (sin «Ya la vi»); la fuente de verdad sigue siendo el teléfono y el servidor sólo guarda la copia autorizada.
+- **v4.3: visibilidad por hora del servidor.** Cada respuesta guarda la hora del cliente (para resolver el orden y la idempotencia) y la hora del servidor (para la visibilidad). Un contacto sólo ve respuestas dadas después de que el título quedó intercambiado: enviar un título al azar no revela lo que el otro había respondido antes.
+- **v4.3: avisos con una tabla interna aparte.** El tiempo real de Supabase envía filas completas y exige poder leer todas sus columnas, incluida la del filtro; por eso la marca «aviso push enviado» vive en `social_pushes`, sin acceso para la app.
+- **v4.3: «Compartidas» en vez de «Recibidas».** Agrupa Recibidas, Enviadas y Para ver juntos sin agregar un octavo acceso; la ruta vieja `/recibidas` (avisos ya enviados) redirige conservando los parámetros.
+- **v4.3: sin indicadores de actividad.** Enviadas muestra respuestas, nunca si el otro abrió la app o cuándo se conectó.
+- **v4.3: sin etiqueta de versión** por el mismo bloqueo del proxy; el punto de recuperación de v4.2 es el commit `ae6c561` y su despliegue en Vercel, más la copia `backup_v42` de la base.
