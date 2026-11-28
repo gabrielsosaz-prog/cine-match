@@ -1,3 +1,14 @@
+# Resultados de pruebas (v4.3 Intereses compartidos)
+
+- Unitarias (Vitest): 312/312 (17 nuevas: la tabla de coincidencias es idéntica a la del servidor en las 25 combinaciones y simétrica; un «No» excluye aunque ambos la tengan en Quiero ver; un interés privado no se deduce; orden y desempate de Para ver juntos; deduplicación; publicación desde cualquier pantalla, pendiente sin conexión, el cambio más nuevo gana, la foto del servidor reemplaza la caché al revocar, valoraciones con línea base). Tipos: sin errores.
+- Seguridad de la base (Postgres 16 local, `supabase/tests/run-local.sh`): 154/154 (73 de v4.2 + 81 de v4.3 con usuarios A, B, C y D), migraciones aplicadas dos veces; también probado el paso desde la primera versión de 0002 y la vuelta atrás `0002_down.sql` (después de aplicarla, las 73 de v4.2 siguen pasando).
+- Contra la API de producción (workflow «Servicio social»): v4.2 53/53 y v4.3 51/51 con cuentas efímeras A, B, C y D (flujo de 20 pasos, tiempo real, C no recibe eventos ajenos, avisos push sin repetición y respetando preferencias, concurrencia, reenvíos idempotentes, cambios fuera de orden, enumeración, varios contactos, valoraciones, revocación con borrado en el servidor, bloqueo, preferencias ajenas, eliminación de cuenta). `put_shared` ≈ 230 ms y `get_shared` ≈ 195 ms desde GitHub Actions.
+- Interfaz en emulación Android (Pixel 7 y 360 px, TMDB simulado): 84/84 (la etiqueta «Compartidas» entra sin cortarse en 360 px).
+- Dos teléfonos (`tests/social/v43.spec.ts`, más `v42.spec.ts` sin cambios): local con servidor simulado y en el workflow contra Supabase y TMDB de producción. Permisos con consentimiento, compartir con interés, «Esperando respuesta», respuesta en Recibidas, tiempo real en Inicio, Enviadas con resumen y filtros, coincidencia máxima con un aviso que abre Para ver juntos, sentido inverso desde Buscar, orden por coincidencia, «No», vuelta a «Me interesa» desde Buscar o la ficha, barra de 360 px, revocación.
+- Motores: `src/engine`, `src/types.ts`, `src/db` y el catálogo, byte a byte iguales a v4.2 (`ae6c561`). Top 400 de v4.0 con la copia real (sólo local): 400/400 iguales en orden, diferencia máxima de puntaje 0.
+- Actualización v4.2 → v4.3 con la copia real (`tests/upgrade/upgrade-v41-v42.mjs <dist-v4.2> <dist-v4.3> <copia>`, sólo local): 611 registros idénticos, ninguna clave local perdida, copia de seguridad con el mismo formato, igual tras reabrir.
+- Rendimiento: JavaScript inicial 230,4 → 235,7 KB (gzip -9, +2,3 %); Compartidas y Ajustes sociales se cargan aparte.
+
 # Resultados de pruebas (v4.2 Social)
 
 - Unitarias (Vitest): 295/295 (incluye cifrado Web Push: descifrado de ida y vuelta, sal y claves nuevas por envío, firma VAPID; verificado además contra la librería independiente `http_ece`). Tipos: sin errores.
