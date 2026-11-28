@@ -24,7 +24,10 @@ const PrivacyPage = lazy(() => import('./pages/SocialSettings').then((m) => ({ d
 const NotificationsPage = lazy(() => import('./pages/SocialSettings').then((m) => ({ default: m.NotificationsPage })));
 const InvitePage = lazy(() => import('./pages/SocialSettings').then((m) => ({ default: m.InvitePage })));
 import { useSocial } from './social/useSocial';
-import { initSocial, newCount, setOpenRecHandler, setWantProvider, wantDirty } from './social/store';
+import { initSocial, newCount, onLocalAnswer, setLocalSource, setOpenMatchHandler, setOpenRecHandler, setWantProvider, syncLocalRatings, wantDirty } from './social/store';
+import { listInterests, onInterestRecorded } from './services/taste';
+import { isSharedAnswer, type SharedAnswer } from './social/interests';
+import type { TitleKey } from './types';
 import { predictFor } from './services/recommendations';
 import { listRatings } from './db/repo';
 import { useRatings } from './hooks/useRatings';
@@ -42,7 +45,8 @@ const NAV: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/buscar', label: 'Buscar', icon: svg(<><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L21 21" /></>) },
   { to: '/similares', label: 'Similares', icon: svg(<><circle cx="9" cy="12" r="5.5" /><circle cx="15" cy="12" r="5.5" /></>) },
   { to: '/pendientes', label: 'Quiero ver', icon: svg(<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z" />) },
-  { to: '/recibidas', label: 'Recibidas', icon: svg(<><path d="M3.5 13.5l2.6-7.2A2 2 0 0 1 8 5h8a2 2 0 0 1 1.9 1.3l2.6 7.2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5" /></>) },
+  // v4.3: «Compartidas» (Recibidas · Enviadas · Para ver juntos); ícono de dos personas
+  { to: '/compartidas', label: 'Compartidas', icon: svg(<><circle cx="9" cy="8" r="3.2" /><path d="M3 19.5c.6-3.3 3-5.3 6-5.3s5.4 2 6 5.3" /><circle cx="16.5" cy="9" r="2.6" /><path d="M16.2 14.2c2.6.1 4.3 1.9 4.8 4.6" /></>) },
   { to: '/valoraciones', label: 'Notas', icon: svg(<><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></>) },
   { to: '/ajustes', label: 'Ajustes', icon: svg(<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>) },
 ];
@@ -73,7 +77,8 @@ export default function App() {
           <Route path="/mi-perfil" element={<TasteProfilePage />} />
           <Route path="/estadisticas" element={<EngineStats />} />
           <Route path="/ajustes" element={<Settings />} />
-          <Route path="/recibidas" element={<Lazy><Inbox /></Lazy>} />
+          <Route path="/compartidas" element={<Lazy><Inbox /></Lazy>} />
+          <Route path="/recibidas" element={<LegacyInbox />} />
           <Route path="/ajustes/cuenta" element={<Lazy><AccountPage /></Lazy>} />
           <Route path="/ajustes/contactos" element={<Lazy><ContactsPage /></Lazy>} />
           <Route path="/ajustes/privacidad" element={<Lazy><PrivacyPage /></Lazy>} />
@@ -92,9 +97,10 @@ export default function App() {
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-ink-950/95 backdrop-blur" aria-label="Navegación principal">
           <div className="mx-auto flex max-w-xl">
             {NAV.map((n) => (
+              // «Compartidas» es la palabra más larga: un poco más de ancho para que entre sin cortarse en 360 px
               <NavLink key={n.to} to={n.to} end={n.to === '/'} data-testid={`nav-${n.to.slice(1) || 'inicio'}`}
-                className={({ isActive }) => `flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-start gap-0.5 px-0.5 pb-1 pt-2 text-center text-[10px] font-medium leading-[1.1] ${isActive ? 'text-accent' : 'text-slate-400'}`}>
-                <span className="relative">{n.icon}{n.to === '/recibidas' && <InboxBadge />}</span><span className="max-w-full">{n.label}</span>
+                className={({ isActive }) => `flex min-h-[54px] min-w-0 ${n.to === '/compartidas' ? 'flex-[1.3_1_0%] tracking-[-0.02em]' : 'flex-1'} flex-col items-center justify-start gap-0.5 px-0.5 pb-1 pt-2 text-center text-[10px] font-medium leading-[1.1] ${isActive ? 'text-accent' : 'text-slate-400'}`}>
+                <span className="relative">{n.icon}{n.to === '/compartidas' && <InboxBadge />}</span><span className="max-w-full">{n.label}</span>
               </NavLink>
             ))}
           </div>
@@ -104,6 +110,11 @@ export default function App() {
   );
 }
 
+/** v4.2 usaba «/recibidas» (también en notificaciones ya enviadas): se redirige conservando los parámetros. */
+function LegacyInbox() {
+  const loc = useLocation();
+  return <Navigate to={`/compartidas${loc.search}`} replace />;
+}
 const Lazy = ({ children }: { children: ReactNode }) => <Suspense fallback={<p className="text-sm text-slate-400">Cargando…</p>}>{children}</Suspense>;
 
 /** Contador discreto de recomendaciones nuevas sobre el ícono de «Recibidas». */
@@ -123,7 +134,11 @@ function SocialBridge() {
   const nav = useNavigate();
   const rs = useRatings(profileId);
   useEffect(() => {
-    setOpenRecHandler((id) => nav(`/recibidas?r=${id}`));
+    setOpenRecHandler((id) => nav(`/compartidas?r=${id}`));
+    setOpenMatchHandler((k, c) => nav(`/compartidas?tab=juntos&k=${encodeURIComponent(k)}&c=${encodeURIComponent(c)}`));
+    return onInterestRecorded((r) => onLocalAnswer(r.profileId, r.key, r.answer));
+  }, []);
+  useEffect(() => {
     const t = setTimeout(() => { void initSocial(); }, 400);
     return () => clearTimeout(t);
   }, []);
@@ -134,7 +149,24 @@ function SocialBridge() {
       return want.map((r) => { const p = preds.get(r.key); return { key: r.key, addedAt: r.updatedAt, score: p && p.confidence >= 0.12 ? Math.round(p.score * 100) / 100 : undefined }; });
     });
     wantDirty(1500);
+    // v4.3: lo local es la fuente de verdad (última respuesta de interés sin «Ya la vi»; nota general posterior)
+    setLocalSource({
+      profileId,
+      answers: async () => {
+        const m = new Map<TitleKey, SharedAnswer>();
+        const at = new Map<TitleKey, number>();
+        for (const r of await listInterests(profileId)) if (isSharedAnswer(r.answer) && r.at >= (at.get(r.key) ?? -1)) { m.set(r.key, r.answer); at.set(r.key, r.at); }
+        return m;
+      },
+      ratings: async () => new Map((await listRatings(profileId)).filter((r) => r.overall !== undefined).map((r) => [r.key, r.overall!])),
+    });
   }, [profileId]);
+  const s = useSocial();
+  const rsig = rs.ratings.filter((r) => r.overall !== undefined).map((r) => `${r.key}=${r.overall}`).sort().join(',');
+  useEffect(() => {
+    if (rs.status !== 'ready' || s.phase !== 'ready') return;
+    syncLocalRatings(profileId, new Map(rs.ratings.filter((r) => r.overall !== undefined).map((r) => [r.key, r.overall!])));
+  }, [rsig, s.phase, s.contacts, s.sent.length, s.inbox.length]);
   const sig = rs.ratings.filter((r) => r.list === 'want' || r.list === 'watching').map((r) => r.key).sort().join(',');
   useEffect(() => { if (rs.status === 'ready') wantDirty(); }, [sig]);
   return null;

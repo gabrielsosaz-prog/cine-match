@@ -70,7 +70,7 @@ test('producción v4.1: tarjeta común con TMDB real en las tres pantallas y los
   page.on('pageerror', (e) => errors.push(e.message));
   const v = await (await page.request.get('/version.json')).json();
   log(shots, JSON.stringify(v));
-  expect(v.version).toBe('4.2.0');
+  expect(v.version).toBe('4.3.0');
   await page.goto('/');
   await expect(page.getByText('Paso 1 de 3')).toBeVisible();
   await page.getByTestId('ob-next').click();
@@ -83,7 +83,7 @@ test('producción v4.1: tarjeta común con TMDB real en las tres pantallas y los
 
   // Barra de 7 accesos
   const nav = page.getByRole('navigation', { name: 'Navegación principal' });
-  expect(await nav.getByRole('link').allInnerTexts()).toEqual(['Inicio', 'Buscar', 'Similares', 'Quiero ver', 'Recibidas', 'Notas', 'Ajustes']);
+  expect(await nav.getByRole('link').allInnerTexts()).toEqual(['Inicio', 'Buscar', 'Similares', 'Quiero ver', 'Compartidas', 'Notas', 'Ajustes']);
   for (const l of await nav.getByRole('link').all()) { const b = (await l.boundingBox())!; expect(b.width).toBeGreaterThanOrEqual(44); expect(b.height).toBeGreaterThanOrEqual(44); }
   await noHorizontalScroll(page);
 

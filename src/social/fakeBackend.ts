@@ -72,6 +72,26 @@ export function createFakeBackend(base: string): SocialBackend {
     syncWant: (items) => call('sync_want', { items }),
     async clearWant() { await call('clear_want'); },
     getMatches: (contact) => call('get_matches', { contact }),
+    getPrefs: () => call('get_prefs'),
+    async setPrefs(p) { await call('set_prefs', { p }); },
+    putShared: (items) => (items.length ? call('put_shared', { items }) : Promise.resolve([])),
+    getShared: () => call('get_shared'),
+    subscribeEvents(onEvent) {
+      let last = -1;
+      let stop = false;
+      const tick = async () => {
+        if (stop || !session()) return;
+        try {
+          const evs: any[] = await call('events_since', { id: last });
+          if (last >= 0) for (const e of evs) onEvent(e);
+          if (evs.length) last = Math.max(last, ...evs.map((e) => e.id)); else if (last < 0) last = await call('events_max');
+        } catch { /* sin conexión */ }
+      };
+      void tick();
+      const t = setInterval(tick, 1000);
+      return () => { stop = true; clearInterval(t); };
+    },
+    async notifyEvents(ids) { if (ids.length) await call('notify_events', { ids }); },
     async savePush() { throw new SocialError('unknown', 'push no disponible en pruebas'); },
     async deletePush() { /* */ },
     async notify(recId) { await call('notify', { id: recId }); },

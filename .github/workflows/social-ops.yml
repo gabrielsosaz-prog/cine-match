@@ -1,7 +1,7 @@
 name: Servicio social (Supabase)
 # v4.2 · Operaciones del backend social desde GitHub Actions (el token de Supabase es un secreto del repositorio y
 # nunca se imprime). Se dispara al cambiar ops/request.json en una rama de desarrollo o a mano.
-# Tareas: provision · deploy-function · security · e2e · cleanup · status
+# Tareas: provision · snapshot · migrate · deploy-function · security · security43 · e2e · e2e43 · cleanup · status
 on:
   push:
     branches: ['claude/**']
@@ -32,6 +32,12 @@ jobs:
           T="${{ github.event.inputs.task }}"
           if [ -z "$T" ]; then T=$(node -p "require('./ops/request.json').task"); fi
           echo "task=$T" >> "$GITHUB_OUTPUT"; echo "Tarea: $T"
+      - name: Punto de recuperación de la base (copia privada backup_v42)
+        if: contains(steps.task.outputs.task, 'snapshot')
+        run: node scripts/social/snapshot.mjs
+      - name: Aplicar migraciones
+        if: contains(steps.task.outputs.task, 'migrate')
+        run: node scripts/social/migrate.mjs
       - name: Crear y configurar el proyecto
         if: contains(steps.task.outputs.task, 'provision')
         run: node scripts/social/provision.mjs
@@ -47,8 +53,11 @@ jobs:
           git add src/social/config.ts
           git diff --cached --quiet || { git commit -m "v4.2: configuración pública del servicio social (URL y clave anon; sin claves administrativas)"; git push origin HEAD:${{ github.ref_name }}; }
       - name: Pruebas de seguridad contra la API de producción (usuarios A, B y C)
-        if: contains(steps.task.outputs.task, 'security')
+        if: contains(steps.task.outputs.task, 'security ') || endsWith(steps.task.outputs.task, 'security')
         run: node scripts/social/security-prod.mjs
+      - name: v4.3 · intereses compartidos contra la API de producción (usuarios A, B, C y D)
+        if: contains(steps.task.outputs.task, 'security43')
+        run: node scripts/social/security-v43.mjs
       - name: Flujo real en dos sesiones (Android emulado, TMDB real, Supabase real)
         if: contains(steps.task.outputs.task, 'e2e')
         run: |
@@ -63,13 +72,13 @@ jobs:
         if: contains(steps.task.outputs.task, 'prodlive')
         run: |
           npx playwright install --with-deps chromium
-          for i in $(seq 1 40); do curl -s "$APP_URL/version.json?t=$i" | grep -q '"4.2.0"' && break; sleep 15; done
+          for i in $(seq 1 40); do curl -s "$APP_URL/version.json?t=$i" | grep -q '"4.3.0"' && break; sleep 15; done
           curl -s "$APP_URL/version.json"
           SOCIAL_BASE=https://cine-match-pied-tau.vercel.app npx playwright test -c playwright.social.config.ts --reporter=line
       - name: Publicar capturas (sin datos personales)
         if: always() && (contains(steps.task.outputs.task, 'e2e') || contains(steps.task.outputs.task, 'prodlive'))
         run: |
-          mkdir -p /tmp/caps && find test-results -name 'v42-*.png' -exec cp {} /tmp/caps/ \; || true
+          mkdir -p /tmp/caps && find test-results \( -name 'v42-*.png' -o -name 'v43-*.png' \) -exec cp {} /tmp/caps/ \; || true
           ls /tmp/caps | head -60
           git config user.name "cine-match-bot"; git config user.email "actions@users.noreply.github.com"
           # En un worktree aparte, para no tocar el código que usan los pasos siguientes (limpieza y estado)

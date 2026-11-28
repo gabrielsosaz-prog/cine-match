@@ -30,6 +30,13 @@ El proxy sólo permite rutas de lectura (búsqueda, discover, fichas, proveedore
 
 Vercel (plan Hobby gratuito) publica la app y la función `/api/tmdb` en el mismo dominio, y vuelve a publicar en cada push a `main`. Pasos: vercel.com → *Sign up with GitHub* → *Add New → Project* → importar `cine-match` → agregar `TMDB_READ_ACCESS_TOKEN` → *Deploy*. GitHub Actions (`.github/workflows/tests.yml`) corre las pruebas en cada push.
 
+### Recuperación de v4.2
+
+v4.2 queda recuperable en tres niveles, de menor a mayor:
+1. **App**: en Vercel → Deployments, promover el despliegue del commit `ae6c561` (v4.2.0, «Promote to Production»), o revertir en GitHub el merge de v4.3. Los datos locales no cambian de esquema: no se pierde nada.
+2. **Base social**: la migración `0002` es aditiva (columnas y tablas nuevas, funciones v4.2 intactas), así que la app v4.2 funciona sobre la base v4.3 sin tocar nada. Si se decide abandonar v4.3 del todo, `supabase/rollback/0002_down.sql` borra sólo lo agregado (probado: después de aplicarla, las 73 pruebas de seguridad de v4.2 pasan).
+3. **Copia de la base**: antes de migrar se copiaron todas las tablas sociales de v4.2 al esquema privado `backup_v42` (sin acceso desde la app; tarea `snapshot`). `scripts/social/status.mjs` compara cantidades contra esa copia.
+
 ### Recuperación de v4.1
 
 v4.1 queda recuperable: en Vercel → Deployments, promover el despliegue del commit `ecac00b` («Promote to Production»), o revertir en GitHub el merge de v4.2. Los datos locales no cambian de esquema, así que volver a v4.1 no pierde nada; el servicio social simplemente deja de verse.
@@ -64,6 +71,15 @@ Metadatos (`titles`) y disponibilidad (`availability`, `availabilityEvents`) se 
 - **Las tarjetas no desaparecen al puntuar**: nota general → la tarjeta queda → se ofrece completar aspectos y «Otros» → «Listo». El modelo se recalcula solo; el orden visible cambia únicamente con **Actualizar ranking** (un aviso indica cambios pendientes). Los cambios sin guardar del panel quedan como borrador si se cierra por accidente.
 - **Filtros avanzados** combinables (tipo, géneros incluidos/excluidos, años, plataformas, vistos, duración, afinidad mínima), con indicador, «Limpiar filtros» y «Restablecer generales». Se aplican al conjunto de candidatos antes de ordenar; si no hay resultados se indica qué filtro restringe y se puede buscar más en TMDB con esos filtros.
 - **Porcentaje de aspectos completados** (aspectos / 7 × 100) en Valoraciones, con filtros, orden y acceso directo a los faltantes.
+
+### Novedades v4.3 Intereses compartidos (motores v3.4, v3.5 y v4.0 sin cambios)
+
+- **Las mismas cuatro respuestas de siempre** (No 👎, Podría ?, Me interesa 👍, Muchas ganas ♥) se comparten con un contacto en los títulos que intercambiaron (recomendación en cualquier sentido, o coincidencia de Quiero ver con Para ver juntos). No hay un segundo sistema de votos: se cambian con los botones de siempre desde cualquier pantalla y se sincronizan solas. Compartir un título no cuenta como interés; el interés previo no se mezcla con la valoración posterior.
+- **«Intereses compartidos» en la tarjeta común**: Vos | contacto, con interpretación («Ambos tienen muchas ganas», «Les interesa a ambos», «Coincidencia posible», «No hay coincidencia», «Esperando respuesta», «Interés privado») y selector si hay varios contactos. En Inicio y Buscar sólo aparece en títulos con relación social.
+- **Compartidas** (antes «Recibidas») con tres pestañas: Recibidas, Enviadas (todas las recomendaciones existentes, con la respuesta del destinatario, filtros, órdenes y resumen) y Para ver juntos (dos caminos de candidatos, clasificación simétrica máxima › muy alta › alta › ambos quieren verla › posible › posible baja › pendiente › sin coincidencia, y puntaje conjunto sólo si ambos lo autorizaron).
+- **Permisos por contacto**, todos apagados al inicio y revocables: intereses, Quiero ver, puntuaciones estimadas, valoraciones después de verlos (bloque aparte, nunca entrenan el perfil del otro) y avisos de coincidencias. Para compartir respuestas anteriores se pide consentimiento aparte.
+- **Avisos opcionales** (tres interruptores): recomendaciones recibidas, nuevas coincidencias y coincidencias máximas; sólo en transiciones reales, sin repetir al recargar o reconectar y nunca por respuestas negativas.
+- **Servidor**: toda autorización se verifica en Postgres (RLS + funciones `put_shared` / `get_shared`). Una respuesta sólo es visible si se dio después de que el título quedó intercambiado (evita averiguar respuestas viejas enviando títulos al azar). Operaciones idempotentes, el cambio más nuevo gana aunque llegue tarde, cola local sin conexión y nada se muestra como compartido antes de que el servidor lo confirme.
 
 ### Novedades v4.2 Social (motores v3.4, v3.5 y v4.0 sin cambios)
 
@@ -235,6 +251,6 @@ IndexedDB funciona igual dentro del WebView. Para publicar en Play Store convien
 
 Sin analítica. Sin cuenta, todo vive en el dispositivo como hasta v4.1; se puede exportar, importar y borrar desde Ajustes (la exportación no incluye el token ni la sesión).
 
-Con cuenta (v4.2, opcional) el servidor (Supabase, plan gratuito, región São Paulo) guarda sólo: correo y nombre visible; vínculos con contactos y sus permisos; recomendaciones enviadas (título, año, póster, comentario) y su estado para quien las recibe; y, **sólo si autorizás «Para ver juntos»**, tu lista Quiero ver (y tu puntaje sólo si además lo autorizás). Valoraciones, aspectos, perfil de gustos, notas e historial **no se suben**. Cada persona ve sólo lo suyo (políticas por fila verificadas con pruebas). Se puede revocar todo en Ajustes → Privacidad y eliminar la cuenta con sus datos sociales en Ajustes → Mi cuenta; los datos locales quedan.
+Con cuenta (v4.2, opcional) el servidor (Supabase, plan gratuito, región São Paulo) guarda sólo: correo y nombre visible; vínculos con contactos y sus permisos; recomendaciones enviadas (título, año, póster, comentario) y su estado para quien las recibe; y, **sólo si autorizás «Para ver juntos»**, tu lista Quiero ver (y tu puntaje sólo si además lo autorizás). Valoraciones, aspectos, perfil de gustos, notas e historial **no se suben**. Cada persona ve sólo lo suyo (políticas por fila verificadas con pruebas). Desde v4.3, **sólo si ambos activan «Compartir intereses»**, se guardan también tus respuestas de interés (y, con otro permiso aparte, tu nota después de verlo) de los títulos que intercambiaron con ese contacto; nunca las de otros títulos ni las anteriores sin tu consentimiento. Se puede revocar todo en Ajustes → Privacidad (lo que ya no corresponde se borra del servidor) y eliminar la cuenta con sus datos sociales en Ajustes → Mi cuenta; los datos locales quedan.
 
 Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB.

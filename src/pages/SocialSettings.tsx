@@ -10,7 +10,7 @@ import { useApp } from '../hooks/useApp';
 import { pushNotice } from '../services/notices';
 import { disablePush, enablePush, pushStatus, pushSupported, type PushStatus } from '../social/push';
 import {
-  acceptInvite, blockContact, boundProfile, deleteAccount, getBackend, initSocial, refresh, removeContact, setDisplayName, signIn, signOut, signUp,
+  acceptInvite, backfillCount, blockContact, boundProfile, deleteAccount, getBackend, initSocial, refresh, removeContact, setDisplayName, setPrefs, setSharePermission, signIn, signOut, signUp,
   unblockContact, updateContact, wantDirty,
 } from '../social/store';
 import { toSocialError, type Contact, type Invite } from '../social/types';
@@ -234,6 +234,7 @@ function ContactRow({ c, run }: { c: Contact; run: <T>(fn: () => Promise<T>) => 
         )}
       </div>
       {!c.linked && <p className="text-[11px] text-amber-300">Vínculo inactivo.</p>}
+      <p className="pl-1 text-[11px] text-slate-500" data-testid="contact-perms">Compartís: {[c.shareInterests && 'intereses', c.shareMatches && 'Quiero ver', c.shareScores && 'puntuaciones', c.shareRatings && 'valoraciones'].filter(Boolean).join(', ') || 'nada'} · <Link to="/ajustes/privacidad" className="text-accent underline">Permisos</Link></p>
       {confirm ? (
         <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 p-2 text-xs text-rose-100">
           <span className="flex-1">{confirm === 'remove' ? `¿Eliminar a ${c.alias}? Se corta el vínculo para los dos.` : `¿Bloquear a ${c.alias}? No podrá enviarte nada ni volver a vincularse con sus invitaciones.`}</span>
@@ -301,6 +302,7 @@ export function PrivacyPage() {
   const a = useAsync();
   if (!s.available) return <Page title="Privacidad y permisos"><Unavailable /></Page>;
   const linked = s.contacts.filter((c) => !c.blocked);
+  const anyOn = linked.some((c) => c.shareMatches || c.shareInterests || c.shareRatings || c.shareScores);
   return (
     <Page title="Privacidad y permisos">
       <Card className="space-y-2 text-sm text-slate-300">
@@ -309,30 +311,69 @@ export function PrivacyPage() {
           <li>Tu nombre visible, correo (sólo para iniciar sesión) y tus contactos.</li>
           <li>Las recomendaciones que enviás a propósito (título, año, póster y tu comentario).</li>
           <li>Sólo si autorizás Para ver juntos: tu lista «Quiero ver» (y, si lo elegís, tu puntuación «Para vos» de esos títulos). Tu contacto ve únicamente los títulos en común.</li>
+          <li>Sólo si autorizás «Compartir intereses»: tu respuesta (No, Podría, Me interesa o Muchas ganas) de los títulos que se recomiendan entre ustedes o que ambos tienen en Quiero ver.</li>
+          <li>Sólo si autorizás «Compartir valoraciones»: tu nota real después de verlo, de esos mismos títulos.</li>
         </ul>
         <h2 className="pt-1 font-semibold text-slate-100">Qué nunca se comparte</h2>
-        <p>Valoraciones, aspectos, comentarios, historial, perfil de gustos, respuestas de interés, descartes y motor elegido.</p>
+        <p>Tu historial, perfil de gustos, aspectos, comentarios, listas completas, descartes, motor elegido, intereses de otros títulos ni nada sobre tus otros contactos. Lo que recibís nunca entrena tu perfil.</p>
       </Card>
       <Err msg={a.err} />
       {s.phase === 'ready' && (
         <Card className="space-y-3" data-testid="privacy-card">
-          <h2 className="font-semibold">Para ver juntos, por contacto</h2>
+          <h2 className="font-semibold">Permisos por contacto</h2>
+          <p className="text-[11px] text-slate-500">Todo empieza desactivado. Para ver la información del otro hace falta que los dos lo activen. Podés revocar cuando quieras: se borra del servidor lo que ya no corresponde.</p>
           {!linked.length && <p className="text-sm text-slate-400">Sin contactos.</p>}
-          {linked.map((c) => (
-            <div key={c.id} className="space-y-1.5 rounded-xl bg-ink-800 p-2.5 ring-1 ring-white/10" data-testid="privacy-row" data-contact={c.alias}>
-              <p className="font-semibold">{c.alias}</p>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="privacy-matches" checked={c.shareMatches} onChange={(e) => void a.run(async () => { await updateContact(c.id, { shareMatches: e.target.checked, ...(e.target.checked ? {} : { shareScores: false }) }); wantDirty(0); })} /> Buscar títulos en común con {c.alias}</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="privacy-scores" disabled={!c.shareMatches} checked={c.shareScores} onChange={(e) => void a.run(async () => { await updateContact(c.id, { shareScores: e.target.checked }); wantDirty(0); })} /> Mostrarle mi puntuación en esos títulos</label>
-              <p className="text-[11px] text-slate-500">{c.alias}: {c.theirShareMatches ? 'autorizó Para ver juntos' : 'no autorizó Para ver juntos'}{c.theirShareMatches ? (c.theirShareScores ? ' y comparte su puntuación' : ' sin compartir su puntuación') : ''}.</p>
-            </div>
-          ))}
-          {linked.some((c) => c.shareMatches) && (
-            <button type="button" data-testid="privacy-revoke-all" className={secondary} onClick={() => void a.run(async () => { for (const c of linked.filter((x) => x.shareMatches)) await updateContact(c.id, { shareMatches: false, shareScores: false }); wantDirty(0); })}>Revocar todos los permisos</button>
+          {linked.map((c) => <PermissionRow key={c.id} c={c} run={a.run} busy={a.busy} />)}
+          {anyOn && (
+            <button type="button" data-testid="privacy-revoke-all" className={secondary} onClick={() => void a.run(async () => {
+              for (const c of linked.filter((x) => x.shareMatches || x.shareInterests || x.shareRatings || x.shareScores)) await updateContact(c.id, { shareMatches: false, shareScores: false, shareInterests: false, shareRatings: false });
+              wantDirty(0);
+            })}>Revocar todos los permisos</button>
           )}
-          <p className="text-[11px] text-slate-500">Al revocar, tu lista deja de estar en el servidor y las coincidencias desaparecen para los dos.</p>
+          <p className="text-[11px] text-slate-500">Al revocar, tus datos compartidos con esa persona se borran del servidor y desaparecen también de su app.</p>
         </Card>
       )}
     </Page>
+  );
+}
+
+function PermissionRow({ c, run, busy }: { c: Contact; run: <T>(fn: () => Promise<T>) => Promise<T | undefined>; busy: boolean }) {
+  const [ask, setAsk] = useState<{ what: 'interests' | 'ratings'; n: number }>();
+  const start = async (what: 'interests' | 'ratings') => setAsk({ what, n: await backfillCount(c.id, what) });
+  const their = (on: boolean, what: string) => <span className={on ? 'text-emerald-300' : 'text-slate-500'}>{c.alias} {on ? 'lo activó' : `no activó ${what}`}</span>;
+  return (
+    <div className="space-y-2 rounded-xl bg-ink-800 p-2.5 ring-1 ring-white/10" data-testid="privacy-row" data-contact={c.alias}>
+      <p className="font-semibold">{c.alias}</p>
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="privacy-interests" checked={c.shareInterests} disabled={busy}
+          onChange={(e) => { if (e.target.checked) void start('interests'); else void run(() => setSharePermission(c.id, 'interests', false)); }} /> Compartir intereses en títulos compartidos</label>
+        <p className="pl-6 text-[11px]">{their(c.theirShareInterests, 'compartir intereses')}</p>
+      </div>
+      {ask && (
+        <div className="space-y-2 rounded-lg bg-sky-500/10 p-2.5 text-xs text-sky-100 ring-1 ring-sky-400/20" data-testid="privacy-consent" data-what={ask.what}>
+          {ask.what === 'interests'
+            ? <p>{c.alias} podrá ver tus respuestas <b>No</b>, <b>Podría</b>, <b>Me interesa</b> y <b>Muchas ganas</b> de los títulos que se recomienden entre ustedes (y de los que ambos tengan en Quiero ver con Para ver juntos). Sólo si {c.alias} también lo activa; ninguno ve otros títulos.</p>
+            : <p>{c.alias} podrá ver tu nota real (1-10) después de ver los títulos que se recomienden entre ustedes, en un bloque aparte del interés y de la estimación. No se usa para entrenar el perfil de nadie.</p>}
+          {ask.n > 0 && <p data-testid="privacy-backfill-count">Ya tenés {ask.n} {ask.what === 'interests' ? (ask.n === 1 ? 'respuesta registrada' : 'respuestas registradas') : (ask.n === 1 ? 'valoración' : 'valoraciones')} en títulos que intercambiaron. ¿Las compartimos también? Si no, sólo se comparten las que des a partir de ahora (o al tocar de nuevo tu respuesta).</p>}
+          <div className="flex flex-wrap gap-2">
+            {ask.n > 0 && <button type="button" data-testid="privacy-consent-all" className={primary} onClick={() => void run(async () => { await setSharePermission(c.id, ask.what, true, true); setAsk(undefined); })}>Activar y compartir {ask.n === 1 ? 'esa' : `las ${ask.n}`}</button>}
+            <button type="button" data-testid="privacy-consent-new" className={ask.n > 0 ? secondary : primary} onClick={() => void run(async () => { await setSharePermission(c.id, ask.what, true, false); setAsk(undefined); })}>{ask.n > 0 ? 'Sólo las nuevas' : 'Activar'}</button>
+            <button type="button" className="text-slate-300 underline" onClick={() => setAsk(undefined)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="privacy-matches" checked={c.shareMatches} disabled={busy} onChange={(e) => void run(async () => { await updateContact(c.id, { shareMatches: e.target.checked, ...(e.target.checked ? {} : { shareScores: false }) }); wantDirty(0); })} /> Detectar coincidencias de Quiero ver</label>
+        <label className="flex items-center gap-2 pl-6 text-sm"><input type="checkbox" data-testid="privacy-scores" disabled={!c.shareMatches || busy} checked={c.shareScores} onChange={(e) => void run(async () => { await updateContact(c.id, { shareScores: e.target.checked }); wantDirty(0); })} /> Compartir mis puntuaciones estimadas en esas coincidencias</label>
+        <p className="pl-6 text-[11px]">{their(c.theirShareMatches, 'Para ver juntos')}{c.theirShareMatches ? (c.theirShareScores ? ' y comparte su puntuación' : ' sin compartir su puntuación') : ''}.</p>
+      </div>
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="privacy-ratings" checked={c.shareRatings} disabled={busy}
+          onChange={(e) => { if (e.target.checked) void start('ratings'); else void run(() => setSharePermission(c.id, 'ratings', false)); }} /> Compartir valoraciones después de verlos</label>
+        <p className="pl-6 text-[11px]">{their(c.theirShareRatings, 'compartir valoraciones')}</p>
+      </div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="privacy-notify" checked={c.notifyMatches} disabled={busy} onChange={(e) => void run(() => updateContact(c.id, { notifyMatches: e.target.checked }))} /> Recibir avisos de coincidencias con {c.alias}</label>
+    </div>
   );
 }
 
@@ -345,7 +386,7 @@ export function NotificationsPage() {
   return (
     <Page title="Notificaciones">
       <Card className="space-y-2 text-sm text-slate-300" data-testid="push-card" data-state={st ?? 'loading'}>
-        <p>Te avisamos <b>sólo</b> cuando un contacto te recomienda un título (por ejemplo: «Ana te recomendó una película»). Al tocar el aviso se abre esa recomendación. Sin publicidad ni recordatorios.</p>
+        <p>Te avisamos <b>sólo</b> de lo que elijas abajo: recomendaciones que te envían («Ana te recomendó una película») y, si las activás, coincidencias nuevas. Al tocar el aviso se abre ese título. Nunca hay avisos negativos (si alguien marca «No»), ni publicidad ni recordatorios.</p>
         <p className="text-xs text-slate-400">Dentro de la app siempre ves el contador de «Recibidas» y un aviso al llegar algo nuevo, aunque no actives las notificaciones.</p>
         {!s.available || s.phase !== 'ready' ? <p className="text-xs text-amber-200">Necesitás <Link to="/ajustes/cuenta" className="underline">iniciar sesión</Link>.</p>
           : st === 'unsupported' ? <p className="text-xs text-amber-200" data-testid="push-unsupported">Este navegador no admite notificaciones push{pushSupported() ? '' : ' (o la app no está instalada)'}. En Android, instalá Cine Match desde Chrome («Agregar a la pantalla principal»).</p>
@@ -355,6 +396,18 @@ export function NotificationsPage() {
           : <p className="text-xs text-slate-400">Verificando…</p>}
         <Err msg={a.err} />
       </Card>
+      {s.phase === 'ready' && (
+        <Card className="space-y-2 text-sm" data-testid="notify-prefs">
+          <h2 className="font-semibold">Qué avisos querés</h2>
+          {([['notifyRecs', 'Recomendaciones recibidas', 'Cuando un contacto te envía un título.'],
+            ['notifyMatches', 'Nuevas coincidencias', '«Nueva coincidencia: a Ana también le interesa…» (Me interesa o más, de ambos).'],
+            ['notifyMax', 'Coincidencias máximas', '«Ambos tienen muchas ganas de ver…».']] as const).map(([k, l, d]) => (
+            <label key={k} className="flex items-start gap-2"><input type="checkbox" className="mt-1" data-testid={`pref-${k}`} checked={s.prefs[k]} disabled={a.busy} onChange={(e) => void a.run(() => setPrefs({ [k]: e.target.checked }))} />
+              <span><span className="font-medium text-slate-100">{l}</span><span className="block text-[11px] text-slate-400">{d}</span></span></label>
+          ))}
+          <p className="text-[11px] text-slate-500">Se aplican a los avisos dentro de la app y a las notificaciones push. Por contacto, en <Link to="/ajustes/privacidad" className="text-accent underline">Privacidad y permisos</Link>.</p>
+        </Card>
+      )}
     </Page>
   );
 }

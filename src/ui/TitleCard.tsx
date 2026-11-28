@@ -20,13 +20,13 @@ import { getNarrativeIndex } from '../services/narrativeCatalog';
 import { countriesOf, countryName } from '../services/filters';
 import { safely } from '../services/notices';
 import { rateAndLearn, setNotInterested, setWatched } from '../services/ratings';
-import { INTEREST_ANSWERS } from '../services/taste';
 import { findTrailers, needsExternalSearch, type TrailerChoice } from '../services/trailers';
 import type { AvailabilitySnapshot, DimensionId, DimensionScores, InterestAnswer, Rating, TitleKey, TitleMeta } from '../types';
 import { Poster, publicScore, StarRow, TitleLink } from './components';
 import { num, relTime } from './format';
 import { TrailerModal, YouTubeSearchLink } from './Trailer';
 import ShareAction from './ShareAction';
+import { InterestButtons, SharedInterests } from './SharedInterests';
 
 export interface SimilarRef { key?: TitleKey; title: string; note?: string }
 export interface CardInfo {
@@ -127,9 +127,11 @@ const neutral = `${btn} bg-ink-800 text-slate-200 ring-1 ring-white/10`;
 const gbtn = 'flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[12px] font-semibold leading-tight';
 const gneutral = `${gbtn} bg-ink-800 text-slate-200 ring-1 ring-white/10`;
 
-export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info, interest, profileId, track, onTouch, actionsExtra, testId = 'rec-item', interestTestPrefix = 'interest' }: {
+export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info, interest, profileId, track, onTouch, actionsExtra, testId = 'rec-item', interestTestPrefix = 'interest', sharedContact }: {
   k: TitleKey; meta: TitleMeta; snap?: AvailabilitySnapshot | null; rating?: Rating; rank?: number; info: CardInfo; interest?: InterestCtx;
   profileId: string; track?: (p: Promise<unknown>) => void; onTouch?: (k: TitleKey) => void; actionsExtra?: ReactNode; testId?: string; interestTestPrefix?: string;
+  /** v4.3 · Fija el contacto del bloque «Intereses compartidos» (Enviadas, Recibidas, Para ver juntos) */
+  sharedContact?: string;
 }) {
   const ref = useRef<HTMLLIElement>(null);
   const near = useNear(ref);
@@ -257,16 +259,9 @@ export default function TitleCard({ k, meta: baseMeta, snap, rating, rank, info,
       {panel === 'score' && <ScorePanel current={rating?.overall} onSave={(v) => run(() => rateAndLearn(profileId, k, { overall: v, watched: true }), 'la valoración').then(closeIfSaved)} onCancel={() => setPanel(undefined)} />}
 
       {/* Respuestas de interés (antes de verla). «Ya la vi» está en las acciones principales. */}
-      {interest && (
-        <div className="mt-2 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label={`Interés en ${meta.title}`} data-testid="interest-row">
-          {INTEREST_ANSWERS.filter((o) => o.id !== 'visto').map((o) => (
-            <button key={o.id} type="button" role="radio" aria-checked={interest.value === o.id} aria-label={o.label} data-testid={`${interestTestPrefix}-${o.id}`}
-              onClick={() => { onTouch?.(k); interest.onPick(o.id); }}
-              className={`min-h-[38px] rounded-lg px-0.5 text-[11px] font-semibold leading-tight ring-1 ${interest.value === o.id ? 'text-ink-950 ring-transparent' : 'bg-ink-800 text-slate-300 ring-white/10'}`}
-              style={interest.value === o.id ? { background: '#F4B83F' } : undefined}>{o.short}</button>
-          ))}
-        </div>
-      )}
+      {/* v4.3 · Intereses compartidos (sólo si el título está intercambiado con algún contacto) */}
+      <SharedInterests k={k} profileId={profileId} rating={rating} contactId={sharedContact} />
+      {interest && <InterestButtons value={interest.value} title={meta.title} testPrefix={interestTestPrefix} onPick={(a) => { onTouch?.(k); interest.onPick(a); }} />}
       {actionsExtra}
 
       {/* Más información y acciones */}

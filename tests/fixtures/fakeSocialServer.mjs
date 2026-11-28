@@ -7,7 +7,7 @@ import { randomUUID, randomInt } from 'node:crypto';
 
 const PORT = Number(process.env.FAKE_SOCIAL_PORT ?? 4174);
 let S;
-const reset = () => { S = { users: new Map(), tokens: new Map(), contacts: [], invites: [], recs: [], inbox: new Map(), want: new Map(), outage: false, notified: [] }; };
+const reset = () => { S = { users: new Map(), tokens: new Map(), contacts: [], invites: [], recs: [], inbox: new Map(), want: new Map(), outage: false, notified: [], shared: new Map(), events: [], evSeq: 0, prefs: new Map() }; };
 reset();
 
 class E extends Error { constructor(code, status = 400) { super(code); this.status = status; } }
@@ -40,6 +40,9 @@ const rpc = {
     S.contacts = S.contacts.filter((c) => c.owner !== me && c.contact !== me);
     S.recs = S.recs.filter((r) => r.sender !== me && r.recipient !== me);
     S.invites = S.invites.filter((i) => i.inviter !== me);
+    for (const k of [...S.shared.keys()]) if (k.startsWith(me)) S.shared.delete(k);
+    S.events = S.events.filter((e) => e.user !== me && e.actor !== me);
+    for (const u of S.users.keys()) prune(u);
     for (const k of [...S.want.keys()]) if (k.startsWith(me)) S.want.delete(k);
   },
   get_display_name: (me) => S.users.get(me)?.displayName,
@@ -47,19 +50,23 @@ const rpc = {
   list_contacts: (me) => S.contacts.filter((c) => c.owner === me).map((c) => {
     const t = contact(c.contact, me);
     return { id: c.contact, alias: c.alias, favorite: c.favorite, blocked: c.blocked, shareMatches: c.shareMatches, shareScores: c.shareScores,
-      theirShareMatches: Boolean(t && !t.blocked && t.shareMatches), theirShareScores: Boolean(t && !t.blocked && t.shareScores), linked: Boolean(t && !t.blocked && !c.blocked), createdAt: c.createdAt };
+      theirShareMatches: Boolean(t && !t.blocked && t.shareMatches), theirShareScores: Boolean(t && !t.blocked && t.shareScores),
+      shareInterests: Boolean(c.shareInterests), shareRatings: Boolean(c.shareRatings), notifyMatches: c.notifyMatches !== false,
+      theirShareInterests: Boolean(t && !t.blocked && !c.blocked && t.shareInterests), theirShareRatings: Boolean(t && !t.blocked && !c.blocked && t.shareRatings), linked: Boolean(t && !t.blocked && !c.blocked), createdAt: c.createdAt };
   }),
   update_contact: (me, { id, patch }) => {
     const c = contact(me, id); if (!c || c.blocked) return;
     if (patch.favorite) for (const x of S.contacts) if (x.owner === me) x.favorite = false;
     if (patch.alias !== undefined) c.alias = clean(patch.alias, 40) ?? c.alias;
-    for (const f of ['favorite', 'shareMatches', 'shareScores']) if (patch[f] !== undefined) c[f] = Boolean(patch[f]);
+    for (const f of ['favorite', 'shareMatches', 'shareScores', 'shareInterests', 'shareRatings', 'notifyMatches']) if (patch[f] !== undefined) c[f] = Boolean(patch[f]);
+    afterContacts(me, id);
   },
-  remove_contact: (me, { id }) => { S.contacts = S.contacts.filter((c) => !(c.owner === me && c.contact === id) && !(c.owner === id && c.contact === me && !c.blocked)); },
+  remove_contact: (me, { id }) => { S.contacts = S.contacts.filter((c) => !(c.owner === me && c.contact === id) && !(c.owner === id && c.contact === me && !c.blocked)); afterContacts(me, id); },
   block_contact: (me, { id }) => {
     const c = contact(me, id); if (!c) throw new E('invalid_contact');
-    Object.assign(c, { blocked: true, favorite: false, shareMatches: false, shareScores: false });
+    Object.assign(c, { blocked: true, favorite: false, shareMatches: false, shareScores: false, shareInterests: false, shareRatings: false });
     S.contacts = S.contacts.filter((x) => !(x.owner === id && x.contact === me && !x.blocked));
+    afterContacts(me, id);
   },
   unblock_contact: (me, { id }) => { S.contacts = S.contacts.filter((c) => !(c.owner === me && c.contact === id && c.blocked)); },
   create_invite: (me) => {
@@ -83,7 +90,7 @@ const rpc = {
     if (linked(me, i.inviter)) throw new E('already_linked');
     S.contacts = S.contacts.filter((c) => !(c.owner === me && c.contact === i.inviter) && !(c.owner === i.inviter && c.contact === me));
     const a = clean(alias, 40) ?? S.users.get(i.inviter).displayName;
-    const base = { favorite: false, blocked: false, shareMatches: false, shareScores: false, createdAt: now() };
+    const base = { favorite: false, blocked: false, shareMatches: false, shareScores: false, shareInterests: false, shareRatings: false, notifyMatches: true, createdAt: now() };
     S.contacts.push({ owner: me, contact: i.inviter, alias: a, ...base }, { owner: i.inviter, contact: me, alias: myName, ...base });
     i.usedAt = now(); i.usedBy = me;
     return { contact: i.inviter, alias: a };
@@ -98,8 +105,8 @@ const rpc = {
     S.recs.push(r); S.inbox.set(r.id, {});
     return { id: r.id, createdAt: r.createdAt };
   },
-  retract: (me, { id }) => { const n = S.recs.length; S.recs = S.recs.filter((r) => !(r.id === id && r.sender === me && r.createdAt > now() - 600e3)); return S.recs.length < n; },
-  list_sent: (me) => S.recs.filter((r) => r.sender === me).map((r) => ({ id: r.id, recipient: r.recipient, key: `${r.type}:${r.tmdbId}`, createdAt: r.createdAt })),
+  retract: (me, { id }) => { const r0 = S.recs.find((r) => r.id === id); const n = S.recs.length; S.recs = S.recs.filter((r) => !(r.id === id && r.sender === me && r.createdAt > now() - 600e3)); if (r0 && S.recs.length < n) { prune(r0.sender); prune(r0.recipient); } return S.recs.length < n; },
+  list_sent: (me) => S.recs.filter((r) => r.sender === me).map((r) => ({ id: r.id, recipient: r.recipient, key: `${r.type}:${r.tmdbId}`, createdAt: r.createdAt, title: r.title, year: r.year, posterPath: r.posterPath, comment: r.comment })),
   list_inbox: (me) => S.recs.filter((r) => r.recipient === me).sort((a, b) => b.createdAt - a.createdAt).map(view),
   get_inbox_rec: (me, { id }) => { const r = S.recs.find((x) => x.id === id && x.recipient === me); return r ? view(r) : null; },
   inbox_ids: (me) => S.recs.filter((r) => r.recipient === me).map((r) => r.id),
@@ -110,10 +117,11 @@ const rpc = {
     const want = new Set(items.map((i) => i.key));
     let removed = 0, added = 0;
     for (const [k] of mine) if (!want.has(k.split('|')[1])) { S.want.delete(k); removed++; }
-    for (const i of items) { const k = `${me}|${i.key}`; if (!S.want.has(k)) added++; S.want.set(k, { score: i.score, addedAt: i.addedAt }); }
+    for (const i of items) { const k = `${me}|${i.key}`; const prev = S.want.get(k); if (!prev) added++; S.want.set(k, { score: i.score, addedAt: i.addedAt, syncedAt: prev?.syncedAt ?? now() }); }
+    if (removed) { prune(me); for (const c of S.contacts) if (c.owner === me) prune(c.contact); }
     return { added, removed };
   },
-  clear_want: (me) => { for (const k of [...S.want.keys()]) if (k.startsWith(`${me}|`)) S.want.delete(k); },
+  clear_want: (me) => { for (const k of [...S.want.keys()]) if (k.startsWith(`${me}|`)) S.want.delete(k); prune(me); for (const c of S.contacts) if (c.owner === me) prune(c.contact); },
   get_matches: (me, { contact: other }) => {
     const a = contact(me, other), b = contact(other, me);
     if (!a || !b || a.blocked || b.blocked || !a.shareMatches || !b.shareMatches) throw new E('matches_not_authorized');
@@ -126,8 +134,93 @@ const rpc = {
     }
     return out;
   },
+  // ── v4.3 · intereses compartidos (mismas reglas que 0002_shared_interests.sql)
+  get_prefs: (me) => ({ notifyRecs: true, notifyMatches: false, notifyMax: false, ...(S.prefs.get(me) ?? {}) }),
+  set_prefs: (me, { p }) => { S.prefs.set(me, { ...(S.prefs.get(me) ?? {}), ...p }); },
+  put_shared: (me, { items }) => {
+    if (!Array.isArray(items) || items.length > 200) throw new E('invalid_items');
+    return items.map((it) => {
+      const { key, f, v } = it; let at = Number(it.at);
+      const out = (status, events = []) => ({ key, f, status, events });
+      if (!/^(movie|tv):\d+$/.test(key) || !['answer', 'rating'].includes(f) || !Number.isFinite(at)) return out('invalid');
+      if (f === 'answer' && !['no', 'quiza', 'si', 'mucho'].includes(v)) return out('invalid');
+      if (f === 'rating' && v !== null && !(Number(v) >= 1 && Number(v) <= 10)) return out('invalid');
+      if (at > now() + 300e3) at = now();
+      const what = f === 'answer' ? 'shareInterests' : 'shareRatings';
+      if (!S.contacts.some((c) => c.owner === me && !c.blocked && c[what] && linked(me, c.contact) && since(me, c.contact, key) !== undefined)) return out('not_shared');
+      const sk = `${me}|${key}`; const cur = S.shared.get(sk) ?? {};
+      const atF = f === 'answer' ? 'answerAt' : 'ratingAt';
+      if (cur[atF] !== undefined && cur[atF] >= at) return out('stale');
+      const prev = { ...cur };
+      if (f === 'answer') Object.assign(cur, { answer: v, answerAt: at, answerSrv: now() }); else Object.assign(cur, { rating: v === null ? undefined : Number(v), ratingAt: at, ratingSrv: now() });
+      S.shared.set(sk, cur);
+      const evs = [];
+      for (const c of S.contacts.filter((x) => x.owner === me && !x.blocked)) {
+        if (!mutual(me, c.contact, f === 'answer' ? 'shareInterests' : 'shareRatings')) continue;
+        const sn = since(me, c.contact, key); if (sn === undefined) continue;
+        ping(c.contact, me);
+        if (f !== 'answer') continue;
+        const t = S.shared.get(`${c.contact}|${key}`); const theirs = t && t.answerSrv >= sn ? t.answer : undefined;
+        const nl = level(v, theirs), ol = level(prev.answerSrv >= sn ? prev.answer : undefined, theirs);
+        const pos = ['alta', 'muy_alta', 'maxima'];
+        if (pos.includes(nl) && (!pos.includes(ol) || (nl === 'maxima' && ol !== 'maxima'))) {
+          const kind = nl === 'maxima' ? 'match_max' : 'match';
+          if (!S.events.some((e) => e.user === c.contact && e.actor === me && e.key === key && e.kind === kind && e.createdAt > now() - 600e3)) {
+            const r = S.recs.filter((x) => `${x.type}:${x.tmdbId}` === key && ((x.sender === me && x.recipient === c.contact) || (x.sender === c.contact && x.recipient === me))).sort((a, b) => b.createdAt - a.createdAt)[0];
+            const e = { id: ++S.evSeq, user: c.contact, actor: me, kind, key, title: r?.title, createdAt: now() };
+            S.events.push(e); evs.push(e.id);
+          }
+        }
+      }
+      return out('ok', evs);
+    });
+  },
+  get_shared: (me) => {
+    const out = [];
+    for (const c of S.contacts.filter((x) => x.owner === me && !x.blocked && linked(me, x.contact))) {
+      const mi = mutual(me, c.contact, 'shareInterests'), mr = mutual(me, c.contact, 'shareRatings');
+      if (!mi && !mr) continue;
+      for (const [sk, row] of S.shared) {
+        if (!sk.startsWith(`${c.contact}|`)) continue;
+        const key = sk.split('|')[1]; const sn = since(me, c.contact, key); if (sn === undefined) continue;
+        const a = mi && row.answer && row.answerSrv >= sn, r = mr && row.ratingAt !== undefined && row.ratingSrv >= sn;
+        if (a || r) out.push({ contact: c.contact, key, answer: a ? row.answer : undefined, answerAt: a ? row.answerAt : undefined, rating: r ? row.rating : undefined, ratingAt: r ? row.ratingAt : undefined });
+      }
+    }
+    return out;
+  },
+  events_since: (me, { id }) => S.events.filter((e) => e.user === me && e.id > id).map(({ id: i, actor, kind, key, title, createdAt }) => ({ id: i, actor, kind, key, title, createdAt })),
+  events_max: () => S.evSeq,
+  notify_events: (me, { ids }) => { for (const id of ids ?? []) { const e = S.events.find((x) => x.id === id && x.actor === me); if (e && !e.pushedAt) { e.pushedAt = now(); S.notified.push(`event:${e.kind}:${e.key}`); } } },
   notify: (me, { id }) => { const r = S.recs.find((x) => x.id === id && x.sender === me); if (r && !r.notifiedAt) { r.notifiedAt = now(); S.notified.push(id); } },
 };
+const level = (x, y) => (x === 'no' || y === 'no' ? 'sin' : !x || !y ? 'pendiente' : x === 'mucho' && y === 'mucho' ? 'maxima'
+  : (x === 'mucho' && y === 'si') || (x === 'si' && y === 'mucho') ? 'muy_alta' : x === 'si' && y === 'si' ? 'alta' : x === 'quiza' && y === 'quiza' ? 'posible_baja' : 'posible');
+const grants = (o, p, what) => linked(o, p) && Boolean(contact(o, p)?.[what]);
+const mutual = (a, b, what) => grants(a, b, what) && grants(b, a, what);
+function since(a, b, key) {
+  const recs = S.recs.filter((r) => `${r.type}:${r.tmdbId}` === key && ((r.sender === a && r.recipient === b) || (r.sender === b && r.recipient === a))).map((r) => r.createdAt);
+  const x = contact(a, b), y = contact(b, a);
+  const wa = S.want.get(`${a}|${key}`), wb = S.want.get(`${b}|${key}`);
+  if (x?.shareMatches && y?.shareMatches && !x.blocked && !y.blocked && wa && wb) recs.push(Math.max(wa.syncedAt, wb.syncedAt));
+  return recs.length ? Math.min(...recs) : undefined;
+}
+function ping(to, from) { if (!S.events.some((e) => e.user === to && e.actor === from && e.kind === 'shared' && e.createdAt > now() - 2000)) S.events.push({ id: ++S.evSeq, user: to, actor: from, kind: 'shared', createdAt: now() }); }
+function prune(owner) {
+  for (const [sk, row] of [...S.shared]) {
+    if (!sk.startsWith(`${owner}|`)) continue;
+    const key = sk.split('|')[1];
+    const ok = (what) => S.contacts.some((c) => c.owner === owner && c[what] && !c.blocked && linked(owner, c.contact) && since(owner, c.contact, key) !== undefined);
+    if (!ok('shareInterests')) { delete row.answer; delete row.answerAt; delete row.answerSrv; }
+    if (!ok('shareRatings')) { delete row.rating; delete row.ratingAt; delete row.ratingSrv; }
+    if (row.answerAt === undefined && row.ratingAt === undefined) S.shared.delete(sk);
+  }
+}
+function afterContacts(a, b) {
+  prune(a); prune(b);
+  if (!mutual(a, b, 'shareInterests')) S.events = S.events.filter((e) => !(e.kind !== 'shared' && ((e.user === a && e.actor === b) || (e.user === b && e.actor === a))));
+  if (S.users.has(a) && S.users.has(b)) ping(b, a);
+}
 function view(r) {
   const st = S.inbox.get(r.id) ?? {};
   return { id: r.id, sender: r.sender, senderName: r.senderName, key: `${r.type}:${r.tmdbId}`, title: r.title, year: r.year, posterPath: r.posterPath, comment: r.comment, createdAt: r.createdAt, seenAt: st.seenAt, archivedAt: st.archivedAt };
@@ -144,7 +237,7 @@ createServer(async (req, res) => {
   if (url.pathname === '/admin/reset') { reset(); return send(200, { ok: true }); }
   if (url.pathname === '/admin/outage') { S.outage = Boolean(body.on); return send(200, { ok: true }); }
   if (url.pathname === '/admin/expire-invites') { for (const i of S.invites) i.expiresAt = now() - 1; return send(200, { ok: true }); }
-  if (url.pathname === '/admin/state') return send(200, { users: S.users.size, contacts: S.contacts, recs: S.recs, want: [...S.want.keys()], notified: S.notified });
+  if (url.pathname === '/admin/state') return send(200, { users: S.users.size, contacts: S.contacts, recs: S.recs, want: [...S.want.keys()], notified: S.notified, shared: [...S.shared.entries()], events: S.events });
   if (S.outage) { res.destroy(); return; }
   const m = url.pathname.match(/^\/rpc\/(\w+)$/);
   const fn = m && rpc[m[1]];
